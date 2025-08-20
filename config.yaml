@@ -3,8 +3,12 @@ api:
     key: "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"  # 请替换为真实的API密钥
     base_url: "https://openrouter.ai/api/v1"
     models:
-      summary: "deepseek/deepseek-chat-v3-0324:free"  # DeepSeek V3免费模型
-      mindmap: "openai/gpt-4o-mini"  # 便宜模型用于思维导图
+      summary: "google/gemma-3n-e2b-it:free"  # Google免费快速模型
+      mindmap: "google/gemma-3n-e2b-it:free"  # Google免费快速模型
+      # 备选免费快速模型：
+      # "opengvlab/internvl3-2b:free"      # 最快 (379.88 t/s) 
+      # "google/gemini-2.5-flash-preview"  # 快速 (140.85 t/s)
+      # "qwen/qwen3-30b-a3b:free"          # 中等 (83.19 t/s)
 
 paths:
   watch_folder: "./watch_folder"
@@ -13,6 +17,12 @@ paths:
 
 spacy:
   model: "zh_core_web_sm"
+
+whisperkit:
+  model: "medium"  # 可选: tiny, small, base, medium, large-v3
+  language: "en"   # 默认语言改为英文（上课以英文为主）
+  supported_languages: ["en", "zh"]  # 支持的语言列表
+  model_path: "/Users/me/Documents/huggingface/models/argmaxinc/whisperkit-coreml"
 
 logging:
   level: "INFO"

@@ -1,6 +1,1 @@
-这是一堂技术讲座的转录内容，来自文件 tech_lecture.wav。
-教授陈明详细介绍了人工智能在现代软件开发中的应用。
-学生刘华提问关于机器学习算法的选择问题。
-助教孙丽回答了关于数据预处理的具体方法。
-讲座涵盖了理论基础、实践案例和未来发展趋势。
-课程时长约60分钟，包含15分钟的问答环节。
+Error when transcribing /Users/me/Documents/GitHub/Project_Bach/watch_folder/tech_lecture.wav: Error Domain=com.apple.coreaudio.avfaudio Code=1954115647 "(null)" UserInfo={failed call=ExtAudioFileOpenURL((__bridge CFURLRef)fileURL, &_extAudioFile)}

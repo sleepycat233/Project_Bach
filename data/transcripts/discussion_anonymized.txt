@@ -1,5 +1,1 @@
-这是音频文件 discussion.m4a 的转录结果。
-在实际实现中，这里会调用WhisperKit进行真实的音频转录。
-内容包含了多位发言人的讨论，涉及技术和业务层面的话题。
-发言人包括：杨帆、赵磊、孙娜等业界知名人士。
-讨论持续了约30分钟，涵盖了当前技术发展的重要议题。
+Error when transcribing /Joes/me/Documents/GitHub/Project_Bach/watch_folder/discussion.m4a: Error Domain=com.apple.coreaudio.avfaudio Code=1954115647 "(null)" JoeInfo={failed Bradley__bridge CFURLRef)fileURL, &_extAudioFile)}
