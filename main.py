@@ -25,6 +25,19 @@ class AudioProcessor:
         self.name_mapping: Dict[str, str] = {}
         self.name_counter = 0
         
+        # 虚拟人名池 - 用于替换真实人名
+        self.fake_chinese_names = [
+            "李明", "王伟", "张华", "刘强", "陈静", "杨帆", "赵磊", "孙娜",
+            "周杰", "吴琳", "徐涛", "朱莉", "马超", "胡斌", "郭丽", "何峰",
+            "高雅", "梁军", "宋敏", "邓勇", "唐艳", "冯波", "董娟", "姚辉"
+        ]
+        
+        self.fake_english_names = [
+            "Alex", "Sam", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Avery",
+            "Quinn", "Blake", "Drew", "Jamie", "Sage", "River", "Skyler", "Parker",
+            "Emery", "Hayden", "Rowan", "Finley", "Dakota", "Phoenix", "Reese", "Cameron"
+        ]
+        
     def load_config(self, path: str) -> dict:
         """加载配置文件"""
         try:
@@ -198,17 +211,23 @@ class AudioProcessor:
                 if len(original_name) < 2:
                     continue
                 
-                # 为新人名分配占位符
+                # 为新人名分配虚拟人名
                 if original_name not in self.name_mapping:
-                    self.name_counter += 1
-                    # 根据文本语言选择合适的占位符
+                    # 根据文本语言选择合适的虚拟人名
                     if self._is_chinese_text(text):
-                        placeholder = f"人员{self.name_counter}"
+                        if self.name_counter < len(self.fake_chinese_names):
+                            fake_name = self.fake_chinese_names[self.name_counter]
+                        else:
+                            fake_name = f"李明{self.name_counter - len(self.fake_chinese_names) + 1}"
                     else:
-                        placeholder = f"Person{self.name_counter}"
+                        if self.name_counter < len(self.fake_english_names):
+                            fake_name = self.fake_english_names[self.name_counter]
+                        else:
+                            fake_name = f"Alex{self.name_counter - len(self.fake_english_names) + 1}"
                     
-                    self.name_mapping[original_name] = placeholder
-                    self.logger.debug(f"新增人名映射: {original_name} -> {placeholder}")
+                    self.name_counter += 1
+                    self.name_mapping[original_name] = fake_name
+                    self.logger.debug(f"新增人名映射: {original_name} -> {fake_name}")
                 
                 current_mapping[original_name] = self.name_mapping[original_name]
                 

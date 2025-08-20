@@ -3,7 +3,7 @@ api:
     key: "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"  # 请替换为真实的API密钥
     base_url: "https://openrouter.ai/api/v1"
     models:
-      summary: "deepseek/deepseek-chat"  # DeepSeek免费模型
+      summary: "deepseek/deepseek-chat-v3-0324:free"  # DeepSeek V3免费模型
       mindmap: "openai/gpt-4o-mini"  # 便宜模型用于思维导图
 
 paths:
