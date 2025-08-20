@@ -1,0 +1,10 @@
+watchdog>=3.0.0
+spacy>=3.7.0
+requests>=2.31.0
+gitpython>=3.1.0
+pyyaml>=6.0
+structlog>=23.1.0
+
+# spaCy language models (需要单独安装)
+# python -m spacy download zh_core_web_sm
+# python -m spacy download en_core_web_sm

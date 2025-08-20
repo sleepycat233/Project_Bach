@@ -1,0 +1,19 @@
+api:
+  openrouter:
+    key: "YOUR_API_KEY_HERE"  # 请替换为真实的API密钥
+    base_url: "https://openrouter.ai/api/v1"
+    models:
+      summary: "deepseek/deepseek-chat"
+      mindmap: "openai/gpt-4o-mini"  # 便宜的模型用于测试
+
+paths:
+  watch_folder: "./watch_folder"
+  data_folder: "./data"
+  output_folder: "./output"
+
+spacy:
+  model: "zh_core_web_sm"
+  
+logging:
+  level: "INFO"
+  file: "./data/logs/app.log"
