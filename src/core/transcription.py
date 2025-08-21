@@ -200,6 +200,14 @@ class WhisperKitClient:
         else:
             timeout = base_timeout
         
+        # 获取性能优化配置
+        model_prefix = self.config.get('model_prefix', 'openai')
+        audio_compute = self.config.get('audio_encoder_compute_units', 'cpuAndNeuralEngine')
+        text_compute = self.config.get('text_decoder_compute_units', 'cpuAndNeuralEngine')
+        use_cache = self.config.get('use_prefill_cache', True)
+        chunking = self.config.get('chunking_strategy', 'vad')
+        workers = self.config.get('concurrent_workers', 2)
+        
         # 构建WhisperKit命令
         cmd = [
             "whisperkit-cli",
@@ -207,12 +215,24 @@ class WhisperKitClient:
             "--audio-path", str(audio_path),
             "--language", language,
             "--model", model,
-            "--task", "transcribe"
+            "--model-prefix", model_prefix,
+            "--task", "transcribe",
+            "--audio-encoder-compute-units", audio_compute,
+            "--text-decoder-compute-units", text_compute,
+            "--chunking-strategy", chunking,
+            "--concurrent-worker-count", str(workers)
         ]
         
+        # 添加性能优化选项
+        if use_cache:
+            cmd.append("--use-prefill-cache")
+        
         self.logger.debug(f"WhisperKit命令: {' '.join(cmd)}")
-        self.logger.info(f"使用WhisperKit转录，模型: {model}，语言: {language}")
-        self.logger.info(f"预计处理时间: {timeout//60}分{timeout%60}秒 (基于{processing_factor}秒/分钟)")
+        self.logger.info(f"🚀 WhisperKit转录配置:")
+        self.logger.info(f"   模型: {model_prefix}-{model}, 语言: {language}")
+        self.logger.info(f"   计算单元: 音频={audio_compute}, 文本={text_compute}")
+        self.logger.info(f"   优化选项: 缓存={'✅' if use_cache else '❌'}, 分块={chunking}, 并发={workers}")
+        self.logger.info(f"   预计处理时间: {timeout//60}分{timeout%60}秒")
         
         # 启动进度监控
         start_time = time.time()
