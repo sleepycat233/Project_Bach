@@ -49,6 +49,7 @@ Thumbs.db
 
 # Project specific
 data/logs/
+data/transcripts/
 *.log
 temp/
 tmp/
@@ -81,3 +82,20 @@ coverage.xml
 !samples/*.mp3
 !samples/*.wav
 !samples/*.m4a
+
+# User data and processing outputs - NEVER commit these!
+watch_folder/
+output/
+results/
+transcriptions/
+logs/
+*.md
+!README.md
+!doc/*.md
+!docs/*.md
+
+# Processing artifacts
+anonymized_*
+processed_*
+result_*
+*_result.*
