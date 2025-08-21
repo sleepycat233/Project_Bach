@@ -32,6 +32,19 @@ whisperkit:
   language: "zh"   # 中文优先（适合中英混杂音频）
   supported_languages: ["en", "zh"]  # 支持的语言列表
   model_path: "/Users/me/Documents/huggingface/models/argmaxinc/whisperkit-coreml"
+  
+  # 大文件处理优化
+  large_file_threshold_mb: 50    # 大文件阈值（MB）
+  long_audio_threshold_min: 30   # 长音频阈值（分钟）
+  base_timeout_seconds: 120      # 基础超时时间（秒）
+  processing_factor_per_model:   # 每个模型的处理因子（秒/分钟）
+    tiny: 5
+    base: 8  
+    small: 10
+    medium: 15
+    large: 20
+  max_timeout_seconds: 7200      # 最大超时时间（2小时）
+  progress_report_intervals: [30, 60, 120, 300, 600]  # 进度报告间隔（秒）
 
 logging:
   level: "INFO"

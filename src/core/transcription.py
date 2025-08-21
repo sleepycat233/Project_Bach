@@ -6,9 +6,12 @@
 
 import subprocess
 import logging
+import time
+import threading
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class TranscriptionService:
@@ -38,11 +41,35 @@ class TranscriptionService:
         """
         model = self.config.get('model', 'medium')
         language = self.config.get('language', 'zh')
-        self.logger.info(f"开始转录音频: {audio_path.name}，模型: {model}，语言: {language}")
+        
+        # 获取音频文件信息
+        file_size_mb = audio_path.stat().st_size / (1024 * 1024)
+        audio_duration = self._estimate_audio_duration(audio_path)
+        
+        self.logger.info(f"开始转录音频: {audio_path.name}")
+        self.logger.info(f"文件信息: 大小={file_size_mb:.1f}MB, 预估时长={audio_duration:.1f}分钟, 模型={model}, 语言={language}")
+        
+        # 从配置获取阈值
+        large_file_threshold = self.config.get('large_file_threshold_mb', 50)
+        long_audio_threshold = self.config.get('long_audio_threshold_min', 30)
+        
+        # 大文件预警
+        if file_size_mb > large_file_threshold:
+            self.logger.warning(f"检测到大音频文件 ({file_size_mb:.1f}MB > {large_file_threshold}MB)，转录可能需要较长时间")
+        
+        if audio_duration > long_audio_threshold:
+            self.logger.warning(f"检测到长音频文件 ({audio_duration:.1f}分钟 > {long_audio_threshold}分钟)，建议考虑分段处理")
+            # 为超长音频提供处理建议
+            if audio_duration > 60:  # 超过1小时
+                self.logger.warning("📋 大文件处理建议:")
+                self.logger.warning("   1. 推荐使用tiny或base模型以减少处理时间")
+                self.logger.warning("   2. 考虑将音频分割为30分钟的片段")
+                self.logger.warning("   3. 增加系统可用内存和处理器资源")
+                self.logger.warning("   4. 设置足够的处理超时时间")
         
         try:
             # 使用WhisperKit CLI进行真实转录
-            return self.whisperkit_client.transcribe(audio_path)
+            return self.whisperkit_client.transcribe(audio_path, audio_duration)
         except Exception as e:
             self.logger.warning(f"WhisperKit转录失败，使用备用方案: {str(e)}")
             return self._fallback_transcription(audio_path)
@@ -91,6 +118,37 @@ WhisperKit转录备用方案 - 文件: {audio_path.name}
         preview = transcript[:50] + "..." if len(transcript) > 50 else transcript
         self.logger.info(f"备用转录完成，文本长度: {len(transcript)} 字符，内容预览: {preview}")
         return transcript
+    
+    def _estimate_audio_duration(self, audio_path: Path) -> float:
+        """估算音频文件时长（分钟）
+        
+        Args:
+            audio_path: 音频文件路径
+            
+        Returns:
+            估算的音频时长（分钟）
+        """
+        try:
+            # 尝试使用ffprobe获取精确时长
+            cmd = ["ffprobe", "-i", str(audio_path), "-show_entries", "format=duration", 
+                   "-v", "quiet", "-of", "csv=p=0"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                duration_seconds = float(result.stdout.strip())
+                duration_minutes = duration_seconds / 60.0
+                self.logger.debug(f"ffprobe检测音频时长: {duration_minutes:.1f}分钟")
+                return duration_minutes
+                
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, ValueError, FileNotFoundError):
+            self.logger.debug("ffprobe不可用，使用文件大小估算时长")
+        
+        # 备用方案：基于文件大小估算（经验公式）
+        file_size_mb = audio_path.stat().st_size / (1024 * 1024)
+        # 假设平均比特率约64kbps（适中质量），1MB ≈ 2分钟
+        estimated_minutes = file_size_mb * 2.0
+        self.logger.debug(f"基于文件大小估算音频时长: {estimated_minutes:.1f}分钟")
+        return estimated_minutes
 
 
 class WhisperKitClient:
@@ -106,11 +164,12 @@ class WhisperKitClient:
         self.logger = logging.getLogger('project_bach.whisperkit')
         self.language_detector = LanguageDetector(config)
         
-    def transcribe(self, audio_path: Path) -> str:
+    def transcribe(self, audio_path: Path, audio_duration: float = None) -> str:
         """使用WhisperKit CLI进行音频转录
         
         Args:
             audio_path: 音频文件路径
+            audio_duration: 音频时长（分钟），用于计算合适的超时时间
             
         Returns:
             转录文本
@@ -125,6 +184,22 @@ class WhisperKitClient:
         # 检测音频语言
         language = self.language_detector.detect_language(audio_path, default_language)
         
+        # 从配置获取超时参数
+        base_timeout = self.config.get('base_timeout_seconds', 120)
+        max_timeout = self.config.get('max_timeout_seconds', 7200)  # 2小时最大超时
+        processing_factors = self.config.get('processing_factor_per_model', {
+            'tiny': 5, 'base': 8, 'small': 10, 'medium': 15, 'large': 20
+        })
+        
+        # 动态计算超时时间：基础时间 + 音频时长的倍数
+        if audio_duration:
+            processing_factor = processing_factors.get(model, 15)
+            estimated_timeout = int(audio_duration * processing_factor + base_timeout)
+            timeout = min(max(estimated_timeout, 300), max_timeout)  # 至少5分钟，最多max_timeout
+            self.logger.info(f"根据音频时长({audio_duration:.1f}分钟)计算超时时间: {timeout}秒 (因子={processing_factor})")
+        else:
+            timeout = base_timeout
+        
         # 构建WhisperKit命令
         cmd = [
             "whisperkit-cli",
@@ -137,14 +212,27 @@ class WhisperKitClient:
         
         self.logger.debug(f"WhisperKit命令: {' '.join(cmd)}")
         self.logger.info(f"使用WhisperKit转录，模型: {model}，语言: {language}")
+        self.logger.info(f"预计处理时间: {timeout//60}分{timeout%60}秒 (基于{processing_factor}秒/分钟)")
+        
+        # 启动进度监控
+        start_time = time.time()
+        progress_thread = threading.Thread(target=self._monitor_progress, args=(start_time, timeout, audio_path.name))
+        progress_thread.daemon = True
+        progress_thread.start()
         
         # 执行转录
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=120  # 2分钟超时
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+        except subprocess.TimeoutExpired:
+            elapsed = time.time() - start_time
+            raise Exception(f"WhisperKit转录超时 (已运行{elapsed//60:.0f}分{elapsed%60:.0f}秒，超时限制{timeout}秒)")
+        
+        elapsed_time = time.time() - start_time
         
         if result.returncode != 0:
             raise Exception(f"WhisperKit执行失败: {result.stderr}")
@@ -155,10 +243,66 @@ class WhisperKitClient:
         if not transcript or len(transcript.strip()) < 5:
             raise Exception("转录结果为空或过短")
         
-        # 记录转录结果预览
-        preview = transcript[:50] + "..." if len(transcript) > 50 else transcript
-        self.logger.info(f"WhisperKit转录完成，文本长度: {len(transcript)} 字符，内容预览: {preview}")
+        # 计算转录性能指标
+        words_count = len(transcript.split())
+        chars_count = len(transcript)
+        words_per_second = words_count / elapsed_time if elapsed_time > 0 else 0
+        chars_per_second = chars_count / elapsed_time if elapsed_time > 0 else 0
+        
+        # 记录转录结果和性能
+        preview = transcript[:80].replace('\n', ' ') + "..." if len(transcript) > 80 else transcript
+        self.logger.info(f"✅ WhisperKit转录完成!")
+        self.logger.info(f"📊 性能指标: 用时={elapsed_time:.1f}秒, 速度={words_per_second:.1f}词/秒, {chars_per_second:.1f}字符/秒")
+        self.logger.info(f"📄 结果统计: {words_count}词, {chars_count}字符, 内容预览: {preview}")
+        
         return transcript
+    
+    def _monitor_progress(self, start_time: float, timeout: int, filename: str):
+        """监控转录进度并定期输出状态
+        
+        Args:
+            start_time: 开始时间戳
+            timeout: 总超时时间
+            filename: 文件名
+        """
+        # 从配置获取进度报告间隔
+        intervals = self.config.get('progress_report_intervals', [30, 60, 120, 300, 600])
+        
+        for interval in intervals:
+            time.sleep(interval)
+            elapsed = time.time() - start_time
+            
+            if elapsed >= timeout:
+                break
+                
+            remaining = timeout - elapsed
+            progress_percent = (elapsed / timeout) * 100
+            
+            self.logger.info(f"🔄 转录进度: 正在处理 {filename}")
+            self.logger.info(f"⏱️  已运行: {self._format_time(elapsed)}, 剩余约: {self._format_time(remaining)} ({progress_percent:.1f}%)")
+            
+            # 如果接近超时，提供建议
+            if remaining < 120:  # 最后2分钟
+                self.logger.warning(f"⚠️  转录即将超时，建议考虑：")
+                self.logger.warning(f"   1. 使用更小的WhisperKit模型（如tiny/base）")
+                self.logger.warning(f"   2. 分段处理长音频文件")
+                self.logger.warning(f"   3. 增加处理超时时间配置")
+    
+    def _format_time(self, seconds: float) -> str:
+        """格式化时间显示
+        
+        Args:
+            seconds: 秒数
+            
+        Returns:
+            格式化的时间字符串
+        """
+        if seconds < 60:
+            return f"{seconds:.0f}秒"
+        elif seconds < 3600:
+            return f"{seconds//60:.0f}分{seconds%60:.0f}秒"
+        else:
+            return f"{seconds//3600:.0f}小时{(seconds%3600)//60:.0f}分{seconds%60:.0f}秒"
 
 
 class LanguageDetector:
