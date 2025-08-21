@@ -21,6 +21,19 @@ class ConfigManager:
             config_path: 配置文件路径
         """
         self.config_path = config_path
+        
+        # 首先尝试使用环境管理器
+        try:
+            from .env_manager import setup_project_environment
+            self.config = setup_project_environment()
+            if self.config:
+                # 验证通过环境管理器加载的配置
+                self.validate_config(self.config)
+                return
+        except Exception as e:
+            logging.warning(f"环境管理器加载失败，回退到直接加载: {e}")
+        
+        # 回退到原有方式
         self.config = self.load_config(config_path)
         self.validate_config(self.config)
         

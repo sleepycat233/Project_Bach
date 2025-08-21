@@ -53,9 +53,15 @@ data/logs/
 temp/
 tmp/
 
-# API keys and secrets
+# API keys and secrets - NEVER commit these!
+.env
 .env.local
+.env.production
 secrets.yaml
+config.local.yaml
+config.production.yaml
+**/config.yaml
+!config.template.yaml
 
 # Test outputs
 test_output/

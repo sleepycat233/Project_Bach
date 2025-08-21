@@ -1,0 +1,84 @@
+api:
+  openrouter:
+    key: "${OPENROUTER_API_KEY}"  # 从环境变量读取
+    base_url: "https://openrouter.ai/api/v1"
+    models:
+      summary: "google/gemma-3n-e2b-it:free"  # Google免费快速模型
+      mindmap: "google/gemma-3n-e2b-it:free"  # Google免费快速模型
+      # 备选免费快速模型：
+      # "opengvlab/internvl3-2b:free"      # 最快 (379.88 t/s) 
+      # "google/gemini-2.5-flash-preview"  # 快速 (140.85 t/s)
+      # "qwen/qwen3-30b-a3b:free"          # 中等 (83.19 t/s)
+    rate_limits:
+      free_tier:
+        requests_per_10s: 10      # 每10秒最多10个请求
+        requests_per_minute: 60   # 每分钟最多60个请求
+        daily_credit_limit: 5     # 免费层每日5个credits
+      paid_tier:
+        requests_per_10s: 10      # 付费账户10秒限制相同
+        requests_per_minute: 60   # 每分钟限制相同
+        credit_to_requests_ratio: 100  # 每个credit允许100个请求/天
+
+paths:
+  watch_folder: "./watch_folder"
+  data_folder: "./data"
+  output_folder: "./output"
+
+spacy:
+  model: "zh_core_web_sm"
+
+whisperkit:
+  model: "medium"  # 可选: tiny, small, base, medium, large-v3
+  language: "zh"   # 中文优先（适合中英混杂音频）
+  supported_languages: ["en", "zh"]  # 支持的语言列表
+  model_path: "/Users/me/Documents/huggingface/models/argmaxinc/whisperkit-coreml"
+
+logging:
+  level: "INFO"
+  file: "./data/logs/app.log"
+
+# Phase 4: 网络集成配置
+network:
+  tailscale:
+    auth_key: "${TAILSCALE_AUTH_KEY}"  # 从环境变量读取
+    machine_name: "project-bach"  # 机器名称
+    network_name: "project-bach-network"  # 网络名称
+    auto_connect: true  # 自动连接
+    timeout: 30  # 连接超时时间（秒）
+
+  file_transfer:
+    remote_base_path: "/Users/remote/project_bach/watch_folder"  # 远程监控文件夹路径
+    local_base_path: "./watch_folder"  # 本地监控文件夹路径
+    chunk_size: 8192  # 文件传输块大小（字节）
+    timeout: 60  # 传输超时时间（秒）
+    retry_attempts: 3  # 重试次数
+    verify_integrity: true  # 是否验证文件完整性
+    max_file_size: 104857600  # 最大文件大小限制（100MB）
+
+  security:
+    allowed_networks: ["100.64.0.0/10"]  # Tailscale CGNAT范围
+    blocked_ips: []  # 阻止的IP地址列表
+    require_encryption: true  # 是否要求加密连接
+    max_connection_attempts: 3  # 最大连接尝试次数
+    connection_timeout: 10  # 连接超时时间（秒）
+    max_connections_per_minute: 60  # 每分钟最大连接数
+    connection_window_seconds: 60  # 连接频率统计窗口（秒）
+
+  monitoring:
+    check_interval: 30  # 网络状态检查间隔（秒）
+    timeout: 5  # ping超时时间（秒）
+    max_retries: 3  # 最大重试次数
+    target_hosts: []  # 监控目标主机列表，启动时自动发现Tailscale节点
+    alert_on_disconnect: true  # 连接断开时是否告警
+  
+  # 安全文件服务器配置
+  secure_file_server:
+    enabled: true  # 是否启用安全文件服务器
+    host: "0.0.0.0"  # 监听地址，0.0.0.0表示所有接口
+    port: 8080  # 服务端口
+    allowed_dirs:  # 只允许访问这些目录
+      - "./watch_folder"
+      - "./output"
+    auth_token: "${SECURE_FILE_SERVER_TOKEN}"  # 从环境变量读取
+    enable_upload: true  # 是否允许文件上传
+    enable_download: true  # 是否允许文件下载
