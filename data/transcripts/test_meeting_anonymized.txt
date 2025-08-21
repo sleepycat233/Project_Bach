@@ -1,1 +1,0 @@
-Error when transcribing /Joes/me/Documents/GitHub/Project_Bach/watch_folder/test_meeting.mp3: Error Domain=com.apple.coreaudio.avfaudio Code=1685348671 "(null)" JoeInfo={failed Bradley__bridge CFURLRef)fileURL, &_extAudioFile)}

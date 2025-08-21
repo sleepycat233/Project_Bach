@@ -290,3 +290,253 @@
 2025-08-20 19:43:53,768 - INFO - 加载spaCy中文模型: zh_core_web_sm
 2025-08-20 19:43:54,269 - INFO - 加载spaCy英文模型: en_core_web_sm
 2025-08-20 19:43:54,426 - INFO - spaCy双语模型加载成功
+2025-08-20 20:04:53,674 - project_bach - INFO - 日志系统初始化完成
+2025-08-20 20:04:53,675 - project_bach - INFO - 目录结构创建完成
+2025-08-20 20:04:53,675 - project_bach.anonymization - INFO - 加载spaCy中文模型: zh_core_web_sm
+2025-08-20 20:04:54,091 - project_bach.anonymization - INFO - 加载spaCy英文模型: en_core_web_sm
+2025-08-20 20:04:54,225 - project_bach.anonymization - INFO - spaCy双语模型加载成功
+2025-08-20 20:04:54,255 - project_bach.audio_processor - INFO - 开始处理音频文件: test_meeting.mp3
+2025-08-20 20:04:54,255 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:04:54,255 - project_bach.transcription - INFO - 开始转录音频: test_meeting.mp3
+2025-08-20 20:04:55,465 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 248 字符
+2025-08-20 20:04:55,466 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:04:55,466 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:04:55,497 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:04:55,498 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:04:55,498 - project_bach.ai_generation - INFO - 开始生成内容摘要
+2025-08-20 20:04:59,830 - project_bach.ai_generation - INFO - 摘要生成成功
+2025-08-20 20:04:59,830 - project_bach.ai_generation - INFO - 开始生成思维导图
+2025-08-20 20:05:08,759 - project_bach.ai_generation - INFO - 思维导图生成成功
+2025-08-20 20:05:08,760 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:05:08,761 - project_bach.result_storage - INFO - 结果已保存: output/test_meeting_result.md
+2025-08-20 20:05:08,762 - project_bach.audio_processor - INFO - 处理完成: test_meeting.mp3 (耗时: 14.51秒)
+2025-08-20 20:05:08,762 - project_bach.audio_processor - INFO - 开始处理音频文件: english_lecture.wav
+2025-08-20 20:05:08,762 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:05:08,762 - project_bach.transcription - INFO - 开始转录音频: english_lecture.wav
+2025-08-20 20:05:09,990 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 251 字符
+2025-08-20 20:05:09,991 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:05:09,991 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:05:10,003 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:05:10,003 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:05:10,003 - project_bach.ai_generation - INFO - 开始生成内容摘要
+2025-08-20 20:05:14,797 - project_bach.ai_generation - INFO - 摘要生成成功
+2025-08-20 20:05:14,798 - project_bach.ai_generation - INFO - 开始生成思维导图
+2025-08-20 20:05:15,140 - project_bach.ai_generation - ERROR - 思维导图生成失败: API调用失败，状态码: 429，错误: Provider returned error
+2025-08-20 20:05:15,141 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:05:15,141 - project_bach.result_storage - INFO - 结果已保存: output/english_lecture_result.md
+2025-08-20 20:05:15,142 - project_bach.audio_processor - INFO - 处理完成: english_lecture.wav (耗时: 6.38秒)
+2025-08-20 20:05:15,142 - project_bach.audio_processor - INFO - 开始处理音频文件: tech_lecture.wav
+2025-08-20 20:05:15,142 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:05:15,142 - project_bach.transcription - INFO - 开始转录音频: tech_lecture.wav
+2025-08-20 20:05:15,778 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 248 字符
+2025-08-20 20:05:15,778 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:05:15,778 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:05:15,785 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:05:15,785 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:05:15,785 - project_bach.ai_generation - INFO - 开始生成内容摘要
+2025-08-20 20:05:20,551 - project_bach.ai_generation - INFO - 摘要生成成功
+2025-08-20 20:05:20,553 - project_bach.ai_generation - INFO - 开始生成思维导图
+2025-08-20 20:05:20,860 - project_bach.ai_generation - ERROR - 思维导图生成失败: API调用失败，状态码: 429，错误: Provider returned error
+2025-08-20 20:05:20,860 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:05:20,861 - project_bach.result_storage - INFO - 结果已保存: output/tech_lecture_result.md
+2025-08-20 20:05:20,862 - project_bach.audio_processor - INFO - 处理完成: tech_lecture.wav (耗时: 5.72秒)
+2025-08-20 20:05:20,862 - project_bach.audio_processor - INFO - 开始处理音频文件: discussion.m4a
+2025-08-20 20:05:20,862 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:05:20,862 - project_bach.transcription - INFO - 开始转录音频: discussion.m4a
+2025-08-20 20:05:21,473 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 246 字符
+2025-08-20 20:05:21,473 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:05:21,473 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:05:21,480 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:05:21,480 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:05:21,480 - project_bach.ai_generation - INFO - 开始生成内容摘要
+2025-08-20 20:05:21,726 - project_bach.ai_generation - ERROR - 摘要生成失败: API调用失败，状态码: 429，错误: Provider returned error
+2025-08-20 20:05:21,726 - project_bach.ai_generation - INFO - 开始生成思维导图
+2025-08-20 20:05:21,987 - project_bach.ai_generation - ERROR - 思维导图生成失败: API调用失败，状态码: 429，错误: Provider returned error
+2025-08-20 20:05:21,988 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:05:21,988 - project_bach.result_storage - INFO - 结果已保存: output/discussion_result.md
+2025-08-20 20:05:21,989 - project_bach.audio_processor - INFO - 处理完成: discussion.m4a (耗时: 1.13秒)
+2025-08-20 20:05:21,989 - project_bach.audio_processor - INFO - 开始处理音频文件: audio1.m4a
+2025-08-20 20:05:21,989 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:05:21,989 - project_bach.transcription - INFO - 开始转录音频: audio1.m4a
+2025-08-20 20:05:23,019 - project_bach.transcription - WARNING - WhisperKit转录失败，使用备用方案: WhisperKit执行失败: Error: Model not found. Please check the model or repo name and try again.
+Error: httpStatusCode(504)
+
+2025-08-20 20:05:23,020 - project_bach.transcription - INFO - 使用备用转录方案
+2025-08-20 20:05:23,020 - project_bach.transcription - INFO - 备用转录完成，文本长度: 172 字符
+2025-08-20 20:05:23,021 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:05:23,022 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:05:23,065 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:05:23,066 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:05:23,066 - project_bach.ai_generation - INFO - 开始生成内容摘要
+2025-08-20 20:05:23,296 - project_bach.ai_generation - ERROR - 摘要生成失败: API调用失败，状态码: 429，错误: Provider returned error
+2025-08-20 20:05:23,296 - project_bach.ai_generation - INFO - 开始生成思维导图
+2025-08-20 20:05:28,743 - project_bach.ai_generation - INFO - 思维导图生成成功
+2025-08-20 20:05:28,744 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:05:28,744 - project_bach.result_storage - INFO - 结果已保存: output/audio1_result.md
+2025-08-20 20:05:28,745 - project_bach.audio_processor - INFO - 处理完成: audio1.m4a (耗时: 6.76秒)
+2025-08-20 20:45:48,038 - project_bach - INFO - 日志系统初始化完成
+2025-08-20 20:45:48,039 - project_bach - INFO - 目录结构创建完成
+2025-08-20 20:45:48,039 - project_bach.anonymization - INFO - 加载spaCy中文模型: zh_core_web_sm
+2025-08-20 20:45:48,431 - project_bach.anonymization - INFO - 加载spaCy英文模型: en_core_web_sm
+2025-08-20 20:45:48,566 - project_bach.anonymization - INFO - spaCy双语模型加载成功
+2025-08-20 20:45:48,599 - project_bach.ai_generation - INFO - AI生成服务已启用限流保护
+2025-08-20 20:45:48,599 - project_bach.audio_processor - INFO - 开始处理音频文件: test_meeting.mp3
+2025-08-20 20:45:48,599 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:45:48,599 - project_bach.transcription - INFO - 开始转录音频: test_meeting.mp3
+2025-08-20 20:45:49,744 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 248 字符
+2025-08-20 20:45:49,744 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:45:49,744 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:45:49,759 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:45:49,759 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:45:49,759 - project_bach.ai_generation - INFO - 开始生成内容摘要
+2025-08-20 20:45:55,362 - project_bach.ai_generation - INFO - 摘要生成成功
+2025-08-20 20:45:55,363 - project_bach.ai_generation - INFO - 开始生成思维导图
+2025-08-20 20:46:04,457 - project_bach.ai_generation - INFO - 思维导图生成成功
+2025-08-20 20:46:04,458 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:46:04,459 - project_bach.result_storage - INFO - 结果已保存: output/test_meeting_result.md
+2025-08-20 20:46:04,459 - project_bach.audio_processor - INFO - 处理完成: test_meeting.mp3 (耗时: 15.86秒)
+2025-08-20 20:46:04,459 - project_bach.audio_processor - INFO - 开始处理音频文件: english_lecture.wav
+2025-08-20 20:46:04,459 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:46:04,460 - project_bach.transcription - INFO - 开始转录音频: english_lecture.wav
+2025-08-20 20:46:05,562 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 251 字符
+2025-08-20 20:46:05,562 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:46:05,562 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:46:05,575 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:46:05,575 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:46:05,575 - project_bach.ai_generation - INFO - 开始生成内容摘要
+2025-08-20 20:46:10,515 - project_bach.ai_generation - INFO - 摘要生成成功
+2025-08-20 20:46:10,515 - project_bach.ai_generation - INFO - 开始生成思维导图
+2025-08-20 20:48:02,528 - project_bach - INFO - 日志系统初始化完成
+2025-08-20 20:48:02,528 - project_bach - INFO - 目录结构创建完成
+2025-08-20 20:48:02,528 - project_bach.anonymization - INFO - 加载spaCy中文模型: zh_core_web_sm
+2025-08-20 20:48:02,921 - project_bach.anonymization - INFO - 加载spaCy英文模型: en_core_web_sm
+2025-08-20 20:48:03,053 - project_bach.anonymization - INFO - spaCy双语模型加载成功
+2025-08-20 20:48:03,080 - project_bach.ai_generation - INFO - AI生成服务已启用限流保护
+2025-08-20 20:48:03,080 - project_bach.audio_processor - INFO - 开始处理音频文件: audio1.m4a
+2025-08-20 20:48:03,080 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:48:03,080 - project_bach.transcription - INFO - 开始转录音频: audio1.m4a
+2025-08-20 20:48:06,119 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 106 字符
+2025-08-20 20:48:06,119 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:48:06,120 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:48:06,129 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:48:06,130 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:48:06,130 - project_bach.ai_generation - INFO - 开始生成内容摘要
+2025-08-20 20:48:09,266 - project_bach.ai_generation - INFO - 摘要生成成功
+2025-08-20 20:48:09,267 - project_bach.ai_generation - INFO - 开始生成思维导图
+2025-08-20 20:48:15,059 - project_bach.ai_generation - INFO - 思维导图生成成功
+2025-08-20 20:48:15,059 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:48:15,061 - project_bach.result_storage - INFO - 结果已保存: output/audio1_result.md
+2025-08-20 20:48:15,061 - project_bach.audio_processor - INFO - 处理完成: audio1.m4a (耗时: 11.98秒)
+2025-08-20 20:51:45,339 - project_bach - INFO - 日志系统初始化完成
+2025-08-20 20:51:45,339 - project_bach - INFO - 目录结构创建完成
+2025-08-20 20:51:45,339 - project_bach.anonymization - INFO - 加载spaCy中文模型: zh_core_web_sm
+2025-08-20 20:51:45,735 - project_bach.anonymization - INFO - 加载spaCy英文模型: en_core_web_sm
+2025-08-20 20:51:45,866 - project_bach.anonymization - INFO - spaCy双语模型加载成功
+2025-08-20 20:51:45,893 - project_bach.ai_generation - INFO - AI生成服务已启用限流保护
+2025-08-20 20:51:45,893 - project_bach.audio_processor - INFO - 开始处理音频文件: audio1.m4a
+2025-08-20 20:51:45,893 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:51:45,893 - project_bach.transcription - INFO - 开始转录音频: audio1.m4a
+2025-08-20 20:51:45,909 - project_bach.transcription - WARNING - WhisperKit转录失败，使用备用方案: WhisperKit执行失败: Error: Invalid language code "auto". Supported languages: ["sq", "uz", "es", "kn", "sd", "be", "eu", "yo", "mn", "ba", "tr", "vi", "ko", "da", "ca", "th", "mk", "ht", "sn", "haw", "ro", "as", "ja", "ca", "mt", "tk", "hr", "en", "hi", "nn", "lb", "kk", "ro", "hu", "ar", "lv", "cy", "ur", "pa", "ro", "ms", "sr", "el", "bn", "su", "af", "yi", "bo", "si", "sl", "az", "hy", "nl", "sv", "zh", "ru", "no", "la", "uk", "km", "te", "ps", "nl", "fa", "sa", "bs", "fi", "br", "ps", "ne", "fr", "id", "ht", "my", "pa", "si", "is", "ta", "bg", "lb", "gl", "zh", "tl", "ha", "oc", "yue", "so", "tt", "it", "my", "cs", "lo", "he", "et", "mr", "gu", "mi", "mg", "ln", "pl", "jw", "ml", "sk", "de", "sw", "lt", "fo", "es", "am", "pt", "ka", "tg"]
+Usage: whisperkit-cli transcribe <options>
+  See 'whisperkit-cli transcribe --help' for more information.
+
+2025-08-20 20:51:45,909 - project_bach.transcription - INFO - 使用备用转录方案
+2025-08-20 20:51:45,909 - project_bach.transcription - INFO - 备用转录完成，文本长度: 172 字符
+2025-08-20 20:51:45,909 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:51:45,909 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:51:45,925 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:51:45,925 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:51:45,925 - project_bach.ai_generation - INFO - 开始生成内容摘要
+2025-08-20 20:51:48,403 - project_bach.ai_generation - INFO - 摘要生成成功
+2025-08-20 20:51:48,403 - project_bach.ai_generation - INFO - 开始生成思维导图
+2025-08-20 20:51:52,738 - project_bach.ai_generation - INFO - 思维导图生成成功
+2025-08-20 20:51:52,739 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:51:52,740 - project_bach.result_storage - INFO - 结果已保存: output/audio1_result.md
+2025-08-20 20:51:52,740 - project_bach.audio_processor - INFO - 处理完成: audio1.m4a (耗时: 6.85秒)
+2025-08-20 20:52:09,492 - project_bach - INFO - 日志系统初始化完成
+2025-08-20 20:52:09,493 - project_bach - INFO - 目录结构创建完成
+2025-08-20 20:52:09,493 - project_bach.anonymization - INFO - 加载spaCy中文模型: zh_core_web_sm
+2025-08-20 20:52:09,893 - project_bach.anonymization - INFO - 加载spaCy英文模型: en_core_web_sm
+2025-08-20 20:52:10,023 - project_bach.anonymization - INFO - spaCy双语模型加载成功
+2025-08-20 20:52:10,049 - project_bach.ai_generation - INFO - AI生成服务已启用限流保护
+2025-08-20 20:52:10,049 - project_bach.audio_processor - INFO - 开始处理音频文件: audio1.m4a
+2025-08-20 20:52:10,049 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:52:10,049 - project_bach.transcription - INFO - 开始转录音频: audio1.m4a
+2025-08-20 20:52:12,742 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 39 字符
+2025-08-20 20:52:12,743 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:52:12,743 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:52:12,751 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:52:12,751 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:52:12,751 - project_bach.ai_generation - INFO - 开始生成内容摘要
+2025-08-20 20:52:16,101 - project_bach.ai_generation - INFO - 摘要生成成功
+2025-08-20 20:52:16,101 - project_bach.ai_generation - INFO - 开始生成思维导图
+2025-08-20 20:52:18,636 - project_bach.ai_generation - INFO - 思维导图生成成功
+2025-08-20 20:52:18,636 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:52:18,636 - project_bach.result_storage - INFO - 结果已保存: output/audio1_result.md
+2025-08-20 20:52:18,636 - project_bach.audio_processor - INFO - 处理完成: audio1.m4a (耗时: 8.59秒)
+2025-08-20 20:54:05,874 - project_bach - INFO - 日志系统初始化完成
+2025-08-20 20:54:05,874 - project_bach - INFO - 目录结构创建完成
+2025-08-20 20:54:05,874 - project_bach.anonymization - INFO - 加载spaCy中文模型: zh_core_web_sm
+2025-08-20 20:54:06,264 - project_bach.anonymization - INFO - 加载spaCy英文模型: en_core_web_sm
+2025-08-20 20:54:06,398 - project_bach.anonymization - INFO - spaCy双语模型加载成功
+2025-08-20 20:54:06,425 - project_bach.ai_generation - INFO - AI生成服务已启用限流保护
+2025-08-20 20:54:06,425 - project_bach.audio_processor - INFO - 开始处理音频文件: audio1.m4a
+2025-08-20 20:54:06,425 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:54:06,425 - project_bach.transcription - INFO - 开始转录音频: audio1.m4a，模型: medium，语言: zh
+2025-08-20 20:54:06,425 - project_bach.whisperkit - INFO - 使用WhisperKit转录，模型: medium，语言: zh
+2025-08-20 20:54:09,187 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 39 字符，内容预览: 这是一段本地的测试音频,主要测试咱们新做的Project Bach功能是否正确
+2025-08-20 20:54:09,188 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:54:09,188 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:54:09,200 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:54:09,201 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:54:09,201 - project_bach.audio_processor - ERROR - 处理失败: audio1.m4a - 'RateLimitedAPIClient' object has no attribute 'models'
+2025-08-20 20:54:32,794 - project_bach - INFO - 日志系统初始化完成
+2025-08-20 20:54:32,795 - project_bach - INFO - 目录结构创建完成
+2025-08-20 20:54:32,795 - project_bach.anonymization - INFO - 加载spaCy中文模型: zh_core_web_sm
+2025-08-20 20:54:33,179 - project_bach.anonymization - INFO - 加载spaCy英文模型: en_core_web_sm
+2025-08-20 20:54:33,309 - project_bach.anonymization - INFO - spaCy双语模型加载成功
+2025-08-20 20:54:33,333 - project_bach.ai_generation - INFO - AI生成服务已启用限流保护
+2025-08-20 20:54:33,334 - project_bach.audio_processor - INFO - 开始处理音频文件: audio1.m4a
+2025-08-20 20:54:33,334 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:54:33,334 - project_bach.transcription - INFO - 开始转录音频: audio1.m4a，模型: medium，语言: zh
+2025-08-20 20:54:33,334 - project_bach.whisperkit - INFO - 使用WhisperKit转录，模型: medium，语言: zh
+2025-08-20 20:54:36,046 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 39 字符，内容预览: 这是一段本地的测试音频,主要测试咱们新做的Project Bach功能是否正确
+2025-08-20 20:54:36,047 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:54:36,047 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:54:36,053 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:54:36,053 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:54:36,053 - project_bach.ai_generation - INFO - 开始生成内容摘要，使用模型: google/gemma-3n-e2b-it:free
+2025-08-20 20:54:40,000 - project_bach.ai_generation - INFO - 摘要生成成功，长度: 335 字符，内容预览: ## 摘要：
+
+这是一段本地测试音频，旨在验证新开发的Project Bach功能的有效性。该音频被...
+2025-08-20 20:54:40,000 - project_bach.ai_generation - INFO - 开始生成思维导图，使用模型: google/gemma-3n-e2b-it:free
+2025-08-20 20:54:41,330 - project_bach.ai_generation - INFO - 思维导图生成成功，长度: 114 字符，内容预览: ## 测试音频 - Project Bach 功能验证
+
+### 目的
+
+- 验证新做的 Proje...
+2025-08-20 20:54:41,330 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:54:41,331 - project_bach.result_storage - INFO - 结果已保存: output/audio1_result.md
+2025-08-20 20:54:41,331 - project_bach.audio_processor - INFO - 处理完成: audio1.m4a (耗时: 8.00秒)
+2025-08-20 20:55:22,147 - project_bach - INFO - 日志系统初始化完成
+2025-08-20 20:55:22,147 - project_bach - INFO - 目录结构创建完成
+2025-08-20 20:55:22,148 - project_bach.anonymization - INFO - 加载spaCy中文模型: zh_core_web_sm
+2025-08-20 20:55:22,585 - project_bach.anonymization - INFO - 加载spaCy英文模型: en_core_web_sm
+2025-08-20 20:55:22,732 - project_bach.anonymization - INFO - spaCy双语模型加载成功
+2025-08-20 20:55:22,762 - project_bach.ai_generation - INFO - AI生成服务已启用限流保护
+2025-08-20 20:55:22,762 - project_bach.audio_processor - INFO - 开始处理音频文件: audio1.m4a
+2025-08-20 20:55:22,762 - project_bach.audio_processor - INFO - 步骤1: 开始音频转录
+2025-08-20 20:55:22,762 - project_bach.transcription - INFO - 开始转录音频: audio1.m4a，模型: medium，语言: zh
+2025-08-20 20:55:22,762 - project_bach.whisperkit - INFO - 使用WhisperKit转录，模型: medium，语言: zh
+2025-08-20 20:55:25,561 - project_bach.whisperkit - INFO - WhisperKit转录完成，文本长度: 39 字符，内容预览: 这是一段本地的测试音频,主要测试咱们新做的Project Bach功能是否正确
+2025-08-20 20:55:25,562 - project_bach.audio_processor - INFO - 步骤2: 开始人名匿名化
+2025-08-20 20:55:25,562 - project_bach.anonymization - INFO - 开始基于NLP的动态人名匿名化处理
+2025-08-20 20:55:25,579 - project_bach.anonymization - INFO - NLP检测：未发现人名实体
+2025-08-20 20:55:25,579 - project_bach.audio_processor - INFO - 步骤3: 开始AI内容生成
+2025-08-20 20:55:25,579 - project_bach.ai_generation - INFO - 开始生成内容摘要，使用模型: google/gemma-3n-e2b-it:free
+2025-08-20 20:55:29,353 - project_bach.ai_generation - INFO - 摘要生成成功，长度: 309 字符，内容预览: ## 摘要：  这段音频是本地测试，旨在验证新开发完成的 "Project Bach" 功能的正确性...
+2025-08-20 20:55:29,353 - project_bach.ai_generation - INFO - 开始生成思维导图，使用模型: google/gemma-3n-e2b-it:free
+2025-08-20 20:55:34,819 - project_bach.ai_generation - INFO - 思维导图生成成功，长度: 504 字符，内容预览: 好的，以下是将您提供的文字整理成Markdown思维导图结构：  ```markdown # 测试音...
+2025-08-20 20:55:34,819 - project_bach.audio_processor - INFO - 步骤4: 保存处理结果
+2025-08-20 20:55:34,821 - project_bach.result_storage - INFO - 结果已保存: output/audio1_result.md
+2025-08-20 20:55:34,821 - project_bach.audio_processor - INFO - 处理完成: audio1.m4a (耗时: 12.06秒)

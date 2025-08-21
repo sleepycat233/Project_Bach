@@ -1,1 +1,0 @@
-Error when transcribing /Users/me/Documents/GitHub/Project_Bach/watch_folder/discussion.m4a: Error Domain=com.apple.coreaudio.avfaudio Code=1954115647 "(null)" UserInfo={failed call=ExtAudioFileOpenURL((__bridge CFURLRef)fileURL, &_extAudioFile)}

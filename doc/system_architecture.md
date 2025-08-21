@@ -1,12 +1,13 @@
-# Project Bach - 简化系统架构设计
+# Project Bach - 系统架构设计
 
-## 1. 设计原则
+## 1. 设计原则 (重构后)
 
-**个人项目，简洁至上**
+**个人项目，简洁至上，架构清晰**
+- **模块化设计**: 清晰的职责分离，易于维护和测试  
 - **简单实用**: 能跑就行，不追求完美
 - **串行处理**: 一个音频文件处理完再处理下一个
 - **最小依赖**: 只用必需的库，避免过度工程化
-- **快速实现**: 重点是MVP，后续再优化
+- **配置驱动**: 统一配置管理，易于调整
 
 ## 2. 简化架构图
 
@@ -32,12 +33,33 @@
 └─────────────────────────────────────────────────────────┘
 ```
 
-## 3. 核心文件结构
+## 3. 核心文件结构 (重构后)
 
 ```
-project_bach/
-├── main.py                 # 主处理脚本 (全部逻辑)
-├── config.yaml            # 简单配置文件
+Project_Bach/
+├── src/                    # 模块化源代码
+│   ├── core/              # 核心业务逻辑
+│   │   ├── transcription.py     # 音频转录服务
+│   │   ├── anonymization.py     # 人名匿名化服务  
+│   │   ├── ai_generation.py     # AI内容生成服务
+│   │   ├── audio_processor.py   # 音频处理编排器
+│   │   └── dependency_container.py # 依赖注入容器
+│   ├── monitoring/        # 文件监控系统
+│   │   ├── file_monitor.py      # 文件监控器
+│   │   ├── event_handler.py     # 文件事件处理器
+│   │   └── processing_queue.py  # 处理队列管理
+│   ├── utils/             # 工具模块
+│   │   ├── config.py           # 配置管理
+│   │   └── rate_limiter.py     # API限流保护
+│   ├── storage/           # 存储模块
+│   │   ├── transcript_storage.py # 转录文本存储
+│   │   └── result_storage.py     # 结果文件存储
+│   └── cli/               # 命令行接口
+│       └── main.py             # 简化主入口 (307行)
+├── tests/                  # 测试目录
+│   ├── unit/              # 单元测试
+│   └── integration/       # 集成测试
+├── config.yaml            # 统一配置文件
 ├── requirements.txt       # 依赖清单
 ├── data/                  # 数据目录
 │   ├── audio/            # 音频文件存储

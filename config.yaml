@@ -9,6 +9,15 @@ api:
       # "opengvlab/internvl3-2b:free"      # 最快 (379.88 t/s) 
       # "google/gemini-2.5-flash-preview"  # 快速 (140.85 t/s)
       # "qwen/qwen3-30b-a3b:free"          # 中等 (83.19 t/s)
+    rate_limits:
+      free_tier:
+        requests_per_10s: 10      # 每10秒最多10个请求
+        requests_per_minute: 60   # 每分钟最多60个请求
+        daily_credit_limit: 5     # 免费层每日5个credits
+      paid_tier:
+        requests_per_10s: 10      # 付费账户10秒限制相同
+        requests_per_minute: 60   # 每分钟限制相同
+        credit_to_requests_ratio: 100  # 每个credit允许100个请求/天
 
 paths:
   watch_folder: "./watch_folder"
@@ -20,7 +29,7 @@ spacy:
 
 whisperkit:
   model: "medium"  # 可选: tiny, small, base, medium, large-v3
-  language: "en"   # 默认语言改为英文（上课以英文为主）
+  language: "zh"   # 中文优先（适合中英混杂音频）
   supported_languages: ["en", "zh"]  # 支持的语言列表
   model_path: "/Users/me/Documents/huggingface/models/argmaxinc/whisperkit-coreml"
 
