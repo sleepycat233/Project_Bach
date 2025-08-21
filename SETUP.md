@@ -41,6 +41,8 @@ nano .env
 python3.11 -c "from src.utils.env_manager import setup_project_environment; setup_project_environment()"
 ```
 
+python3.11 src/cli/main.py --mode monitor --config config.yaml
+
 ## 🚀 快速启动
 
 ### 第一次设置

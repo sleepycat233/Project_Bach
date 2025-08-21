@@ -47,11 +47,11 @@ class TranscriptionService:
         audio_duration = self._estimate_audio_duration(audio_path)
         
         self.logger.info(f"开始转录音频: {audio_path.name}")
-        self.logger.info(f"文件信息: 大小={file_size_mb:.1f}MB, 预估时长={audio_duration:.1f}分钟, 模型={model}, 语言={language}")
+        self.logger.info(f"文件信息: 大小={file_size_mb:.1f}MB, 模型={model}, 语言={language}")
         
-        # 从配置获取阈值
-        large_file_threshold = self.config.get('large_file_threshold_mb', 50)
-        long_audio_threshold = self.config.get('long_audio_threshold_min', 30)
+        # 硬编码合理的阈值
+        large_file_threshold = 50  # MB
+        long_audio_threshold = 30  # 分钟
         
         # 大文件预警
         if file_size_mb > large_file_threshold:
@@ -162,7 +162,6 @@ class WhisperKitClient:
         """
         self.config = config
         self.logger = logging.getLogger('project_bach.whisperkit')
-        self.language_detector = LanguageDetector(config)
         
     def transcribe(self, audio_path: Path, audio_duration: float = None) -> str:
         """使用WhisperKit CLI进行音频转录
@@ -179,17 +178,14 @@ class WhisperKitClient:
         """
         # 从配置文件获取WhisperKit设置
         model = self.config.get('model', 'medium')
-        default_language = self.config.get('language', 'zh')
+        language = self.config.get('language', 'zh')
         
-        # 检测音频语言
-        language = self.language_detector.detect_language(audio_path, default_language)
-        
-        # 从配置获取超时参数
-        base_timeout = self.config.get('base_timeout_seconds', 120)
-        max_timeout = self.config.get('max_timeout_seconds', 7200)  # 2小时最大超时
-        processing_factors = self.config.get('processing_factor_per_model', {
+        # 硬编码合理的超时参数
+        base_timeout = 120  # 2分钟基础超时
+        max_timeout = 7200  # 2小时最大超时
+        processing_factors = {
             'tiny': 5, 'base': 8, 'small': 10, 'medium': 15, 'large': 20
-        })
+        }
         
         # 动态计算超时时间：基础时间 + 音频时长的倍数
         if audio_duration:
@@ -215,7 +211,6 @@ class WhisperKitClient:
             "whisperkit-cli",
             "transcribe",
             "--audio-path", str(audio_path),
-            "--language", language,
             "--model", model,
             "--model-prefix", model_prefix,
             "--task", "transcribe",
@@ -224,6 +219,10 @@ class WhisperKitClient:
             "--chunking-strategy", chunking,
             "--concurrent-worker-count", str(workers)
         ]
+        
+        # 添加语言参数
+        if language:
+            cmd.extend(["--language", language])
         
         # 添加性能优化选项
         if use_cache:
@@ -234,7 +233,7 @@ class WhisperKitClient:
         self.logger.info(f"   模型: {model_prefix}-{model}, 语言: {language}")
         self.logger.info(f"   计算单元: 音频={audio_compute}, 文本={text_compute}")
         self.logger.info(f"   优化选项: 缓存={'✅' if use_cache else '❌'}, 分块={chunking}, 并发={workers}")
-        self.logger.info(f"   预计处理时间: {timeout//60}分{timeout%60}秒")
+        self.logger.info(f"   超时限制: {timeout//60}分{timeout%60}秒")
         
         # 启动进度监控
         start_time = time.time()
@@ -287,8 +286,8 @@ class WhisperKitClient:
             timeout: 总超时时间
             filename: 文件名
         """
-        # 从配置获取进度报告间隔
-        intervals = self.config.get('progress_report_intervals', [30, 60, 120, 300, 600])
+        # 硬编码合理的进度报告间隔
+        intervals = [30, 60, 120, 300, 600]  # 30秒, 1分钟, 2分钟, 5分钟, 10分钟
         
         for interval in intervals:
             time.sleep(interval)
@@ -300,8 +299,9 @@ class WhisperKitClient:
             remaining = timeout - elapsed
             progress_percent = (elapsed / timeout) * 100
             
-            self.logger.info(f"🔄 转录进度: 正在处理 {filename}")
-            self.logger.info(f"⏱️  已运行: {self._format_time(elapsed)}, 剩余约: {self._format_time(remaining)} ({progress_percent:.1f}%)")
+            # 显示实时处理状态
+            self.logger.info(f"🔄 转录进行中: {filename}")
+            self.logger.info(f"⏱️  已运行: {self._format_time(elapsed)} | 超时进度: {progress_percent:.1f}%")
             
             # 如果接近超时，提供建议
             if remaining < 120:  # 最后2分钟
@@ -326,65 +326,6 @@ class WhisperKitClient:
         else:
             return f"{seconds//3600:.0f}小时{(seconds%3600)//60:.0f}分{seconds%60:.0f}秒"
 
-
-class LanguageDetector:
-    """音频语言检测器"""
-    
-    def __init__(self, config: Dict[str, Any]):
-        """初始化语言检测器
-        
-        Args:
-            config: WhisperKit配置字典
-        """
-        self.config = config
-        self.logger = logging.getLogger('project_bach.language_detector')
-    
-    def detect_language(self, audio_path: Path, default_language: str = 'zh') -> str:
-        """智能检测音频语言（支持中英文双语）
-        
-        Args:
-            audio_path: 音频文件路径
-            default_language: 默认语言
-            
-        Returns:
-            检测到的语言代码
-        """
-        filename_lower = audio_path.name.lower()
-        
-        # 明确的英文关键词检测（优先级最高）
-        explicit_english_keywords = ['english', 'en-', '_en_', 'eng', 'lecture', 'meeting', 'class', 'course', 
-                                   'lesson', 'presentation', 'seminar', 'interview']
-        if any(keyword in filename_lower for keyword in explicit_english_keywords):
-            self.logger.debug(f"文件名明确标识为英文: {audio_path.name}")
-            return 'en'
-        
-        # 检查文件名中是否包含中文字符
-        if any('\u4e00' <= char <= '\u9fff' for char in audio_path.name):
-            self.logger.debug(f"文件名包含中文字符，判定为中文: {audio_path.name}")
-            return 'zh'
-        
-        # 中文相关关键词检测
-        chinese_keywords = ['chinese', 'zh', '中文', '会议', '讲座', '讨论', '汇报', '培训', 'audio', 'test']
-        if any(keyword in filename_lower for keyword in chinese_keywords):
-            self.logger.debug(f"文件名检测为中文相关: {audio_path.name}")
-            return 'zh'
-        
-        # 对于无法明确判断的文件，使用配置的默认语言
-        # 考虑到Project Bach主要处理中文内容，默认倾向中文
-        self.logger.debug(f"无法从文件名判断语言，使用默认语言 {default_language}: {audio_path.name}")
-        return default_language
-    
-    def is_supported_language(self, language: str) -> bool:
-        """检查是否为支持的语言
-        
-        Args:
-            language: 语言代码
-            
-        Returns:
-            是否支持
-        """
-        supported_languages = self.config.get('supported_languages', ['en', 'zh'])
-        return language in supported_languages
 
 
 class TranscriptionValidator:
