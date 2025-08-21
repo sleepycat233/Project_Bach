@@ -150,8 +150,34 @@ class NameAnonymizer:
         Returns:
             是否无效
         """
-        invalid_patterns = ['先生', '女士', '教授', '博士', '总监', '经理', '老师']
-        return any(pattern in name for pattern in invalid_patterns)
+        # 中文称呼过滤
+        chinese_invalid_patterns = ['先生', '女士', '教授', '博士', '总监', '经理', '老师']
+        
+        # 英文无意义检测过滤
+        english_invalid_patterns = [
+            'X.', 'Y.', 'Z.',  # 单字母加点
+            'You', 'I', 'We', 'They',  # 代词
+            'Therefore', 'Suppose', 'However', 'Moreover',  # 连接词
+            'Figure', 'Table', 'Chapter', 'Section',  # 文档标记
+            'A.', 'B.', 'C.', 'D.', 'E.', 'F.',  # 选项标记
+        ]
+        
+        # 检查是否包含无效模式
+        if any(pattern in name for pattern in chinese_invalid_patterns):
+            return True
+        
+        if any(pattern in name for pattern in english_invalid_patterns):
+            return True
+            
+        # 过滤纯标点符号或过短的检测结果
+        if len(name.replace('.', '').replace(' ', '').strip()) < 2:
+            return True
+            
+        # 过滤以"X. "开头的模式（如"X. Suppose", "X. Therefore"等）
+        if name.startswith('X. ') or name.startswith('Y. ') or name.startswith('Z. '):
+            return True
+            
+        return False
     
     def get_name_mapping(self) -> Dict[str, str]:
         """获取完整的人名映射

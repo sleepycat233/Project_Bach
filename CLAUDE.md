@@ -279,6 +279,48 @@ src/
 - 网站模板设计
 - CI/CD流程建立
 
+### 📋 第六阶段: 智能模型选择优化 (规划中)
+
+**目标**: 实现基于音频内容类型的智能模型选择，平衡转录速度和语言支持
+
+**核心功能**:
+1. **Web前端模型选择界面**
+   - 用户上传音频时可选择语言类型
+   - 选项：Multilingual（中英混合） / English Only（纯英文）
+   - 智能预览和建议功能
+
+2. **多语言智能路由系统**
+   - Multilingual选择 → openai-large-v3 (支持中文，4.2x实时)
+   - English Only选择 → distil-large-v3 (仅英文，18x实时，4.4倍速度提升)
+   - 后端动态配置whisperkit模型参数
+
+3. **性能优化与用户体验**
+   - 实时显示预估处理时间
+   - 模型性能对比展示
+   - 批量处理的智能调度
+
+**技术方案**:
+```yaml
+# 动态模型配置
+whisperkit_profiles:
+  multilingual:
+    model: "large-v3"
+    model_prefix: "openai" 
+    estimated_speed: "4.2x实时"
+    languages: ["zh", "en", "混合"]
+  english_only:
+    model: "large-v3"
+    model_prefix: "distil"
+    estimated_speed: "18x实时"
+    languages: ["en"]
+```
+
+**预期效果**:
+- 🚀 纯英文音频处理速度提升4.4倍
+- 🌍 保持多语言音频的高质量转录
+- 👤 用户可根据内容类型选择最优模型
+- ⚖️  在速度和功能之间找到完美平衡
+
 ---
 
 **最后更新**: 2025-08-21

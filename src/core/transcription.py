@@ -200,13 +200,15 @@ class WhisperKitClient:
         else:
             timeout = base_timeout
         
-        # 获取性能优化配置
+        # 获取用户配置
         model_prefix = self.config.get('model_prefix', 'openai')
-        audio_compute = self.config.get('audio_encoder_compute_units', 'cpuAndNeuralEngine')
-        text_compute = self.config.get('text_decoder_compute_units', 'cpuAndNeuralEngine')
-        use_cache = self.config.get('use_prefill_cache', True)
-        chunking = self.config.get('chunking_strategy', 'vad')
-        workers = self.config.get('concurrent_workers', 2)
+        
+        # 硬编码最优性能设置
+        audio_compute = 'cpuAndNeuralEngine'  # Apple Silicon最优
+        text_compute = 'cpuAndNeuralEngine'   # 神经引擎加速
+        use_cache = True                      # 启用预填充缓存
+        chunking = 'vad'                     # 语音活动检测
+        workers = 2                          # 长音频优化并发数
         
         # 构建WhisperKit命令
         cmd = [

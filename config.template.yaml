@@ -34,13 +34,6 @@ whisperkit:
   supported_languages: ["en", "zh"]  # 支持的语言列表
   model_path: "/Users/me/Documents/huggingface/models/argmaxinc/whisperkit-coreml"
   
-  # 性能优化选项
-  audio_encoder_compute_units: "cpuAndNeuralEngine"  # 音频编码器计算单元
-  text_decoder_compute_units: "cpuAndNeuralEngine"   # 文本解码器计算单元
-  use_prefill_cache: true      # 启用预填充缓存
-  chunking_strategy: "vad"     # 语音活动检测分块
-  concurrent_workers: 2        # 并发处理数（长音频建议减少）
-  
   # 大文件处理优化
   large_file_threshold_mb: 50    # 大文件阈值（MB）
   long_audio_threshold_min: 30   # 长音频阈值（分钟）
