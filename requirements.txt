@@ -1,3 +1,8 @@
+# Python version requirement
+# Requires Python 3.11.x
+# Installation: brew install python@3.11
+
+# Core dependencies (Phases 1-5)
 watchdog>=3.0.0
 spacy>=3.7.0
 requests>=2.31.0
@@ -5,7 +10,18 @@ gitpython>=3.1.0
 pyyaml>=6.0
 structlog>=23.1.0
 faker>=37.5.0
+
+# Phase 6 Web frontend & multimedia
+Flask>=3.0.0
+Werkzeug>=3.0.1
+yt-dlp>=2025.8.20
+feedparser>=6.0.10
+python-magic>=0.4.27
+
+# Testing
 pytest>=8.4.0
+pytest-flask>=1.3.0
+pytest-mock>=3.12.0
 
 # spaCy language models (需要单独安装)
 # python -m spacy download zh_core_web_sm

@@ -98,11 +98,12 @@ class AudioProcessor:
         self.publishing_workflow = workflow
         self.logger.debug("发布工作流已设置")
     
-    def process_audio_file(self, audio_path: str) -> bool:
+    def process_audio_file(self, audio_path: str, privacy_level: str = 'public') -> bool:
         """处理单个音频文件的完整流程
         
         Args:
             audio_path: 音频文件路径
+            privacy_level: 隐私级别 ('public' 或 'private')
             
         Returns:
             处理是否成功
@@ -124,12 +125,12 @@ class AudioProcessor:
                 raise Exception("转录失败或结果为空")
             
             # 保存原始转录
-            self.transcript_storage.save_raw_transcript(audio_path.stem, transcript)
+            self.transcript_storage.save_raw_transcript(audio_path.stem, transcript, privacy_level)
             
             # 步骤2: 人名匿名化
             self.logger.info("步骤2: 开始人名匿名化")
             anonymized_text, mapping = self.anonymization_service.anonymize_names(transcript)
-            self.transcript_storage.save_anonymized_transcript(audio_path.stem, anonymized_text)
+            self.transcript_storage.save_anonymized_transcript(audio_path.stem, anonymized_text, privacy_level)
             
             # 记录匿名化映射
             if mapping:
@@ -147,15 +148,18 @@ class AudioProcessor:
                 'mindmap': mindmap,
                 'original_file': str(audio_path),
                 'processed_time': datetime.now().isoformat(),
-                'anonymization_mapping': mapping
+                'anonymized_transcript': anonymized_text,  # 添加匿名化转录文本
+                'anonymization_mapping': mapping,
+                'privacy_level': privacy_level
             }
             
-            # 保存多种格式的结果
-            self.result_storage.save_markdown_result(audio_path.stem, results)
-            self.result_storage.save_json_result(audio_path.stem, results)
+            # 按隐私级别保存结果
+            self.result_storage.save_markdown_result(audio_path.stem, results, privacy_level=privacy_level)
+            self.result_storage.save_json_result(audio_path.stem, results, privacy_level=privacy_level)
+            self.result_storage.save_html_result(audio_path.stem, results, privacy_level=privacy_level)
             
-            # 步骤5: 自动部署到GitHub Pages (如果配置了)
-            if self.publishing_workflow and self._should_auto_deploy():
+            # 步骤5: 自动部署到GitHub Pages (仅公开内容)
+            if privacy_level == 'public' and self.publishing_workflow and self._should_auto_deploy():
                 self.logger.info("步骤5: 开始自动部署到GitHub Pages")
                 try:
                     deploy_result = self.publishing_workflow.deploy_to_github_pages()
@@ -167,9 +171,11 @@ class AudioProcessor:
                         self.logger.warning(f"⚠️  自动部署失败: {deploy_result.get('error', '未知错误')}")
                 except Exception as e:
                     self.logger.error(f"❌ 自动部署异常: {e}")
+            elif privacy_level == 'private':
+                self.logger.info("私人内容，跳过GitHub Pages部署")
             
             elapsed = time.time() - start_time
-            self.logger.info(f"处理完成: {audio_path.name} (耗时: {elapsed:.2f}秒)")
+            self.logger.info(f"处理完成: {audio_path.name} (耗时: {elapsed:.2f}秒, 隐私级别: {privacy_level})")
             return True
             
         except Exception as e:
@@ -266,6 +272,314 @@ class AudioProcessor:
         self.logger.info(f"批量处理完成: {success_count}/{total_count} 成功")
         
         return results
+    
+    def process_youtube_content(self, youtube_result: Dict[str, Any], privacy_level: str = 'public') -> bool:
+        """处理YouTube内容（字幕优先策略）
+        
+        Args:
+            youtube_result: YouTubeProcessor的处理结果
+            privacy_level: 隐私级别 ('public' 或 'private')
+            
+        Returns:
+            处理是否成功
+        """
+        try:
+            video_metadata = youtube_result.get('video_metadata', {})
+            video_id = video_metadata.get('video_id', 'unknown')
+            video_title = video_metadata.get('title', 'Unknown Video')
+            
+            self.logger.info(f"开始处理YouTube内容: {video_title}")
+            
+            # 确定转录文本来源
+            transcript_text = ""
+            transcription_method = youtube_result.get('transcription_method', 'unknown')
+            
+            if transcription_method == 'subtitles':
+                # 使用字幕文本
+                transcript_text = youtube_result.get('transcript_text', '')
+                self.logger.info(f"使用YouTube字幕: {len(transcript_text)}字符")
+            elif transcription_method == 'whisper':
+                # 使用Whisper转录
+                audio_file_path = youtube_result.get('audio_file_path')
+                if audio_file_path and Path(audio_file_path).exists():
+                    if not self.transcription_service:
+                        self.logger.error("Whisper转录服务未配置")
+                        return False
+                    
+                    self.logger.info("使用Whisper转录音频")
+                    transcription_result = self.transcription_service.transcribe_audio(audio_file_path)
+                    
+                    if transcription_result.get('success'):
+                        transcript_text = transcription_result['transcript']
+                        self.logger.info(f"Whisper转录完成: {len(transcript_text)}字符")
+                    else:
+                        self.logger.error(f"Whisper转录失败: {transcription_result.get('error')}")
+                        return False
+                else:
+                    self.logger.error("音频文件路径无效")
+                    return False
+            else:
+                self.logger.error(f"未知的转录方法: {transcription_method}")
+                return False
+            
+            if not transcript_text.strip():
+                self.logger.error("转录文本为空")
+                return False
+            
+            # YouTube视频不需要人名匿名化（已是公开资源）
+            anonymized_text = transcript_text
+            mapping = {}
+            self.logger.info("跳过人名匿名化处理（YouTube内容为公开资源）")
+            
+            # AI内容生成
+            if not self.ai_generation_service:
+                self.logger.error("AI内容生成服务未配置")
+                return False
+            
+            self.logger.info("开始AI内容生成")
+            summary = self.ai_generation_service.generate_summary(anonymized_text)
+            mindmap = self.ai_generation_service.generate_mindmap(anonymized_text)
+            
+            if not summary or not mindmap:
+                self.logger.error("AI内容生成失败")
+                return False
+            
+            # 保存转录结果
+            if self.transcript_storage:
+                self.transcript_storage.save_raw_transcript(
+                    filename=f"youtube_{video_id}",
+                    content=transcript_text,
+                    privacy_level=privacy_level
+                )
+                self.transcript_storage.save_anonymized_transcript(
+                    filename=f"youtube_{video_id}",
+                    content=anonymized_text,
+                    privacy_level=privacy_level
+                )
+            
+            # 保存最终结果
+            if self.result_storage:
+                result_data = {
+                    'title': video_title,
+                    'video_id': video_id,
+                    'video_url': youtube_result.get('source_url', ''),
+                    'summary': summary,
+                    'mindmap': mindmap,
+                    'transcription_method': transcription_method,
+                    'privacy_level': privacy_level,
+                    'processed_time': datetime.now().isoformat(),
+                    'content_type': 'youtube',
+                    'video_metadata': video_metadata,
+                    'anonymized_transcript': anonymized_text,  # 添加匿名化转录文本
+                    'anonymization_mapping': mapping
+                }
+                
+                # 保存HTML格式的YouTube处理结果
+                self.result_storage.save_html_result(
+                    filename=f"youtube_{video_id}",
+                    results=result_data,
+                    privacy_level=privacy_level
+                )
+            
+            # 发布到GitHub Pages（仅公开内容 + 敏感内容保护）
+            if privacy_level == 'public' and self.publishing_workflow:
+                # 政治敏感内容检测 🕵️
+                sensitive_keywords = ['习近平', '政治', '中共', '权力', '斯大林', '传闻', '听床师', '政府', '党', '领导人']
+                is_sensitive = any(keyword in video_title.lower() or keyword in transcript_text[:500] 
+                                 for keyword in sensitive_keywords)
+                
+                if is_sensitive:
+                    self.logger.warning(f"🚨 检测到政治敏感内容，智能保护启动，跳过GitHub Pages发布: {video_title}")
+                    self.logger.info("💡 建议: 如需发布此内容，请手动设置为Private模式")
+                else:
+                    try:
+                        self.logger.info("发布YouTube内容到GitHub Pages")
+                        self.publishing_workflow.deploy_to_github_pages()
+                    except Exception as e:
+                        self.logger.warning(f"GitHub Pages发布失败: {e}")
+            
+            self.logger.info(f"YouTube内容处理完成: {video_title}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"YouTube内容处理异常: {e}")
+            return False
+    
+    def _generate_youtube_html(self, video_metadata: Dict, summary: str, mindmap: str, 
+                             transcription_method: str, privacy_level: str) -> str:
+        """生成包含YouTube视频嵌入的HTML内容
+        
+        Args:
+            video_metadata: 视频元数据
+            summary: AI生成的摘要
+            mindmap: AI生成的思维导图
+            transcription_method: 转录方法
+            privacy_level: 隐私级别
+            
+        Returns:
+            完整的HTML内容
+        """
+        video_id = video_metadata.get('video_id', '')
+        title = video_metadata.get('title', 'Unknown Video')
+        channel_name = video_metadata.get('channel_name', 'Unknown Channel')
+        duration_formatted = video_metadata.get('duration_formatted', 'Unknown')
+        upload_date_formatted = video_metadata.get('upload_date_formatted', 'Unknown')
+        
+        # 隐私标识
+        privacy_badge = "🔒 Private" if privacy_level == 'private' else "🌐 Public"
+        
+        # 转录方法标识
+        method_badge = "📄 Subtitles" if transcription_method == 'subtitles' else "🎤 Whisper"
+        
+        html_content = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} - Project Bach</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            background-color: #f8f9fa;
+        }}
+        .header {{
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        .video-container {{
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            overflow: hidden;
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        .video-container iframe {{
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+        }}
+        .content-section {{
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        .badges {{
+            margin: 10px 0;
+        }}
+        .badge {{
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 0.9em;
+            font-weight: 500;
+            margin-right: 8px;
+        }}
+        .badge-privacy {{
+            background-color: {"#dc3545" if privacy_level == "private" else "#28a745"};
+            color: white;
+        }}
+        .badge-method {{
+            background-color: #6f42c1;
+            color: white;
+        }}
+        .meta-info {{
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }}
+        .summary {{
+            margin-top: 20px;
+        }}
+        .mindmap {{
+            background: #f8f9ff;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #6f42c1;
+            margin-top: 20px;
+        }}
+        .nav-links {{
+            text-align: center;
+            margin-top: 30px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 8px;
+        }}
+        .nav-links a {{
+            color: #495057;
+            text-decoration: none;
+            margin: 0 15px;
+            font-weight: 500;
+        }}
+        h1 {{ color: #343a40; margin-bottom: 10px; }}
+        h2 {{ color: #495057; border-bottom: 2px solid #e9ecef; padding-bottom: 8px; }}
+        pre {{ white-space: pre-wrap; background: #f8f9fa; padding: 15px; border-radius: 6px; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{title}</h1>
+        <div class="badges">
+            <span class="badge badge-privacy">{privacy_badge}</span>
+            <span class="badge badge-method">{method_badge}</span>
+        </div>
+        <div class="meta-info">
+            <strong>频道:</strong> {channel_name} | 
+            <strong>时长:</strong> {duration_formatted} | 
+            <strong>上传时间:</strong> {upload_date_formatted}
+        </div>
+    </div>
+    
+    <div class="video-container">
+        <iframe 
+            src="https://www.youtube.com/embed/{video_id}" 
+            title="YouTube video player" 
+            frameborder="0" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+            allowfullscreen>
+        </iframe>
+    </div>
+    
+    <div class="content-section">
+        <h2>📋 内容摘要</h2>
+        <div class="summary">
+            {summary.replace(chr(10), '<br>')}
+        </div>
+    </div>
+    
+    <div class="content-section">
+        <h2>🧠 思维导图</h2>
+        <div class="mindmap">
+            <pre>{mindmap}</pre>
+        </div>
+    </div>
+    
+    <div class="nav-links">
+        <a href="{"/" if privacy_level == "public" else "/private/"}"">← 返回主页</a>
+        {"| <a href='/private/'>Private内容</a>" if privacy_level == "private" else ""}
+    </div>
+    
+    <footer style="text-align: center; margin-top: 30px; color: #6c757d; font-size: 0.9em;">
+        <p>Generated by Project Bach - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+    </footer>
+</body>
+</html>'''
+        
+        return html_content
     
     def get_processing_stats(self) -> Dict[str, Any]:
         """获取处理统计信息

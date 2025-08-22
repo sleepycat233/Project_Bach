@@ -27,18 +27,30 @@ class ResultStorage:
         # 确保目录存在
         self.output_folder.mkdir(parents=True, exist_ok=True)
         
-    def save_markdown_result(self, filename: str, results: Dict[str, Any]) -> str:
+        # 确保隐私目录存在
+        self.public_folder = self.output_folder / 'public'
+        self.private_folder = self.output_folder / 'private'
+        self.public_folder.mkdir(parents=True, exist_ok=True)
+        self.private_folder.mkdir(parents=True, exist_ok=True)
+        
+    def save_markdown_result(self, filename: str, results: Dict[str, Any], privacy_level: str = 'public') -> str:
         """保存Markdown格式的结果文件
         
         Args:
             filename: 文件名（不包含扩展名）
             results: 结果数据字典
+            privacy_level: 隐私级别 ('public' 或 'private')
             
         Returns:
             保存的文件路径
         """
         markdown_content = self._generate_markdown_content(filename, results)
-        file_path = self.output_folder / f"{filename}_result.md"
+        
+        # 根据隐私级别选择保存目录
+        if privacy_level == 'private':
+            file_path = self.private_folder / f"{filename}_result.md"
+        else:
+            file_path = self.public_folder / f"{filename}_result.md"
         
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
@@ -52,12 +64,13 @@ class ResultStorage:
             self.logger.error(error_msg)
             raise OSError(error_msg)
     
-    def save_json_result(self, filename: str, results: Dict[str, Any]) -> str:
+    def save_json_result(self, filename: str, results: Dict[str, Any], privacy_level: str = 'public') -> str:
         """保存JSON格式的结果文件
         
         Args:
             filename: 文件名（不包含扩展名）
             results: 结果数据字典
+            privacy_level: 隐私级别 ('public' 或 'private')
             
         Returns:
             保存的文件路径
@@ -68,11 +81,16 @@ class ResultStorage:
             'metadata': {
                 'filename': filename,
                 'created_time': datetime.now().isoformat(),
-                'format_version': '1.0'
+                'format_version': '1.0',
+                'privacy_level': privacy_level
             }
         }
         
-        file_path = self.output_folder / f"{filename}_result.json"
+        # 根据隐私级别选择保存目录
+        if privacy_level == 'private':
+            file_path = self.private_folder / f"{filename}_result.json"
+        else:
+            file_path = self.public_folder / f"{filename}_result.json"
         
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
@@ -86,18 +104,24 @@ class ResultStorage:
             self.logger.error(error_msg)
             raise OSError(error_msg)
     
-    def save_html_result(self, filename: str, results: Dict[str, Any]) -> str:
+    def save_html_result(self, filename: str, results: Dict[str, Any], privacy_level: str = 'public') -> str:
         """保存HTML格式的结果文件
         
         Args:
             filename: 文件名（不包含扩展名）
             results: 结果数据字典
+            privacy_level: 隐私级别 ('public' 或 'private')
             
         Returns:
             保存的文件路径
         """
         html_content = self._generate_html_content(filename, results)
-        file_path = self.output_folder / f"{filename}_result.html"
+        
+        # 根据隐私级别选择保存目录
+        if privacy_level == 'private':
+            file_path = self.private_folder / f"{filename}_result.html"
+        else:
+            file_path = self.public_folder / f"{filename}_result.html"
         
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
@@ -171,6 +195,15 @@ class ResultStorage:
         mindmap = results.get('mindmap', '思维导图生成失败')
         anonymization_mapping = results.get('anonymization_mapping', {})
         
+        # YouTube特殊处理
+        content_type = results.get('content_type', 'audio')
+        video_metadata = results.get('video_metadata', {})
+        video_url = results.get('video_url', '')
+        privacy_level = results.get('privacy_level', 'public')
+        
+        # 获取匿名化transcript (仅公开内容显示)
+        anonymized_transcript = results.get('anonymized_transcript', '') if privacy_level == 'public' else ''
+        
         # 转换Markdown思维导图为HTML
         mindmap_html = self._markdown_to_html(mindmap)
         
@@ -234,6 +267,8 @@ class ResultStorage:
         <strong>原始文件:</strong> {original_file}
     </div>
     
+    {self._generate_video_embed_section(content_type, video_metadata, video_url)}
+    
     <div class="section">
         <h2>内容摘要</h2>
         <p>{summary}</p>
@@ -245,6 +280,8 @@ class ResultStorage:
             {mindmap_html}
         </div>
     </div>
+    
+    {self._generate_transcript_section(anonymized_transcript, privacy_level)}
     
     <div class="section">
         <h2>处理信息</h2>
@@ -289,6 +326,132 @@ class ResultStorage:
                 html_lines.append(f'<p>{line}</p>')
         
         return '\n'.join(html_lines)
+    
+    def _generate_video_embed_section(self, content_type: str, video_metadata: Dict[str, Any], video_url: str) -> str:
+        """生成YouTube视频嵌入部分
+        
+        Args:
+            content_type: 内容类型
+            video_metadata: 视频元数据
+            video_url: 视频URL
+            
+        Returns:
+            视频嵌入HTML代码
+        """
+        if content_type != 'youtube' or not video_metadata.get('video_id'):
+            return ""
+        
+        video_id = video_metadata['video_id']
+        video_title = video_metadata.get('title', 'YouTube Video')
+        channel = video_metadata.get('uploader', 'Unknown Channel')
+        duration = video_metadata.get('duration_string', 'Unknown')
+        
+        # YouTube嵌入iframe
+        embed_html = f"""
+    <div class="section">
+        <h2>📺 YouTube 视频</h2>
+        <div style="margin-bottom: 15px;">
+            <strong>标题:</strong> {video_title}<br>
+            <strong>频道:</strong> {channel}<br>
+            <strong>时长:</strong> {duration}<br>
+            <strong>视频链接:</strong> <a href="{video_url}" target="_blank">{video_url}</a>
+        </div>
+        <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000;">
+            <iframe 
+                src="https://www.youtube.com/embed/{video_id}" 
+                frameborder="0" 
+                allowfullscreen
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+            </iframe>
+        </div>
+    </div>
+        """
+        return embed_html
+    
+    def _generate_transcript_section(self, anonymized_transcript: str, privacy_level: str) -> str:
+        """生成transcript复制功能部分
+        
+        Args:
+            anonymized_transcript: 匿名化后的转录文本
+            privacy_level: 隐私级别
+            
+        Returns:
+            HTML代码
+        """
+        if not anonymized_transcript or privacy_level != 'public':
+            return ""
+        
+        # 截取transcript前500字符用于预览
+        preview_text = anonymized_transcript[:500] + ("..." if len(anonymized_transcript) > 500 else "")
+        
+        transcript_section = f"""
+    <div class="section">
+        <h2>📝 转录文本 (匿名化)</h2>
+        <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 15px;">
+            <div id="transcript-preview" style="max-height: 150px; overflow-y: auto; margin-bottom: 15px; font-family: monospace; line-height: 1.4; color: #495057;">
+                {preview_text}
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button id="copy-transcript-btn" onclick="copyTranscript()" 
+                        style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    📋 复制完整转录文本
+                </button>
+                <button id="toggle-transcript-btn" onclick="toggleTranscript()" 
+                        style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    👁️ 显示完整文本
+                </button>
+                <span id="copy-status" style="color: #28a745; font-weight: bold; display: none;">✅ 已复制!</span>
+            </div>
+        </div>
+        
+        <!-- 隐藏的完整transcript用于复制 -->
+        <textarea id="full-transcript" style="position: absolute; left: -9999px; opacity: 0;" readonly>{anonymized_transcript}</textarea>
+        
+        <script>
+        let isFullTextVisible = false;
+        const originalText = `{preview_text}`;
+        const fullText = `{anonymized_transcript}`;
+        
+        function copyTranscript() {{
+            const textarea = document.getElementById('full-transcript');
+            textarea.select();
+            textarea.setSelectionRange(0, 99999);
+            document.execCommand('copy');
+            
+            const status = document.getElementById('copy-status');
+            const btn = document.getElementById('copy-transcript-btn');
+            
+            status.style.display = 'inline';
+            btn.innerHTML = '✅ 已复制!';
+            btn.style.background = '#28a745';
+            
+            setTimeout(() => {{
+                status.style.display = 'none';
+                btn.innerHTML = '📋 复制完整转录文本';
+                btn.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+            }}, 2000);
+        }}
+        
+        function toggleTranscript() {{
+            const preview = document.getElementById('transcript-preview');
+            const btn = document.getElementById('toggle-transcript-btn');
+            
+            if (!isFullTextVisible) {{
+                preview.innerHTML = fullText;
+                preview.style.maxHeight = '400px';
+                btn.innerHTML = '👁️ 隐藏完整文本';
+                isFullTextVisible = true;
+            }} else {{
+                preview.innerHTML = originalText;
+                preview.style.maxHeight = '150px';
+                btn.innerHTML = '👁️ 显示完整文本';
+                isFullTextVisible = false;
+            }}
+        }}
+        </script>
+    </div>
+        """
+        return transcript_section
     
     def load_result(self, filename: str, format: str = 'json') -> Optional[Dict[str, Any]]:
         """加载结果文件

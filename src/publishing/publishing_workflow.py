@@ -271,14 +271,19 @@ class PublishingWorkflow:
         try:
             self.logger.info("检查GitHub Pages部署条件")
             
-            # 获取output文件夹的所有结果文件
+            # 获取output文件夹的public子目录的所有结果文件
             output_path = Path(self.config.get('paths', {}).get('output_folder', './data/output'))
+            public_output_path = output_path / 'public'
+            
             if not output_path.exists():
                 return {'success': False, 'error': '输出文件夹不存在'}
             
-            result_files = list(output_path.glob('*.md'))
+            if not public_output_path.exists():
+                return {'success': False, 'error': 'public输出文件夹不存在'}
+            
+            result_files = list(public_output_path.glob('*.md'))
             if not result_files:
-                return {'success': False, 'error': '没有找到待发布的结果文件'}
+                return {'success': False, 'error': '没有找到待发布的public结果文件'}
             
             self.logger.info(f"找到 {len(result_files)} 个结果文件待发布")
             

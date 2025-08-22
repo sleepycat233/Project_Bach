@@ -424,6 +424,23 @@ class AudioUploadProcessor:
                 'success': False,
                 'error': f"清理异常: {e}"
             }
+    
+    def process_file(self, file_path: str, content_type: str, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Web界面兼容方法 - 处理音频文件
+        
+        Args:
+            file_path: 音频文件路径
+            content_type: 内容类型
+            metadata: 元数据
+            
+        Returns:
+            处理结果字典
+        """
+        return self.process_uploaded_file(
+            source_file_path=Path(file_path),
+            selected_content_type=content_type,
+            custom_metadata=metadata
+        )
 
 
 if __name__ == '__main__':
