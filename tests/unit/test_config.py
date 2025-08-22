@@ -63,8 +63,10 @@ class TestConfigManager(unittest.TestCase):
         """清理测试环境"""
         shutil.rmtree(self.test_dir)
     
-    def test_load_valid_config(self):
+    @patch('utils.env_manager.setup_project_environment')
+    def test_load_valid_config(self, mock_setup_env):
         """测试加载有效配置文件"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
         self.assertEqual(manager.get_full_config(), self.valid_config)
     
@@ -82,8 +84,10 @@ class TestConfigManager(unittest.TestCase):
         with self.assertRaises(ValueError):
             ConfigManager(invalid_yaml_path)
     
-    def test_validate_missing_required_keys(self):
+    @patch('utils.env_manager.setup_project_environment')
+    def test_validate_missing_required_keys(self, mock_setup_env):
         """测试验证缺少必要键的配置"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
         incomplete_config = {'api': {'openrouter': {'key': 'test'}}}
         incomplete_path = os.path.join(self.test_dir, 'incomplete.yaml')
         
@@ -95,26 +99,34 @@ class TestConfigManager(unittest.TestCase):
         
         self.assertIn('配置文件缺少必要项', str(context.exception))
     
-    def test_get_api_config(self):
+    @patch('utils.env_manager.setup_project_environment')
+    def test_get_api_config(self, mock_setup_env):
         """测试获取API配置"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
         api_config = manager.get_api_config()
         self.assertEqual(api_config, self.valid_config['api'])
     
-    def test_get_openrouter_config(self):
+    @patch('utils.env_manager.setup_project_environment')
+    def test_get_openrouter_config(self, mock_setup_env):
         """测试获取OpenRouter配置"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
         openrouter_config = manager.get_openrouter_config()
         self.assertEqual(openrouter_config, self.valid_config['api']['openrouter'])
     
-    def test_get_paths_config(self):
+    @patch('utils.env_manager.setup_project_environment')
+    def test_get_paths_config(self, mock_setup_env):
         """测试获取路径配置"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
         paths_config = manager.get_paths_config()
         self.assertEqual(paths_config, self.valid_config['paths'])
     
-    def test_get_whisperkit_config(self):
+    @patch('utils.env_manager.setup_project_environment')
+    def test_get_whisperkit_config(self, mock_setup_env):
         """测试获取WhisperKit配置"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
         whisperkit_config = manager.get_whisperkit_config()
         self.assertEqual(whisperkit_config, self.valid_config['whisperkit'])

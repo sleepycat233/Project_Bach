@@ -13,18 +13,43 @@ from pathlib import Path
 import re
 import html
 
+from src.utils.config import ConfigManager
+
 
 class ContentFormatter:
-    """内容格式化服务"""
+    """内容格式化服务
     
-    def __init__(self, config: Dict[str, Any]):
+    Phase 6 增强版本，支持多媒体内容类型的专门格式化:
+    - lecture (🎓 学术讲座)
+    - youtube (📺 YouTube视频) 
+    - rss (📰 RSS文章)
+    - podcast (🎙️ 播客内容)
+    """
+    
+    def __init__(self, config: Dict[str, Any], config_manager: Optional[ConfigManager] = None):
         """初始化内容格式化服务
         
         Args:
             config: 格式化配置
+            config_manager: 配置管理器实例（用于获取内容类型配置）
         """
         self.config = config
+        self.config_manager = config_manager
         self.logger = logging.getLogger('project_bach.content_formatter')
+        
+        # 加载内容类型配置
+        if config_manager:
+            try:
+                self.content_types_config = config_manager.get_content_types_config()
+                self.classification_config = config_manager.get_classification_config()
+                self.logger.info(f"加载内容类型配置: {list(self.content_types_config.keys())}")
+            except Exception as e:
+                self.logger.warning(f"无法加载内容类型配置: {e}，使用默认配置")
+                self.content_types_config = self._get_default_content_types()
+                self.classification_config = {}
+        else:
+            self.content_types_config = self._get_default_content_types()
+            self.classification_config = {}
         
         # 配置Markdown扩展
         self.markdown_extensions = [
@@ -48,13 +73,15 @@ class ContentFormatter:
             }
         )
         
-        self.logger.info("内容格式化服务初始化完成")
+        self.logger.info("Phase 6 内容格式化服务初始化完成")
     
     def format_content(self, content_data: Dict[str, Any]) -> Dict[str, Any]:
-        """格式化音频处理结果为发布内容
+        """格式化多媒体内容处理结果为发布内容
+        
+        Phase 6 增强版本，支持不同内容类型的专门格式化
         
         Args:
-            content_data: 音频处理结果数据
+            content_data: 多媒体内容处理结果数据
             
         Returns:
             格式化后的内容
@@ -67,8 +94,12 @@ class ContentFormatter:
             if not validation_result['valid']:
                 raise ValueError(f"内容结构无效: {validation_result['message']}")
             
-            # 生成Markdown内容
-            markdown_content = self._generate_markdown_content(content_data)
+            # 检测和应用内容类型特定格式化
+            content_type = self._detect_content_type(content_data)
+            self.logger.info(f"检测到内容类型: {content_type}")
+            
+            # 生成类型特定的Markdown内容
+            markdown_content = self._generate_type_specific_markdown(content_data, content_type)
             
             # 转换为HTML
             html_content = self.generate_html_from_markdown(markdown_content)
@@ -87,6 +118,7 @@ class ContentFormatter:
                     'metadata': metadata,
                     'filename': filename,
                     'title': content_data['title'],
+                    'content_type': content_type,
                     'formatted_time': datetime.now().isoformat()
                 }
             }
@@ -97,6 +129,404 @@ class ContentFormatter:
                 'success': False,
                 'error': str(e)
             }
+    
+    def _get_default_content_types(self) -> Dict[str, Any]:
+        """获取默认内容类型配置（兼容模式）
+        
+        Returns:
+            默认内容类型配置
+        """
+        return {
+            'lecture': {
+                'icon': '🎓',
+                'display_name': '讲座',
+                'description': '学术讲座、课程录音、教育内容'
+            },
+            'youtube': {
+                'icon': '📺', 
+                'display_name': '视频',
+                'description': 'YouTube视频内容、教学视频、技术分享'
+            },
+            'rss': {
+                'icon': '📰',
+                'display_name': '文章', 
+                'description': 'RSS订阅文章、技术博客、新闻资讯'
+            },
+            'podcast': {
+                'icon': '🎙️',
+                'display_name': '播客',
+                'description': '播客节目、访谈内容、讨论节目'
+            }
+        }
+    
+    def _detect_content_type(self, content_data: Dict[str, Any]) -> str:
+        """检测内容类型
+        
+        Args:
+            content_data: 内容数据
+            
+        Returns:
+            检测到的内容类型
+        """
+        # 优先使用已有的分类结果
+        if 'classification_result' in content_data:
+            classification = content_data['classification_result']
+            if isinstance(classification, dict) and 'content_type' in classification:
+                return classification['content_type']
+        
+        # 如果有直接的content_type字段
+        if 'content_type' in content_data:
+            return content_data['content_type']
+        
+        # 基于文件名或其他信息进行简单推断
+        original_file = content_data.get('original_file', '').lower()
+        
+        if any(keyword in original_file for keyword in ['youtube', 'video', 'tutorial']):
+            return 'youtube'
+        elif any(keyword in original_file for keyword in ['rss', 'feed', 'article', 'news']):
+            return 'rss'
+        elif any(keyword in original_file for keyword in ['podcast', 'interview', 'talk']):
+            return 'podcast'
+        elif any(keyword in original_file for keyword in ['lecture', 'course', 'professor', 'class']):
+            return 'lecture'
+        
+        # 默认为lecture类型
+        return 'lecture'
+    
+    def _generate_type_specific_markdown(self, content_data: Dict[str, Any], content_type: str) -> str:
+        """生成类型特定的Markdown内容
+        
+        Args:
+            content_data: 内容数据
+            content_type: 内容类型
+            
+        Returns:
+            类型特定的Markdown内容
+        """
+        # 获取类型配置
+        type_config = self.content_types_config.get(content_type, {})
+        type_icon = type_config.get('icon', '📄')
+        type_name = type_config.get('display_name', content_type.title())
+        
+        # 根据类型生成不同的内容结构
+        if content_type == 'youtube':
+            return self._generate_youtube_markdown(content_data, type_icon, type_name)
+        elif content_type == 'rss':
+            return self._generate_rss_markdown(content_data, type_icon, type_name)
+        elif content_type == 'podcast':
+            return self._generate_podcast_markdown(content_data, type_icon, type_name)
+        elif content_type == 'lecture':
+            return self._generate_lecture_markdown(content_data, type_icon, type_name)
+        else:
+            # 通用格式
+            return self._generate_generic_markdown(content_data, type_icon, type_name)
+    
+    def _generate_youtube_markdown(self, content_data: Dict[str, Any], icon: str, type_name: str) -> str:
+        """生成YouTube视频专用Markdown格式
+        
+        Args:
+            content_data: 内容数据
+            icon: 类型图标
+            type_name: 类型显示名称
+            
+        Returns:
+            YouTube格式的Markdown
+        """
+        # 处理时间格式化
+        formatted_time = self._format_time(content_data.get('processed_time'))
+        
+        # 提取YouTube特有信息
+        source_url = content_data.get('source_url', '')
+        video_title = content_data.get('video_title', content_data.get('title', ''))
+        channel_name = content_data.get('channel_name', '')
+        video_duration = content_data.get('video_duration', content_data.get('audio_duration', ''))
+        view_count = content_data.get('view_count', '')
+        
+        markdown = f"""# {icon} {video_title}
+
+**内容类型**: {type_name}  
+**处理时间**: {formatted_time}  
+**原始视频**: `{content_data.get('original_file', '未知')}`  
+**视频链接**: {source_url if source_url else '未提供'}  
+**频道名称**: {channel_name if channel_name else '未知'}  
+**视频时长**: {video_duration if video_duration else '未知'}  
+**观看次数**: {view_count if view_count else '未知'}  
+**处理状态**: ✅ 完成
+
+---
+
+## 📹 视频信息
+
+{self._format_video_metadata(content_data)}
+
+---
+
+## 📄 内容摘要
+
+{self._clean_text(content_data.get('summary', ''))[:2000]}
+
+---
+
+## 🧠 知识提取
+
+{self._format_mindmap(content_data.get('mindmap', ''))}
+
+---
+
+## 🏷️ 内容标签
+
+{self._format_content_tags(content_data)}
+
+---
+
+## 📊 处理统计
+
+{self._generate_statistics(content_data)}
+
+---
+
+<div class="footer youtube-footer">
+<p><em>📺 YouTube视频由 <a href="https://github.com/project-bach">Project Bach</a> 智能分析</em></p>
+<p><small>分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</small></p>
+</div>
+"""
+        return markdown
+    
+    def _generate_rss_markdown(self, content_data: Dict[str, Any], icon: str, type_name: str) -> str:
+        """生成RSS文章专用Markdown格式"""
+        formatted_time = self._format_time(content_data.get('processed_time'))
+        
+        # RSS特有信息
+        source_url = content_data.get('source_url', '')
+        author = content_data.get('author', '')
+        published_date = content_data.get('published_date', '')
+        category = content_data.get('category', '')
+        
+        markdown = f"""# {icon} {content_data.get('title', '未知标题')}
+
+**内容类型**: {type_name}  
+**处理时间**: {formatted_time}  
+**原始文章**: `{content_data.get('original_file', '未知')}`  
+**文章链接**: {source_url if source_url else '未提供'}  
+**作者**: {author if author else '未知'}  
+**发布日期**: {published_date if published_date else '未知'}  
+**分类**: {category if category else '未分类'}  
+**处理状态**: ✅ 完成
+
+---
+
+## 📰 文章摘要
+
+{self._clean_text(content_data.get('summary', ''))[:2000]}
+
+---
+
+## 🔍 关键信息提取
+
+{self._format_mindmap(content_data.get('mindmap', ''))}
+
+---
+
+## 🏷️ 文章标签
+
+{self._format_content_tags(content_data)}
+
+---
+
+## 📊 处理统计
+
+{self._generate_statistics(content_data)}
+
+---
+
+<div class="footer rss-footer">
+<p><em>📰 RSS文章由 <a href="https://github.com/project-bach">Project Bach</a> 智能分析</em></p>
+<p><small>分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</small></p>
+</div>
+"""
+        return markdown
+    
+    def _generate_podcast_markdown(self, content_data: Dict[str, Any], icon: str, type_name: str) -> str:
+        """生成播客专用Markdown格式"""
+        formatted_time = self._format_time(content_data.get('processed_time'))
+        
+        # 播客特有信息
+        episode_number = content_data.get('episode_number', '')
+        host_name = content_data.get('host_name', '')
+        guest_names = content_data.get('guest_names', [])
+        podcast_series = content_data.get('podcast_series', '')
+        
+        markdown = f"""# {icon} {content_data.get('title', '未知标题')}
+
+**内容类型**: {type_name}  
+**处理时间**: {formatted_time}  
+**原始文件**: `{content_data.get('original_file', '未知')}`  
+**播客系列**: {podcast_series if podcast_series else '未知'}  
+**集数**: {episode_number if episode_number else '未知'}  
+**主持人**: {host_name if host_name else '未知'}  
+**嘉宾**: {', '.join(guest_names) if guest_names else '无'}  
+**音频时长**: {content_data.get('audio_duration', '未知')}  
+**处理状态**: ✅ 完成
+
+---
+
+## 🎙️ 节目摘要
+
+{self._clean_text(content_data.get('summary', ''))[:2000]}
+
+---
+
+## 💬 对话要点
+
+{self._format_mindmap(content_data.get('mindmap', ''))}
+
+---
+
+## 👥 人物信息
+
+{self._format_anonymization_info(content_data.get('anonymized_names', {}))}
+
+---
+
+## 🏷️ 话题标签
+
+{self._format_content_tags(content_data)}
+
+---
+
+## 📊 处理统计
+
+{self._generate_statistics(content_data)}
+
+---
+
+<div class="footer podcast-footer">
+<p><em>🎙️ 播客内容由 <a href="https://github.com/project-bach">Project Bach</a> 智能分析</em></p>
+<p><small>分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</small></p>
+</div>
+"""
+        return markdown
+    
+    def _generate_lecture_markdown(self, content_data: Dict[str, Any], icon: str, type_name: str) -> str:
+        """生成学术讲座专用Markdown格式"""
+        formatted_time = self._format_time(content_data.get('processed_time'))
+        
+        # 讲座特有信息
+        lecturer = content_data.get('lecturer', '')
+        institution = content_data.get('institution', '')
+        course_name = content_data.get('course_name', '')
+        academic_field = content_data.get('academic_field', '')
+        
+        markdown = f"""# {icon} {content_data.get('title', '未知标题')}
+
+**内容类型**: {type_name}  
+**处理时间**: {formatted_time}  
+**原始文件**: `{content_data.get('original_file', '未知')}`  
+**讲师**: {lecturer if lecturer else '未知'}  
+**机构**: {institution if institution else '未知'}  
+**课程名称**: {course_name if course_name else '未知'}  
+**学科领域**: {academic_field if academic_field else '未知'}  
+**讲座时长**: {content_data.get('audio_duration', '未知')}  
+**处理状态**: ✅ 完成
+
+---
+
+## 📚 讲座摘要
+
+{self._clean_text(content_data.get('summary', ''))[:2000]}
+
+---
+
+## 🧠 知识框架
+
+{self._format_mindmap(content_data.get('mindmap', ''))}
+
+---
+
+## 👥 人名处理
+
+{self._format_anonymization_info(content_data.get('anonymized_names', {}))}
+
+---
+
+## 🔬 学术标签
+
+{self._format_content_tags(content_data)}
+
+---
+
+## 📊 处理统计
+
+{self._generate_statistics(content_data)}
+
+---
+
+<div class="footer lecture-footer">
+<p><em>🎓 学术讲座由 <a href="https://github.com/project-bach">Project Bach</a> 智能分析</em></p>
+<p><small>分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</small></p>
+</div>
+"""
+        return markdown
+    
+    def _generate_generic_markdown(self, content_data: Dict[str, Any], icon: str, type_name: str) -> str:
+        """生成通用Markdown格式（兼容原有格式）"""
+        return self._generate_markdown_content(content_data)
+    
+    def _format_time(self, timestamp: Any) -> str:
+        """格式化时间戳
+        
+        Args:
+            timestamp: 时间戳
+            
+        Returns:
+            格式化的时间字符串
+        """
+        if not timestamp:
+            return datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')
+        
+        if isinstance(timestamp, str):
+            try:
+                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                return dt.strftime('%Y年%m月%d日 %H:%M:%S')
+            except:
+                return str(timestamp)
+        else:
+            return str(timestamp)
+    
+    def _format_video_metadata(self, content_data: Dict[str, Any]) -> str:
+        """格式化视频元数据"""
+        metadata_items = []
+        
+        if content_data.get('video_description'):
+            metadata_items.append(f"**视频描述**: {content_data['video_description'][:300]}...")
+        
+        if content_data.get('upload_date'):
+            metadata_items.append(f"**上传日期**: {content_data['upload_date']}")
+        
+        if content_data.get('video_tags'):
+            tags = content_data['video_tags']
+            if isinstance(tags, list):
+                metadata_items.append(f"**原始标签**: {', '.join(tags[:10])}")
+        
+        return '\n'.join(metadata_items) if metadata_items else '暂无详细视频信息'
+    
+    def _format_content_tags(self, content_data: Dict[str, Any]) -> str:
+        """格式化内容标签"""
+        # 优先使用分类结果中的标签
+        if 'classification_result' in content_data:
+            classification = content_data['classification_result']
+            if isinstance(classification, dict) and 'tags' in classification:
+                tags = classification['tags']
+                if tags:
+                    return '`' + '` `'.join(tags) + '`'
+        
+        # 回退到其他标签来源
+        if 'extracted_tags' in content_data:
+            tags = content_data['extracted_tags']
+            if tags:
+                return '`' + '` `'.join(tags) + '`'
+        
+        return '暂无自动提取的标签'
     
     def _generate_markdown_content(self, content_data: Dict[str, Any]) -> str:
         """生成Markdown内容
@@ -278,24 +708,82 @@ class ContentFormatter:
     def _extract_metadata(self, content_data: Dict[str, Any]) -> Dict[str, Any]:
         """提取内容元数据
         
+        Phase 6 增强版本，支持多媒体内容类型的专门元数据
+        
         Args:
             content_data: 内容数据
             
         Returns:
             元数据字典
         """
-        return {
+        # 检测内容类型
+        content_type = self._detect_content_type(content_data)
+        type_config = self.content_types_config.get(content_type, {})
+        
+        # 基础元数据
+        metadata = {
             'title': content_data['title'],
             'description': content_data.get('summary', '')[:200] + '...' if len(content_data.get('summary', '')) > 200 else content_data.get('summary', ''),
-            'keywords': self._extract_keywords(content_data),
+            'keywords': self._extract_enhanced_keywords(content_data, content_type),
             'author': 'Project Bach',
             'created': content_data.get('processed_time', datetime.now().isoformat()),
             'language': 'zh-CN',
-            'type': 'audio-analysis'
+            'type': f'{content_type}-analysis',
+            'content_type': content_type,
+            'content_type_display': type_config.get('display_name', content_type.title()),
+            'content_type_icon': type_config.get('icon', '📄')
         }
+        
+        # 类型特定的元数据
+        if content_type == 'youtube':
+            metadata.update({
+                'source_platform': 'YouTube',
+                'video_url': content_data.get('source_url', ''),
+                'channel': content_data.get('channel_name', ''),
+                'video_duration': content_data.get('video_duration', content_data.get('audio_duration', '')),
+                'view_count': content_data.get('view_count', '')
+            })
+        elif content_type == 'rss':
+            metadata.update({
+                'source_platform': 'RSS',
+                'article_url': content_data.get('source_url', ''),
+                'article_author': content_data.get('author', ''),
+                'published_date': content_data.get('published_date', ''),
+                'category': content_data.get('category', '')
+            })
+        elif content_type == 'podcast':
+            metadata.update({
+                'source_platform': 'Podcast',
+                'episode_number': content_data.get('episode_number', ''),
+                'host': content_data.get('host_name', ''),
+                'guests': content_data.get('guest_names', []),
+                'series': content_data.get('podcast_series', ''),
+                'duration': content_data.get('audio_duration', '')
+            })
+        elif content_type == 'lecture':
+            metadata.update({
+                'source_platform': 'Academic',
+                'lecturer': content_data.get('lecturer', ''),
+                'institution': content_data.get('institution', ''),
+                'course': content_data.get('course_name', ''),
+                'field': content_data.get('academic_field', ''),
+                'duration': content_data.get('audio_duration', '')
+            })
+        
+        # 添加分类结果信息
+        if 'classification_result' in content_data:
+            classification = content_data['classification_result']
+            if isinstance(classification, dict):
+                metadata.update({
+                    'auto_detected': classification.get('auto_detected', True),
+                    'classification_confidence': classification.get('confidence', 0.0),
+                    'extracted_tags': classification.get('tags', [])
+                })
+        
+        return metadata
     
     def _extract_keywords(self, content_data: Dict[str, Any]) -> List[str]:
-        """提取关键词
+        """提取关键词（兼容版本）
         
         Args:
             content_data: 内容数据
@@ -303,27 +791,98 @@ class ContentFormatter:
         Returns:
             关键词列表
         """
-        keywords = ['音频处理', 'AI分析', '内容摘要']
+        return self._extract_enhanced_keywords(content_data, 'lecture')
+    
+    def _extract_enhanced_keywords(self, content_data: Dict[str, Any], content_type: str) -> List[str]:
+        """提取增强关键词
+        
+        Phase 6 版本，根据内容类型提取专门关键词
+        
+        Args:
+            content_data: 内容数据
+            content_type: 内容类型
+            
+        Returns:
+            关键词列表
+        """
+        # 基础关键词
+        keywords = ['多媒体处理', 'AI分析', '内容摘要']
+        
+        # 根据内容类型添加特定关键词
+        if content_type == 'youtube':
+            keywords.extend(['YouTube', '视频处理', '在线内容', '教学视频'])
+        elif content_type == 'rss':
+            keywords.extend(['RSS订阅', '文章分析', '新闻处理', '博客内容'])
+        elif content_type == 'podcast':
+            keywords.extend(['播客', '音频节目', '访谈内容', '对话分析'])
+        elif content_type == 'lecture':
+            keywords.extend(['学术讲座', '教育内容', '课程录音', '知识传播'])
         
         # 从标题提取
         title = content_data.get('title', '')
-        if '会议' in title:
-            keywords.append('会议')
-        if '讲座' in title:
-            keywords.append('讲座')
-        if '培训' in title:
-            keywords.append('培训')
+        title_keywords = {
+            '会议': '会议',
+            '讲座': '讲座',
+            '培训': '培训',
+            '课程': '课程',
+            '教程': '教程',
+            '访谈': '访谈',
+            '对话': '对话',
+            '新闻': '新闻',
+            '技术': '技术分享',
+            '科学': '科学研究',
+            '医学': '医学内容',
+            '商业': '商业分析',
+            '经济': '经济讨论',
+            'AI': '人工智能',
+            '机器学习': '机器学习',
+            '数据': '数据分析'
+        }
         
-        # 从摘要提取常见词汇
+        for term, keyword in title_keywords.items():
+            if term in title:
+                keywords.append(keyword)
+        
+        # 从摘要提取专业词汇
         summary = content_data.get('summary', '')
-        if '项目' in summary:
-            keywords.append('项目管理')
-        if '技术' in summary:
-            keywords.append('技术讨论')
-        if '决策' in summary:
-            keywords.append('决策分析')
+        summary_keywords = {
+            '项目': '项目管理',
+            '技术': '技术讨论',
+            '决策': '决策分析',
+            '研究': '学术研究',
+            '开发': '软件开发',
+            '设计': '设计思维',
+            '创新': '创新理念',
+            '产品': '产品管理',
+            '市场': '市场分析',
+            '用户': '用户体验',
+            '数据': '数据科学',
+            '算法': '算法分析',
+            '系统': '系统设计',
+            '架构': '技术架构',
+            '安全': '网络安全',
+            '云计算': '云计算',
+            '区块链': '区块链',
+            '物联网': '物联网',
+            '大数据': '大数据',
+            '深度学习': '深度学习'
+        }
         
-        return list(set(keywords))
+        for term, keyword in summary_keywords.items():
+            if term in summary:
+                keywords.append(keyword)
+        
+        # 从分类结果获取标签
+        if 'classification_result' in content_data:
+            classification = content_data['classification_result']
+            if isinstance(classification, dict) and 'tags' in classification:
+                classification_tags = classification['tags']
+                if isinstance(classification_tags, list):
+                    keywords.extend(classification_tags[:5])  # 最多添加5个分类标签
+        
+        # 去重并限制数量
+        unique_keywords = list(set(keywords))
+        return unique_keywords[:15]  # 最多返回15个关键词
     
     def _generate_filename(self, content_data: Dict[str, Any]) -> str:
         """生成文件名
@@ -404,13 +963,15 @@ class ContentFormatter:
     def create_site_index(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """创建网站首页索引
         
+        Phase 6 增强版本，支持内容类型分类显示
+        
         Args:
             results: 所有处理结果列表
             
         Returns:
             索引页面内容
         """
-        self.logger.info(f"创建网站索引，包含{len(results)}个结果")
+        self.logger.info(f"创建Phase 6网站索引，包含{len(results)}个结果")
         
         try:
             # 按日期排序（最新的在前）
@@ -420,17 +981,20 @@ class ContentFormatter:
                 reverse=True
             )
             
+            # 按内容类型分组统计
+            type_stats = self._analyze_content_types(sorted_results)
+            
             # 生成索引Markdown
-            index_markdown = self._generate_index_markdown(sorted_results)
+            index_markdown = self._generate_enhanced_index_markdown(sorted_results, type_stats)
             
             # 转换为HTML
             index_html = self.generate_html_from_markdown(index_markdown)
             
             # 生成元数据
             metadata = {
-                'title': 'Project Bach - 音频处理结果',
-                'description': f'共收录{len(results)}个音频处理结果',
-                'keywords': ['音频处理', 'AI分析', '结果索引'],
+                'title': 'Project Bach - 多媒体内容处理结果',
+                'description': f'共收录{len(results)}个多媒体内容处理结果，包含{len(type_stats)}种内容类型',
+                'keywords': ['多媒体处理', 'AI分析', '内容分类', '结果索引'] + list(type_stats.keys()),
                 'author': 'Project Bach',
                 'created': datetime.now().isoformat(),
                 'language': 'zh-CN',
@@ -444,8 +1008,9 @@ class ContentFormatter:
                     'html': index_html,
                     'metadata': metadata,
                     'filename': 'index.html',
-                    'title': 'Project Bach - 音频处理结果',
-                    'total_items': len(results)
+                    'title': 'Project Bach - 多媒体内容处理结果',
+                    'total_items': len(results),
+                    'content_type_stats': type_stats
                 }
             }
             
@@ -455,6 +1020,208 @@ class ContentFormatter:
                 'success': False,
                 'error': str(e)
             }
+    
+    def _analyze_content_types(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """分析内容类型统计
+        
+        Args:
+            results: 处理结果列表
+            
+        Returns:
+            内容类型统计字典
+        """
+        type_stats = {}
+        
+        for result in results:
+            # 尝试从不同字段获取内容类型
+            content_type = None
+            
+            # 优先级1: content_type字段
+            if 'content_type' in result:
+                content_type = result['content_type']
+            # 优先级2: classification_result中的content_type
+            elif 'classification_result' in result:
+                classification = result['classification_result']
+                if isinstance(classification, dict) and 'content_type' in classification:
+                    content_type = classification['content_type']
+            # 优先级3: 从文件名推断
+            elif 'file' in result or 'original_file' in result:
+                filename = result.get('file', result.get('original_file', '')).lower()
+                content_type = self._infer_type_from_filename(filename)
+            
+            # 默认为lecture
+            if not content_type:
+                content_type = 'lecture'
+            
+            # 统计
+            if content_type not in type_stats:
+                type_config = self.content_types_config.get(content_type, {})
+                type_stats[content_type] = {
+                    'count': 0,
+                    'icon': type_config.get('icon', '📄'),
+                    'display_name': type_config.get('display_name', content_type.title()),
+                    'description': type_config.get('description', ''),
+                    'recent_items': []
+                }
+            
+            type_stats[content_type]['count'] += 1
+            
+            # 记录最近的条目（最多5个）
+            if len(type_stats[content_type]['recent_items']) < 5:
+                type_stats[content_type]['recent_items'].append({
+                    'title': result.get('title', '未知标题')[:30],
+                    'date': result.get('date', ''),
+                    'file': result.get('file', '#')
+                })
+        
+        return type_stats
+    
+    def _infer_type_from_filename(self, filename: str) -> str:
+        """从文件名推断内容类型"""
+        if any(keyword in filename for keyword in ['youtube', 'video', 'tutorial']):
+            return 'youtube'
+        elif any(keyword in filename for keyword in ['rss', 'feed', 'article', 'news']):
+            return 'rss'
+        elif any(keyword in filename for keyword in ['podcast', 'interview', 'talk']):
+            return 'podcast'
+        elif any(keyword in filename for keyword in ['lecture', 'course', 'professor', 'class']):
+            return 'lecture'
+        else:
+            return 'lecture'
+    
+    def _generate_enhanced_index_markdown(self, results: List[Dict[str, Any]], type_stats: Dict[str, Any]) -> str:
+        """生成增强的索引页面Markdown
+        
+        Args:
+            results: 结果列表
+            type_stats: 内容类型统计
+            
+        Returns:
+            增强的索引Markdown内容
+        """
+        # 页面头部
+        markdown = f"""# Project Bach 多媒体内容处理结果
+
+> 🎵 智能多媒体内容处理与分析平台  
+> 📊 **共收录 {len(results)} 个处理结果**  
+> 🏷️ **包含 {len(type_stats)} 种内容类型**
+
+---
+
+## 📋 内容类型概览
+
+"""
+        
+        # 内容类型统计卡片
+        for content_type, stats in type_stats.items():
+            icon = stats['icon']
+            name = stats['display_name']
+            count = stats['count']
+            description = stats['description']
+            
+            markdown += f"""### {icon} {name} ({count}个)
+
+{description}
+
+"""
+            
+            # 显示最近的条目
+            if stats['recent_items']:
+                markdown += "**最新内容**:\n"
+                for item in stats['recent_items']:
+                    markdown += f"- [{item['title']}]({item['file']}) - {item['date']}\n"
+                markdown += "\n"
+        
+        markdown += "---\n\n"
+        
+        # 最新结果表格
+        markdown += """## 📋 最新结果
+
+"""
+        
+        if not results:
+            markdown += "暂无处理结果。\n"
+        else:
+            # 结果表格（增加类型列）
+            markdown += """| 类型 | 日期 | 标题 | 摘要预览 | 操作 |
+|------|------|------|----------|------|
+"""
+            
+            for result in results[:20]:  # 只显示最新20个
+                # 获取内容类型图标
+                content_type = result.get('content_type', 'lecture')
+                type_icon = type_stats.get(content_type, {}).get('icon', '📄')
+                
+                title = result.get('title', '未知标题')[:30]
+                date = result.get('date', '未知日期')
+                preview = result.get('summary', '暂无摘要')[:50] + '...' if len(result.get('summary', '')) > 50 else result.get('summary', '暂无摘要')
+                filename = result.get('file', '#')
+                
+                markdown += f"| {type_icon} | {date} | [{title}]({filename}) | {preview} | [查看详情]({filename}) |\n"
+            
+            # 如果结果太多，显示更多链接
+            if len(results) > 20:
+                markdown += f"\n> 📑 共{len(results)}个结果，仅显示最新20个。[查看全部 →](archive.html)\n"
+        
+        # 统计信息
+        markdown += f"""
+
+---
+
+## 📊 统计概览
+
+| 指标 | 数值 |
+|------|------|
+| 总处理数 | {len(results)} |
+| 内容类型数 | {len(type_stats)} |
+| 本月新增 | {self._count_this_month(results)} |
+| 本周新增 | {self._count_this_week(results)} |
+| 最后更新 | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} |
+
+### 🏷️ 类型分布
+
+"""
+        
+        # 类型分布统计
+        for content_type, stats in sorted(type_stats.items(), key=lambda x: x[1]['count'], reverse=True):
+            percentage = (stats['count'] / len(results)) * 100
+            markdown += f"- {stats['icon']} **{stats['display_name']}**: {stats['count']} 个 ({percentage:.1f}%)\n"
+        
+        markdown += f"""
+
+---
+
+## 🔍 快速导航
+
+### 📱 按内容类型浏览
+"""
+        
+        # 按类型导航链接
+        for content_type, stats in type_stats.items():
+            markdown += f"- [{stats['icon']} {stats['display_name']}](#{content_type}.html) - {stats['count']} 个内容\n"
+        
+        markdown += f"""
+
+### 🛠️ 功能页面
+- [📈 数据统计](stats.html) - 处理结果统计分析
+- [🏷️ 标签云](tags.html) - 内容标签分类
+- [🔎 搜索功能](search.html) - 搜索处理结果
+- [ℹ️ 关于项目](about.html) - Project Bach 介绍
+
+---
+
+<div class="footer enhanced-footer">
+<p><strong>Project Bach</strong> - 智能多媒体内容处理与分析平台</p>
+<p><em>最后更新: {datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}</em></p>
+<p>
+    <a href="https://github.com/project-bach" target="_blank">🔗 GitHub</a> | 
+    <a href="mailto:contact@project-bach.com">📧 联系我们</a> |
+    <span class="version">Phase 6 Enhanced</span>
+</p>
+</div>
+"""
+        
+        return markdown
     
     def _generate_index_markdown(self, results: List[Dict[str, Any]]) -> str:
         """生成索引页面Markdown

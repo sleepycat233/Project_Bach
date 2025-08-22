@@ -1,0 +1,75 @@
+# Phase 6 多媒体内容分类与Web界面 - 依赖清单
+
+# Web框架和前端
+Flask==3.0.0
+Flask-WTF==1.2.1  
+Werkzeug==3.0.1
+Jinja2==3.1.2
+
+# 多媒体处理
+yt-dlp==2024.1.7              # YouTube视频下载和音频提取
+feedparser==6.0.10            # RSS feed解析
+Pillow==10.2.0                # 图像处理(缩略图等)
+python-magic==0.4.27          # 文件类型检测
+
+# 内容分析和分类
+scikit-learn==1.4.0           # 机器学习(内容分类)
+nltk==3.8.1                   # 自然语言处理(标签提取)
+textblob==0.17.1              # 文本情感分析
+
+# 网络和安全
+requests==2.31.0              # HTTP请求
+cryptography==41.0.8          # 加密和安全
+pyotp==2.9.0                  # 一次性密码(可选的2FA)
+
+# 数据库和存储(可选)
+sqlite3                       # 内置,用于本地数据存储
+redis==5.0.1                  # 可选,用于会话存储和缓存
+
+# 测试依赖
+pytest==7.4.4
+pytest-flask==1.3.0
+pytest-mock==3.12.0
+pytest-cov==4.1.0
+pytest-xdist==3.5.0           # 并行测试
+responses==0.24.1             # HTTP响应模拟
+
+# 开发工具
+black==23.12.1                # 代码格式化
+flake8==7.0.0                 # 代码检查
+mypy==1.8.0                   # 类型检查
+
+# 已有依赖(来自前面阶段)
+PyYAML==6.0.1
+watchdog==3.0.0
+spacy==3.7.2
+faker==20.1.0
+openai==1.6.1
+requests==2.31.0
+
+# 性能监控
+psutil==5.9.6                 # 系统资源监控
+memory-profiler==0.61.0       # 内存使用分析
+
+# 日志和调试
+structlog==23.2.0             # 结构化日志
+rich==13.7.0                  # 美化控制台输出
+
+# 配置和环境管理  
+python-dotenv==1.0.0          # .env文件支持
+click==8.1.7                  # 命令行接口增强
+
+# 任务队列(可选,用于异步处理)
+celery==5.3.4                 # 异步任务队列
+redis==5.0.1                  # Celery消息代理
+
+# 文件处理
+pathlib2==2.3.7              # 路径处理增强(Python<3.6兼容)
+send2trash==1.8.2            # 安全文件删除
+
+# Web安全
+flask-talisman==1.1.0        # HTTP安全头
+flask-limiter==3.5.0         # 请求限流
+
+# API文档(可选)
+flask-restx==1.3.0           # REST API文档生成

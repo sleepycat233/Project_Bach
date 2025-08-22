@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+    /* 分类页面专用样式 */
+    .category-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    
+    .category-icon {
+        font-size: 4em;
+        margin-bottom: 15px;
+    }
+    
+    .category-title {
+        font-size: 2.5em;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+    
+    .category-description {
+        font-size: 1.2em;
+        opacity: 0.9;
+        margin-bottom: 20px;
+    }
+    
+    .category-stats {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        flex-wrap: wrap;
+    }
+    
+    .stat-item {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 15px 25px;
+        border-radius: 8px;
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 1.8em;
+        font-weight: 700;
+        display: block;
+    }
+    
+    .stat-label {
+        font-size: 0.9em;
+        opacity: 0.8;
+    }
+    
+    /* 内容筛选和搜索 */
+    .content-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    
+    .search-box {
+        display: flex;
+        align-items: center;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 8px 15px;
+        min-width: 300px;
+    }
+    
+    .search-box input {
+        border: none;
+        background: none;
+        outline: none;
+        color: var(--text-color);
+        font-size: 1em;
+        flex: 1;
+        margin-left: 10px;
+    }
+    
+    .filter-buttons {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .filter-btn {
+        padding: 8px 16px;
+        border: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: all 0.2s;
+    }
+    
+    .filter-btn:hover,
+    .filter-btn.active {
+        background-color: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+    }
+    
+    /* 内容卡片 */
+    .content-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 25px;
+    }
+    
+    .lecture-card {
+        background-color: var(--card-bg);
+        border-radius: 12px;
+        padding: 25px;
+        border: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    
+    .lecture-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 122, 255, 0.1);
+        border-color: var(--primary-color);
+    }
+    
+    .lecture-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 15px;
+    }
+    
+    .lecture-title {
+        font-size: 1.3em;
+        font-weight: 600;
+        color: var(--text-color);
+        line-height: 1.4;
+        margin-bottom: 8px;
+    }
+    
+    .lecture-meta {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        color: var(--text-secondary);
+        font-size: 0.9em;
+        margin-bottom: 15px;
+    }
+    
+    .lecture-summary {
+        color: var(--text-color);
+        line-height: 1.6;
+        margin-bottom: 15px;
+    }
+    
+    .lecture-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 15px;
+    }
+    
+    .tag {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: 500;
+    }
+    
+    .lecture-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .view-link {
+        color: var(--primary-color);
+        text-decoration: none;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .view-link:hover {
+        text-decoration: underline;
+    }
+    
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+        .content-controls {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .search-box {
+            min-width: auto;
+        }
+        
+        .filter-buttons {
+            justify-content: center;
+        }
+        
+        .content-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .category-stats {
+            gap: 15px;
+        }
+        
+        .stat-item {
+            padding: 10px 15px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 分类头部 -->
+<div class="category-header">
+    <div class="category-icon">🎓</div>
+    <h1 class="category-title">学术讲座</h1>
+    <p class="category-description">学术讲座、课程录音、教育内容的智能处理与分析</p>
+    
+    <div class="category-stats">
+        <div class="stat-item">
+            <span class="stat-number">{{ lecture_count or 0 }}</span>
+            <span class="stat-label">总讲座数</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-number">{{ total_duration or '0小时' }}</span>
+            <span class="stat-label">总时长</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-number">{{ unique_speakers or 0 }}</span>
+            <span class="stat-label">演讲者</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-number">{{ unique_topics or 0 }}</span>
+            <span class="stat-label">主题数</span>
+        </div>
+    </div>
+</div>
+
+<!-- 内容控制 -->
+<div class="content-controls">
+    <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="搜索讲座标题、演讲者或内容..." />
+    </div>
+    
+    <div class="filter-buttons">
+        <button class="filter-btn active" data-filter="all">全部</button>
+        <button class="filter-btn" data-filter="recent">最近</button>
+        <button class="filter-btn" data-filter="popular">热门</button>
+        <button class="filter-btn" data-filter="academic">学术</button>
+        <button class="filter-btn" data-filter="tutorial">教程</button>
+    </div>
+</div>
+
+<!-- 讲座内容网格 -->
+<div class="content-grid" id="lectureGrid">
+    {% for lecture in lectures %}
+    <div class="lecture-card" data-tags="{{ lecture.tags | join(',') }}" data-date="{{ lecture.date }}">
+        <div class="lecture-header">
+            <div>
+                <h3 class="lecture-title">{{ lecture.title }}</h3>
+                <div class="lecture-meta">
+                    <span>📅 {{ lecture.date }}</span>
+                    <span>⏱️ {{ lecture.duration or '未知时长' }}</span>
+                    <span>👤 {{ lecture.speaker or '未知演讲者' }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="lecture-summary">
+            {{ lecture.summary[:200] }}{% if lecture.summary|length > 200 %}...{% endif %}
+        </div>
+        
+        {% if lecture.tags %}
+        <div class="lecture-tags">
+            {% for tag in lecture.tags[:5] %}
+            <span class="tag">{{ tag }}</span>
+            {% endfor %}
+            {% if lecture.tags|length > 5 %}
+            <span class="tag">+{{ lecture.tags|length - 5 }}</span>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div class="lecture-actions">
+            <a href="{{ lecture.file_path or '#' }}" class="view-link" target="_blank">
+                📄 查看详情 →
+            </a>
+            <span style="color: var(--text-secondary); font-size: 0.9em;">
+                {{ lecture.mindmap_items or 0 }} 个要点
+            </span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 空状态 -->
+{% if not lectures %}
+<div class="card" style="text-align: center; padding: 60px 20px;">
+    <div style="font-size: 4em; margin-bottom: 20px;">🎓</div>
+    <h3 style="color: var(--text-secondary); margin-bottom: 15px;">暂无学术讲座</h3>
+    <p style="color: var(--text-secondary);">
+        上传音频文件并选择"讲座"分类，系统将自动进行智能处理和分析。
+    </p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // 搜索功能
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        const cards = document.querySelectorAll('.lecture-card');
+        
+        cards.forEach(card => {
+            const title = card.querySelector('.lecture-title').textContent.toLowerCase();
+            const summary = card.querySelector('.lecture-summary').textContent.toLowerCase();
+            const tags = card.dataset.tags.toLowerCase();
+            
+            if (title.includes(searchTerm) || summary.includes(searchTerm) || tags.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+    
+    // 筛选功能
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // 更新活动状态
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            const filter = this.dataset.filter;
+            const cards = document.querySelectorAll('.lecture-card');
+            
+            cards.forEach(card => {
+                const tags = card.dataset.tags.toLowerCase();
+                const date = new Date(card.dataset.date);
+                const now = new Date();
+                const daysDiff = (now - date) / (1000 * 60 * 60 * 24);
+                
+                let show = true;
+                
+                switch(filter) {
+                    case 'recent':
+                        show = daysDiff <= 30; // 最近30天
+                        break;
+                    case 'academic':
+                        show = tags.includes('academic') || tags.includes('research') || tags.includes('学术');
+                        break;
+                    case 'tutorial':
+                        show = tags.includes('tutorial') || tags.includes('教程') || tags.includes('course');
+                        break;
+                    case 'popular':
+                        // 可以根据实际数据添加热门逻辑
+                        show = true;
+                        break;
+                    case 'all':
+                    default:
+                        show = true;
+                        break;
+                }
+                
+                card.style.display = show ? 'block' : 'none';
+            });
+        });
+    });
+    
+    // 卡片点击事件
+    document.querySelectorAll('.lecture-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            // 如果点击的是链接，不触发卡片点击
+            if (e.target.tagName === 'A') return;
+            
+            const link = this.querySelector('.view-link');
+            if (link) {
+                window.open(link.href, '_blank');
+            }
+        });
+    });
+</script>
+{% endblock %}

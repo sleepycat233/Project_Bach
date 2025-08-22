@@ -149,6 +149,92 @@ class ConfigManager:
         """
         return self.config.get('logging', {})
     
+    # Phase 6: 新增配置访问方法
+    
+    def get_content_classification_config(self) -> Dict[str, Any]:
+        """获取内容分类配置
+        
+        Returns:
+            内容分类配置字典
+        """
+        return self.config.get('content_classification', {})
+    
+    def get_content_types_config(self) -> Dict[str, Any]:
+        """获取支持的内容类型配置
+        
+        Returns:
+            内容类型配置字典
+        """
+        return self.get_content_classification_config().get('content_types', {})
+    
+    def get_classification_config(self) -> Dict[str, Any]:
+        """获取分类算法配置
+        
+        Returns:
+            分类算法配置字典
+        """
+        return self.get_content_classification_config().get('classification', {})
+    
+    def get_content_filter_config(self) -> Dict[str, Any]:
+        """获取内容过滤配置
+        
+        Returns:
+            内容过滤配置字典
+        """
+        return self.get_content_classification_config().get('content_filter', {})
+    
+    def get_web_frontend_config(self) -> Dict[str, Any]:
+        """获取Web前端配置
+        
+        Returns:
+            Web前端配置字典
+        """
+        return self.config.get('web_frontend', {})
+    
+    def get_youtube_config(self) -> Dict[str, Any]:
+        """获取YouTube处理器配置
+        
+        Returns:
+            YouTube配置字典
+        """
+        return self.config.get('youtube', {})
+    
+    def get_rss_config(self) -> Dict[str, Any]:
+        """获取RSS处理器配置
+        
+        Returns:
+            RSS配置字典
+        """
+        return self.config.get('rss', {})
+    
+    def get_nested_config(self, *keys) -> Any:
+        """获取嵌套配置值
+        
+        Args:
+            *keys: 配置键路径，如 get_nested_config('content_classification', 'content_types', 'lecture')
+            
+        Returns:
+            配置值，如果路径不存在返回None
+        """
+        current = self.config
+        for key in keys:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                return None
+        return current
+    
+    def has_config(self, *keys) -> bool:
+        """检查配置键是否存在
+        
+        Args:
+            *keys: 配置键路径
+            
+        Returns:
+            是否存在
+        """
+        return self.get_nested_config(*keys) is not None
+    
     def get_full_config(self) -> Dict[str, Any]:
         """获取完整配置
         

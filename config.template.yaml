@@ -148,3 +148,193 @@ templates:
     search: false  # 搜索功能 (未来功能)
     rss_feed: false  # RSS订阅 (未来功能)
     comments: false  # 评论系统 (未来功能)
+
+# Phase 6: 多媒体内容分类与Web界面配置
+content_classification:
+  # 支持的内容类型定义
+  content_types:
+    lecture:      # 🎓 学术讲座
+      icon: "🎓"
+      display_name: "讲座"
+      description: "学术讲座、课程录音、教育内容"
+      auto_detect_patterns:
+        filename: ["lecture", "course", "教授", "professor", "university", "class", "lesson"]
+        content: ["education", "university", "classroom", "professor", "course", "lecture", "学习", "教授", "课程"]
+        url: []
+      supported_formats: ["mp3", "wav", "m4a", "mp4", "flac"]
+      default_tags: ["education", "learning"]
+      
+    youtube:      # 📺 YouTube视频
+      icon: "📺"
+      display_name: "视频"
+      description: "YouTube视频内容、教学视频、技术分享"
+      auto_detect_patterns:
+        filename: ["youtube", "video", "tutorial", "视频", "教程"]
+        content: ["youtube", "video", "tutorial", "guide", "how to", "教程", "指南"]
+        url: ["youtube.com", "youtu.be", "m.youtube.com"]
+      supported_formats: ["mp3", "wav", "m4a", "mp4", "webm"]
+      default_tags: ["video", "tutorial"]
+      processing:
+        max_duration: 7200  # 2小时
+        min_duration: 60    # 1分钟
+        preferred_quality: "best[height<=720]"
+        extract_audio_only: true
+        output_format: "mp3"
+        
+    rss:          # 📰 RSS文章
+      icon: "📰"
+      display_name: "文章"
+      description: "RSS订阅文章、技术博客、新闻资讯"
+      auto_detect_patterns:
+        filename: ["rss", "feed", "article", "news", "blog", "文章", "新闻", "博客"]
+        content: ["article", "blog", "news", "research", "paper", "文章", "研究", "论文"]
+        url: ["rss", "feed", "xml", ".rss", "/feed", "/rss.xml"]
+      supported_formats: ["txt", "md", "html"]
+      default_tags: ["article", "news"]
+      processing:
+        max_articles: 50
+        refresh_interval: 3600  # 1小时
+        min_content_length: 500
+        max_content_length: 50000
+        
+    podcast:      # 🎙️ 播客内容
+      icon: "🎙️"
+      display_name: "播客"
+      description: "播客节目、访谈内容、讨论节目"
+      auto_detect_patterns:
+        filename: ["podcast", "interview", "talk", "conversation", "播客", "访谈", "对话"]
+        content: ["podcast", "interview", "conversation", "discussion", "talk", "播客", "访谈", "对话", "讨论"]
+        url: ["podcast", "interview"]
+      supported_formats: ["mp3", "wav", "m4a", "aac"]
+      default_tags: ["podcast", "interview"]
+
+  # 分类算法配置
+  classification:
+    confidence_threshold: 0.5        # 分类置信度阈值
+    max_content_length: 5000         # 内容分析最大长度
+    enable_auto_tagging: true        # 启用自动标签提取
+    default_category: "lecture"      # 默认分类
+    enable_manual_override: true     # 允许手动覆盖分类
+    
+    # 权重配置 (优先级: URL > 文件名 > 内容)
+    scoring_weights:
+      url_match: 0.6      # URL模式匹配权重
+      filename_match: 0.3 # 文件名模式匹配权重  
+      content_match: 0.1  # 内容分析权重
+    
+    # 标签提取配置
+    tag_extraction:
+      max_tags: 10                    # 最大标签数量
+      min_tag_length: 2               # 最小标签长度
+      exclude_common_words: true      # 排除常见词汇
+      include_technical_terms: true   # 包含技术术语
+      
+  # 内容过滤配置
+  content_filter:
+    exclude_patterns:     # 排除模式
+      - "advertisement"
+      - "sponsored"
+      - "ad-block"
+      - "promotion"
+      - "广告"
+      - "推广"
+    include_patterns:     # 包含模式 (优先级高于排除)
+      - "technology"
+      - "research"
+      - "education"
+      - "tutorial"
+      - "技术"
+      - "研究"
+      - "教育"
+      - "教程"
+    min_quality_score: 0.5  # 最小质量分数
+
+# Phase 6: Web前端配置
+web_frontend:
+  # Flask应用配置
+  app:
+    host: "0.0.0.0"              # 监听地址 (Tailscale网络内)
+    port: 8080                   # 服务端口
+    debug: false                 # 调试模式
+    secret_key_env: "FLASK_SECRET_KEY"  # 从环境变量读取密钥
+    
+  # 文件上传配置
+  upload:
+    max_file_size: 104857600     # 100MB
+    allowed_extensions: [".mp3", ".wav", ".m4a", ".mp4", ".flac", ".aac", ".ogg"]
+    upload_folder: "./uploads"
+    temp_folder: "./temp"
+    auto_cleanup: true           # 自动清理临时文件
+    cleanup_interval: 3600       # 清理间隔(秒)
+    
+  # 安全配置
+  security:
+    tailscale_only: true         # 仅允许Tailscale网络访问
+    rate_limit_per_minute: 60    # 每分钟请求限制
+    rate_limit_per_hour: 1000    # 每小时请求限制
+    enable_csrf: true            # 启用CSRF保护
+    session_timeout: 3600        # 会话超时(秒)
+    
+  # UI配置
+  ui:
+    theme: "dark"                # 默认主题
+    language: "zh-CN"            # 默认语言
+    show_progress: true          # 显示处理进度
+    auto_refresh_interval: 5     # 状态自动刷新间隔(秒)
+    max_concurrent_uploads: 3    # 最大并发上传数
+
+# YouTube处理器配置
+youtube:
+  # yt-dlp配置
+  downloader:
+    max_duration: 7200           # 最大时长(秒) 2小时
+    min_duration: 60             # 最小时长(秒) 1分钟
+    preferred_quality: "best[height<=720]"  # 首选质量
+    extract_audio_only: true     # 仅提取音频
+    output_format: "mp3"         # 输出格式
+    output_dir: "./temp/youtube" # 输出目录
+    timeout: 600                 # 下载超时(秒)
+    
+  # 内容验证
+  validation:
+    check_availability: true     # 检查视频可用性
+    validate_duration: true      # 验证时长
+    skip_private: true           # 跳过私有视频
+    skip_age_restricted: false   # 跳过年龄限制视频
+    
+  # 元数据提取
+  metadata:
+    extract_thumbnail: true      # 提取缩略图
+    extract_description: true    # 提取描述
+    extract_tags: true           # 提取标签
+    extract_comments: false      # 提取评论(耗时)
+
+# RSS处理器配置  
+rss:
+  # 订阅管理
+  subscriptions:
+    max_subscriptions: 50        # 最大订阅数
+    default_refresh_interval: 3600  # 默认刷新间隔(秒)
+    auto_refresh: true           # 自动刷新
+    storage_file: "./data/rss_subscriptions.json"  # 订阅存储文件
+    
+  # 内容处理
+  processing:
+    max_articles_per_feed: 20    # 每个feed最大文章数
+    content_length_min: 500      # 最小内容长度
+    content_length_max: 50000    # 最大内容长度
+    enable_summarization: true   # 启用AI摘要
+    preserve_html: false         # 保留HTML格式
+    
+  # 过滤配置
+  filtering:
+    exclude_duplicates: true     # 排除重复文章
+    exclude_old_articles: true   # 排除旧文章
+    max_age_days: 30            # 最大文章年龄(天)
+    spam_detection: true         # 垃圾检测
+    
+  # 网络配置
+  network:
+    timeout: 30                  # 请求超时(秒)
+    max_retries: 3              # 最大重试次数
+    user_agent: "Project Bach RSS Reader 1.0"
