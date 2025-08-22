@@ -91,11 +91,17 @@ def create_app(config=None):
     @app.route('/')
     def index():
         """主页 - 显示上传界面和分类选项"""
+        config_manager = app.config.get('CONFIG_MANAGER')
+        
         # 获取内容类型配置
-        content_types = {
-            'lecture': {'icon': '🎓', 'name': 'Academic Lecture'},
-            'youtube': {'icon': '📺', 'name': 'YouTube Video'}
-        }
+        if config_manager:
+            content_types = config_manager.get_nested_config('content_classification', 'content_types') or {}
+        else:
+            content_types = {
+                'lecture': {'icon': '🎓', 'display_name': 'Academic Lecture'},
+                'meeting': {'icon': '🏢', 'display_name': 'Meeting Recording'},
+                'others': {'icon': '📄', 'display_name': 'Others'}
+            }
         
         return render_template('upload.html', content_types=content_types)
     
@@ -124,6 +130,15 @@ def create_app(config=None):
             # 获取隐私级别
             privacy_level = request.form.get('privacy_level', 'public')
             
+            # 处理子分类信息
+            subcategory = request.form.get('subcategory', '')
+            custom_subcategory = request.form.get('custom_subcategory', '')
+            audio_language = request.form.get('audio_language', 'english')
+            
+            # 如果选择了other，使用自定义子分类名
+            if subcategory == 'other' and custom_subcategory:
+                subcategory = custom_subcategory
+            
             # 处理上传
             handler = app.config['AUDIO_HANDLER']
             result = handler.process_upload(
@@ -131,8 +146,8 @@ def create_app(config=None):
                 content_type=content_type,
                 privacy_level=privacy_level,
                 metadata={
-                    'lecture_series': request.form.get('lecture_series', ''),
-                    'tags': request.form.get('tags', ''),
+                    'subcategory': subcategory,
+                    'audio_language': audio_language,
                     'description': request.form.get('description', '')
                 }
             )
@@ -159,7 +174,7 @@ def create_app(config=None):
             if not youtube_url:
                 return jsonify({'error': 'YouTube URL is required'}), 400
             
-            content_type = request.form.get('content_type', 'youtube')
+            content_type = 'youtube'  # YouTube视频固定为youtube类型
             
             # 验证YouTube URL
             if not is_valid_youtube_url(youtube_url):

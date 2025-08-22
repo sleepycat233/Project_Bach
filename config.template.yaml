@@ -29,12 +29,26 @@ spacy:
 
 whisperkit:
   model: "large-v3"    # 可选: tiny, small, base, medium, large-v3
-  model_prefix: "distil"  # 推荐配置：distil (英文4.4倍速) 或 openai (支持中文)
-  language: "en"  
-  # 性能对比（10分钟英文音频）：
+  language: "auto"  # auto: 基于用户选择自动切换
+  model_path: "/Users/me/Documents/huggingface/models/argmaxinc/whisperkit-coreml"
+  
+  # 语言特定配置
+  language_configs:
+    english:
+      model_prefix: "distil"  # Distil模型：英文专用，高性能
+      language_code: "en"
+      performance: "18x realtime"  # ~32.9秒处理10分钟音频
+      description: "English-only optimized, fastest processing"
+      
+    multilingual:
+      model_prefix: "openai"   # OpenAI模型：多语言支持，较慢
+      language_code: "auto"    # 自动检测语言
+      performance: "4x realtime"   # ~143.9秒处理10分钟音频  
+      description: "Supports Chinese/mixed languages, slower processing"
+      
+  # 性能对比（10分钟音频测试）：
   # - distil-large-v3: 32.9秒 (18x实时，仅英文)  ⚡ 推荐英文内容
   # - openai-large-v3: 143.9秒 (4.2x实时，支持中文) 🎯 推荐中文/混合内容
-  model_path: "/Users/me/Documents/huggingface/models/argmaxinc/whisperkit-coreml"
 
 # 系统配置
 system:
@@ -151,62 +165,50 @@ templates:
 
 # Phase 6: 多媒体内容分类与Web界面配置
 content_classification:
+  # 课程配置 (用于lecture_series多选)
+  courses:
+    - "PHYS101"
+    - "CS101" 
+    - "ML301"
+    - "PHYS401"
   # 支持的内容类型定义
   content_types:
     lecture:      # 🎓 学术讲座
       icon: "🎓"
-      display_name: "讲座"
-      description: "学术讲座、课程录音、教育内容"
+      display_name: "Academic Lecture"
+      description: "Academic lectures, course recordings, educational content"
       auto_detect_patterns:
-        filename: ["lecture", "course", "教授", "professor", "university", "class", "lesson"]
-        content: ["education", "university", "classroom", "professor", "course", "lecture", "学习", "教授", "课程"]
+        filename: ["lecture", "course", "教授", "professor", "university", "class", "lesson", "academic", "seminar", "workshop", "tutorial", "education"]
+        content: ["education", "university", "classroom", "professor", "course", "lecture", "academic", "research", "study", "learning", "teaching", "student", "knowledge", "theory", "concept", "principle", "学习", "教授", "课程", "学术", "研究", "教育", "知识"]
         url: []
       supported_formats: ["mp3", "wav", "m4a", "mp4", "flac"]
       default_tags: ["education", "learning"]
       
-    youtube:      # 📺 YouTube视频
-      icon: "📺"
-      display_name: "视频"
-      description: "YouTube视频内容、教学视频、技术分享"
+    meeting:      # 🏢 会议录音
+      icon: "🏢"
+      display_name: "Meeting Recording"
+      description: "Meeting recordings, discussion records (Limited support, requires ElevenLabs speaker diarization)"
       auto_detect_patterns:
-        filename: ["youtube", "video", "tutorial", "视频", "教程"]
-        content: ["youtube", "video", "tutorial", "guide", "how to", "教程", "指南"]
-        url: ["youtube.com", "youtu.be", "m.youtube.com"]
-      supported_formats: ["mp3", "wav", "m4a", "mp4", "webm"]
-      default_tags: ["video", "tutorial"]
+        filename: ["meeting", "conference", "discussion", "call", "会议", "讨论", "电话会议"]
+        content: ["meeting", "conference", "discussion", "agenda", "participants", "会议", "讨论", "议程"]
+        url: []
+      supported_formats: ["mp3", "wav", "m4a", "mp4", "flac"]
+      default_tags: ["meeting", "discussion"]
       processing:
-        max_duration: 7200  # 2小时
-        min_duration: 60    # 1分钟
-        preferred_quality: "best[height<=720]"
-        extract_audio_only: true
-        output_format: "mp3"
+        requires_speaker_diarization: true
+        api_service: "elevenlabs"  # 需要ElevenLabs API
+        support_level: "limited"
         
-    rss:          # 📰 RSS文章
-      icon: "📰"
-      display_name: "文章"
-      description: "RSS订阅文章、技术博客、新闻资讯"
+    others:       # 📄 其他内容
+      icon: "📄"
+      display_name: "Others"
+      description: "Other types of audio content"
       auto_detect_patterns:
-        filename: ["rss", "feed", "article", "news", "blog", "文章", "新闻", "博客"]
-        content: ["article", "blog", "news", "research", "paper", "文章", "研究", "论文"]
-        url: ["rss", "feed", "xml", ".rss", "/feed", "/rss.xml"]
-      supported_formats: ["txt", "md", "html"]
-      default_tags: ["article", "news"]
-      processing:
-        max_articles: 50
-        refresh_interval: 3600  # 1小时
-        min_content_length: 500
-        max_content_length: 50000
-        
-    podcast:      # 🎙️ 播客内容
-      icon: "🎙️"
-      display_name: "播客"
-      description: "播客节目、访谈内容、讨论节目"
-      auto_detect_patterns:
-        filename: ["podcast", "interview", "talk", "conversation", "播客", "访谈", "对话"]
-        content: ["podcast", "interview", "conversation", "discussion", "talk", "播客", "访谈", "对话", "讨论"]
-        url: ["podcast", "interview"]
-      supported_formats: ["mp3", "wav", "m4a", "aac"]
-      default_tags: ["podcast", "interview"]
+        filename: ["other", "misc", "general"]
+        content: ["other", "miscellaneous", "general"]
+        url: []
+      supported_formats: ["mp3", "wav", "m4a", "mp4", "flac", "aac", "ogg"]
+      default_tags: ["other"]
 
   # 分类算法配置
   classification:

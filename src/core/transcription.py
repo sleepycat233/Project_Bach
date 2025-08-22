@@ -27,11 +27,13 @@ class TranscriptionService:
         self.logger = logging.getLogger('project_bach.transcription')
         self.whisperkit_client = WhisperKitClient(whisperkit_config)
         
-    def transcribe_audio(self, audio_path: Path) -> str:
+    def transcribe_audio(self, audio_path: Path, prompt: str = None, language_preference: str = 'english') -> str:
         """转录音频文件
         
         Args:
             audio_path: 音频文件路径
+            prompt: Whisper系统提示词，用于提高特定术语识别准确性
+            language_preference: 语言偏好 ('english' 或 'multilingual')
             
         Returns:
             转录文本
@@ -39,15 +41,20 @@ class TranscriptionService:
         Raises:
             Exception: 转录失败
         """
-        model = self.config.get('model', 'medium')
-        language = self.config.get('language', 'zh')
+        # 根据语言偏好选择模型配置
+        language_config = self.config.get('language_configs', {}).get(language_preference, {})
+        model = self.config.get('model', 'large-v3')
+        model_prefix = language_config.get('model_prefix', 'distil')
+        language = language_config.get('language_code', 'en')
         
         # 获取音频文件信息
         file_size_mb = audio_path.stat().st_size / (1024 * 1024)
         audio_duration = self._estimate_audio_duration(audio_path)
         
         self.logger.info(f"开始转录音频: {audio_path.name}")
-        self.logger.info(f"文件信息: 大小={file_size_mb:.1f}MB, 模型={model}, 语言={language}")
+        self.logger.info(f"文件信息: 大小={file_size_mb:.1f}MB, 模型={model_prefix}-{model}, 语言={language}")
+        if prompt:
+            self.logger.info(f"使用自定义提示词: {prompt[:50]}{'...' if len(prompt) > 50 else ''}")
         
         # 硬编码合理的阈值
         large_file_threshold = 50  # MB
@@ -69,7 +76,7 @@ class TranscriptionService:
         
         try:
             # 使用WhisperKit CLI进行真实转录
-            return self.whisperkit_client.transcribe(audio_path, audio_duration)
+            return self.whisperkit_client.transcribe(audio_path, audio_duration, prompt, language_preference)
         except Exception as e:
             self.logger.warning(f"WhisperKit转录失败，使用备用方案: {str(e)}")
             return self._fallback_transcription(audio_path)
@@ -163,12 +170,14 @@ class WhisperKitClient:
         self.config = config
         self.logger = logging.getLogger('project_bach.whisperkit')
         
-    def transcribe(self, audio_path: Path, audio_duration: float = None) -> str:
+    def transcribe(self, audio_path: Path, audio_duration: float = None, prompt: str = None, language_preference: str = 'english') -> str:
         """使用WhisperKit CLI进行音频转录
         
         Args:
             audio_path: 音频文件路径
             audio_duration: 音频时长（分钟），用于计算合适的超时时间
+            prompt: Whisper系统提示词，用于提高特定术语识别准确性
+            language_preference: 语言偏好 ('english' 或 'multilingual')
             
         Returns:
             转录文本
@@ -176,9 +185,11 @@ class WhisperKitClient:
         Raises:
             Exception: 转录失败
         """
-        # 从配置文件获取WhisperKit设置
-        model = self.config.get('model', 'medium')
-        language = self.config.get('language', 'zh')
+        # 根据语言偏好获取模型配置
+        language_config = self.config.get('language_configs', {}).get(language_preference, {})
+        model = self.config.get('model', 'large-v3')
+        model_prefix = language_config.get('model_prefix', 'distil')
+        language = language_config.get('language_code', 'en')
         
         # 硬编码合理的超时参数
         base_timeout = 120  # 2分钟基础超时
@@ -196,8 +207,6 @@ class WhisperKitClient:
         else:
             timeout = base_timeout
         
-        # 获取用户配置
-        model_prefix = self.config.get('model_prefix', 'openai')
         
         # 硬编码最优性能设置
         audio_compute = 'cpuAndNeuralEngine'  # Apple Silicon最优
@@ -223,6 +232,10 @@ class WhisperKitClient:
         # 添加语言参数
         if language:
             cmd.extend(["--language", language])
+        
+        # 添加prompt参数
+        if prompt and prompt.strip():
+            cmd.extend(["--prompt", prompt.strip()])
         
         # 添加性能优化选项
         if use_cache:

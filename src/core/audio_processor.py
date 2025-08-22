@@ -98,12 +98,13 @@ class AudioProcessor:
         self.publishing_workflow = workflow
         self.logger.debug("发布工作流已设置")
     
-    def process_audio_file(self, audio_path: str, privacy_level: str = 'public') -> bool:
+    def process_audio_file(self, audio_path: str, privacy_level: str = 'public', metadata: Dict[str, Any] = None) -> bool:
         """处理单个音频文件的完整流程
         
         Args:
             audio_path: 音频文件路径
             privacy_level: 隐私级别 ('public' 或 'private')
+            metadata: 处理元数据，包含description(Whisper prompt)和audio_language
             
         Returns:
             处理是否成功
@@ -118,9 +119,17 @@ class AudioProcessor:
         self.logger.info(f"开始处理音频文件: {audio_path.name}")
         
         try:
-            # 步骤1: 音频转录
+            # 获取metadata信息
+            prompt = metadata.get('description', '') if metadata else ''
+            audio_language = metadata.get('audio_language', 'english') if metadata else 'english'
+            
+            # 步骤1: 音频转录（使用description作为Whisper prompt）
             self.logger.info("步骤1: 开始音频转录")
-            transcript = self.transcription_service.transcribe_audio(audio_path)
+            transcript = self.transcription_service.transcribe_audio(
+                audio_path, 
+                prompt=prompt, 
+                language_preference=audio_language
+            )
             if not transcript:
                 raise Exception("转录失败或结果为空")
             

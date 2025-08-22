@@ -311,7 +311,7 @@
         
         {% if status and status.stage in ['uploaded', 'transcribing', 'anonymizing', 'ai_generating', 'publishing'] %}
         <div class="auto-refresh">
-            <p>🔄 This page will auto-refresh every 5 seconds</p>
+            <p>🔄 Auto-refreshing every second</p>
         </div>
         {% endif %}
     </div>
@@ -376,13 +376,13 @@
             logsContainer.scrollTop = logsContainer.scrollHeight;
         }
         
-        // Check status every 3 seconds via API
-        setInterval(updateStatusFromAPI, 3000);
+        // Check status every 1 second via API
+        setInterval(updateStatusFromAPI, 1000);
         
-        // Fallback full page reload every 15 seconds
+        // Fallback full page reload every 10 seconds
         setTimeout(function() {
             window.location.reload();
-        }, 15000);
+        }, 10000);
         
         {% endif %}
     </script>

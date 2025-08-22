@@ -217,16 +217,25 @@ class AudioUploadProcessor:
                     'available_types': available_types
                 }
             
-            # 3. 生成目标文件名
+            # 3. 生成目标文件名 (日期时间前缀 + 内容类型 + 原文件名)
             safe_filename = self.sanitize_filename(source_file_path.name)
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             
-            # 添加内容类型前缀
+            # 添加内容类型标识
             type_config = self.content_types_config[selected_content_type]
-            type_prefix = selected_content_type[:3].upper()
+            type_prefix = selected_content_type.upper()[:3]  # LEC, POD, YOU, RSS
             
-            target_filename = f"{type_prefix}_{timestamp}_{safe_filename}"
-            target_path = self.watch_dir / target_filename
+            target_filename = f"{timestamp}_{type_prefix}_{safe_filename}"
+            
+            # 如果有课程信息，创建课程子文件夹
+            course_folder = self.watch_dir
+            if custom_metadata and custom_metadata.get('lecture_series'):
+                course_code = custom_metadata['lecture_series']
+                course_folder = self.watch_dir / course_code
+                course_folder.mkdir(parents=True, exist_ok=True)
+                self.logger.info(f"为课程 {course_code} 创建文件夹: {course_folder}")
+            
+            target_path = course_folder / target_filename
             
             # 确保文件名唯一
             counter = 1
@@ -239,18 +248,12 @@ class AudioUploadProcessor:
             shutil.copy2(source_file_path, target_path)
             self.logger.info(f"文件已复制到: {target_path}")
             
-            # 5. 可选保留原始文件
-            preserved_path = None
-            if self.preserve_original:
-                preserved_path = self.upload_dir / f"original_{target_filename}"
-                shutil.copy2(source_file_path, preserved_path)
-                self.logger.info(f"原始文件已保存: {preserved_path}")
+            # 5. 不再保留原始文件副本，避免重复存储
             
             # 6. 创建处理元数据
             processing_metadata = {
                 'source_file': str(source_file_path),
                 'target_file': str(target_path),
-                'preserved_file': str(preserved_path) if preserved_path else None,
                 'selected_content_type': selected_content_type,
                 'content_type_config': type_config,
                 'file_info': file_info,
@@ -279,7 +282,6 @@ class AudioUploadProcessor:
             result = {
                 'success': True,
                 'target_file_path': str(target_path),
-                'preserved_file_path': str(preserved_path) if preserved_path else None,
                 'processing_metadata': processing_metadata,
                 'message': f"文件上传成功，类型: {type_config['display_name']}"
             }
