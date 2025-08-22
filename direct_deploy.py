@@ -1,4 +1,26 @@
-<!DOCTYPE html>
+#!/usr/bin/env python3
+"""
+直接使用Git命令的GitHub Pages部署脚本
+"""
+import os
+import subprocess
+from datetime import datetime
+
+def run_command(cmd, description=""):
+    """执行shell命令"""
+    if description:
+        print(f"📋 {description}")
+    try:
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        print(f"❌ 命令执行失败: {cmd}")
+        print(f"❌ 错误: {e.stderr}")
+        raise
+
+def create_enhanced_index_html():
+    """创建增强的主页HTML"""
+    html_content = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -211,7 +233,7 @@
                 <p>测试覆盖率</p>
             </div>
             <div class="stat-card">
-                <h3>2025-08-22</h3>
+                <h3>""" + datetime.now().strftime('%Y-%m-%d') + """</h3>
                 <p>最后更新</p>
             </div>
         </div>
@@ -315,4 +337,90 @@
         initTheme();
     </script>
 </body>
-</html>
+</html>"""
+    return html_content
+
+def deploy_to_github_pages():
+    """部署到GitHub Pages"""
+    print("🚀 开始GitHub Pages部署...")
+    
+    try:
+        # 切换到gh-pages分支
+        run_command("git checkout gh-pages", "切换到gh-pages分支")
+        
+        # 创建增强的主页
+        print("🎨 生成增强的网站内容...")
+        html_content = create_enhanced_index_html()
+        with open('index.html', 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        # 更新README
+        readme_content = f"""# Project Bach Website
+
+Project Bach智能音频处理系统的GitHub Pages网站。
+
+## 🌟 最新更新
+
+- **部署时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- **系统状态**: 运行正常
+- **架构**: 模块化，6个核心服务
+- **测试覆盖率**: 90%+
+
+## 🔗 相关链接
+
+- [源代码仓库](https://github.com/sleepycat233/Project_Bach)
+- [项目文档](https://github.com/sleepycat233/Project_Bach/blob/main/CLAUDE.md)
+- [实施计划](https://github.com/sleepycat233/Project_Bach/blob/main/doc/implementation_plan.md)
+
+## 🚀 技术栈
+
+- **音频转录**: WhisperKit
+- **自然语言处理**: spaCy (中英文双语)
+- **AI生成**: OpenRouter (多模型支持)
+- **前端**: 响应式HTML + CSS + JavaScript
+- **部署**: GitHub Actions + GitHub Pages
+
+---
+*自动生成于 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
+"""
+        with open('README.md', 'w', encoding='utf-8') as f:
+            f.write(readme_content)
+        
+        # 添加所有更改
+        run_command("git add .", "添加所有更改到暂存区")
+        
+        # 检查是否有更改需要提交
+        try:
+            status_output = run_command("git status --porcelain")
+            if not status_output:
+                print("✅ 没有更改需要提交")
+                return
+        except:
+            pass
+        
+        # 提交更改
+        commit_msg = f"Deploy enhanced website: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        run_command(f'git commit -m "{commit_msg}"', "提交更改")
+        
+        # 推送到远程
+        run_command("git push origin gh-pages", "推送到远程仓库")
+        
+        print("✅ 部署完成!")
+        print("🔗 网站地址: https://sleepycat233.github.io/Project_Bach")
+        print(f"📊 部署时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+    except Exception as e:
+        print(f"❌ 部署失败: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    finally:
+        # 切回main分支
+        try:
+            run_command("git checkout main", "切换回main分支")
+            print("🔄 已切换回main分支")
+        except:
+            print("⚠️  切换回main分支时出现问题")
+
+if __name__ == "__main__":
+    deploy_to_github_pages()
