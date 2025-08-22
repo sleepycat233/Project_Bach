@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="error-page card" style="text-align: center; margin-top: 30px;">
+    <div style="font-size: 4em; color: var(--error-color);">⚠️</div>
+    <h1 style="margin-top: 20px; color: var(--error-color);">出现错误</h1>
+    
+    {% if error_message %}
+    <p style="margin-top: 15px; color: var(--text-secondary);">{{ error_message }}</p>
+    {% endif %}
+    
+    <div style="margin-top: 30px;">
+        <a href="index.html" class="btn btn-primary">🔙 返回首页</a>
+    </div>
+</div>
+{% endblock %}

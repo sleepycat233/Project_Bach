@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="index">
+    <div class="card">
+        <h2>🎵 音频处理结果</h2>
+        <p>智能音频处理与内容分析平台</p>
+        
+        <div style="margin-top: 20px;">
+            <span style="background-color: var(--success-color); color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.9em;">
+                📊 共收录 {{ results | length }} 个处理结果
+            </span>
+        </div>
+    </div>
+    
+    {% if results and results | length > 0 %}
+    <div class="results-section">
+        <h2 style="margin-top: 30px;">📋 最新结果</h2>
+        
+        {% for result in results[:10] %}
+        <article class="card result-item" style="margin-top: 20px;">
+            <h3>
+                <a href="{{ result.file }}" style="color: var(--primary-color); text-decoration: none;">
+                    {{ result.title }}
+                </a>
+            </h3>
+            <div class="meta" style="color: var(--text-secondary); font-size: 0.9em; margin-top: 8px;">
+                <span>📅 {{ result.date | format_date }}</span>
+                {% if result.file_size %}
+                <span style="margin-left: 15px;">📦 {{ result.file_size | file_size }}</span>
+                {% endif %}
+            </div>
+            <p style="margin-top: 12px; color: var(--text-secondary);">
+                {{ result.summary | truncate_words(30) }}
+            </p>
+            <div style="margin-top: 15px;">
+                <a href="{{ result.file }}" class="btn btn-primary" style="font-size: 0.9em; padding: 6px 16px;">
+                    查看详情 →
+                </a>
+            </div>
+        </article>
+        {% endfor %}
+        
+        {% if results | length > 10 %}
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="archive.html" class="btn btn-primary">查看全部 {{ results | length }} 个结果 →</a>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 统计概览 -->
+    <div class="stats-overview card" style="margin-top: 30px;">
+        <h2>📊 统计概览</h2>
+        <table class="table table-striped" style="margin-top: 15px;">
+            <tbody>
+                <tr>
+                    <td>总处理数</td>
+                    <td><strong>{{ results | length }}</strong></td>
+                </tr>
+                <tr>
+                    <td>本月新增</td>
+                    <td><strong>{{ stats.this_month if stats else 0 }}</strong></td>
+                </tr>
+                <tr>
+                    <td>本周新增</td>
+                    <td><strong>{{ stats.this_week if stats else 0 }}</strong></td>
+                </tr>
+                <tr>
+                    <td>最后更新</td>
+                    <td>{{ current_time | format_date('%Y-%m-%d %H:%M:%S') }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    {% else %}
+    <div class="card empty-state" style="text-align: center; margin-top: 30px;">
+        <h3>🎵 暂无处理结果</h3>
+        <p style="color: var(--text-secondary); margin-top: 15px;">
+            还没有音频文件被处理。请将音频文件放入监控文件夹开始处理。
+        </p>
+    </div>
+    {% endif %}
+    
+    <!-- 快速导航 -->
+    <div class="quick-nav card" style="margin-top: 30px;">
+        <h2>🔍 快速导航</h2>
+        <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            <a href="archive.html" style="text-decoration: none;">
+                <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center; transition: transform 0.2s;">
+                    <div style="font-size: 2em;">📋</div>
+                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">完整归档</div>
+                    <div style="color: var(--text-secondary); font-size: 0.9em;">查看所有结果</div>
+                </div>
+            </a>
+            <a href="stats.html" style="text-decoration: none;">
+                <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center;">
+                    <div style="font-size: 2em;">📈</div>
+                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">数据统计</div>
+                    <div style="color: var(--text-secondary); font-size: 0.9em;">处理结果分析</div>
+                </div>
+            </a>
+            <a href="search.html" style="text-decoration: none;">
+                <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center;">
+                    <div style="font-size: 2em;">🔎</div>
+                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">搜索功能</div>
+                    <div style="color: var(--text-secondary); font-size: 0.9em;">快速查找内容</div>
+                </div>
+            </a>
+            <a href="about.html" style="text-decoration: none;">
+                <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center;">
+                    <div style="font-size: 2em;">ℹ️</div>
+                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">关于项目</div>
+                    <div style="color: var(--text-secondary); font-size: 0.9em;">Project Bach</div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
