@@ -21,11 +21,7 @@
             --card-bg: #242526;
         }
         
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -35,45 +31,19 @@
             transition: all 0.3s ease;
         }
         
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-        
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            color: var(--accent-color);
-        }
-        
-        .header p {
-            font-size: 1.2rem;
-            opacity: 0.8;
-        }
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-size: 2.5rem; margin-bottom: 10px; color: var(--accent-color); }
+        .header p { font-size: 1.2rem; opacity: 0.8; }
         
         .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s ease;
+            position: fixed; top: 20px; right: 20px;
+            background: var(--accent-color); color: white; border: none;
+            padding: 10px 15px; border-radius: 20px; cursor: pointer;
+            font-size: 14px; transition: all 0.3s ease;
         }
-        
-        .theme-toggle:hover {
-            opacity: 0.8;
-        }
+        .theme-toggle:hover { opacity: 0.8; }
         
         .stats {
             display: grid;
@@ -84,107 +54,44 @@
         
         .stat-card {
             background: var(--card-bg);
-            padding: 20px;
-            border-radius: 10px;
+            padding: 20px; border-radius: 10px;
             border: 1px solid var(--border-color);
             text-align: center;
         }
         
-        .stat-card h3 {
-            font-size: 2rem;
-            color: var(--accent-color);
-            margin-bottom: 5px;
-        }
+        .stat-card h3 { font-size: 2rem; color: var(--accent-color); margin-bottom: 5px; }
         
-        .demo-section {
+        .results {
             background: var(--card-bg);
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
+            border-radius: 10px; border: 1px solid var(--border-color);
             padding: 20px;
-            margin-bottom: 30px;
         }
         
-        .demo-section h2 {
-            margin-bottom: 20px;
-            color: var(--accent-color);
+        .results h2 { margin-bottom: 20px; color: var(--accent-color); }
+        
+        .result-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 0; border-bottom: 1px solid var(--border-color);
         }
         
-        .demo-item {
-            background: var(--bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 15px;
-        }
+        .result-item:last-child { border-bottom: none; }
         
-        .demo-item h3 {
-            color: var(--accent-color);
-            margin-bottom: 10px;
-        }
+        .result-info h3 { margin-bottom: 5px; }
+        .result-meta { font-size: 0.9rem; opacity: 0.7; }
         
-        .demo-meta {
-            font-size: 0.9rem;
-            opacity: 0.7;
-            margin-bottom: 15px;
+        .view-btn {
+            background: var(--accent-color); color: white; text-decoration: none;
+            padding: 8px 16px; border-radius: 5px; font-size: 0.9rem;
+            transition: all 0.3s ease;
         }
+        .view-btn:hover { opacity: 0.8; }
         
-        .demo-content {
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 5px;
-            margin: 10px 0;
-            font-style: italic;
-        }
-        
-        .features {
-            background: var(--card-bg);
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-            padding: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .features h2 {
-            margin-bottom: 20px;
-            color: var(--accent-color);
-        }
-        
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-        }
-        
-        .feature-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .feature-icon {
-            font-size: 1.5rem;
-        }
-        
-        .footer {
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border-color);
-            opacity: 0.7;
-        }
+        .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color); opacity: 0.7; }
         
         @media (max-width: 768px) {
-            .stats {
-                grid-template-columns: 1fr;
-            }
-            
-            .header h1 {
-                font-size: 2rem;
-            }
-            
-            .feature-grid {
-                grid-template-columns: 1fr;
-            }
+            .stats { grid-template-columns: 1fr; }
+            .result-item { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .header h1 { font-size: 2rem; }
         }
     </style>
 </head>
@@ -199,16 +106,16 @@
         
         <div class="stats">
             <div class="stat-card">
-                <h3>5+</h3>
-                <p>开发阶段</p>
+                <h3>1</h3>
+                <p>已处理音频</p>
             </div>
             <div class="stat-card">
-                <h3>6</h3>
-                <p>核心模块</p>
+                <h3>679</h3>
+                <p>总字符数</p>
             </div>
             <div class="stat-card">
-                <h3>90%+</h3>
-                <p>测试覆盖率</p>
+                <h3>未知</h3>
+                <p>平均时长</p>
             </div>
             <div class="stat-card">
                 <h3>2025-08-22</h3>
@@ -216,60 +123,14 @@
             </div>
         </div>
         
-        <div class="features">
-            <h2>🚀 核心功能</h2>
-            <div class="feature-grid">
-                <div class="feature-item">
-                    <span class="feature-icon">🎙️</span>
-                    <span>WhisperKit音频转录</span>
+        <div class="results">
+            <h2>处理结果</h2>
+            <div class="result-item">
+                <div class="result-info">
+                    <h3>audio1 - 处理结果</h3>
+                    <div class="result-meta">处理时间: 2025-08-20T20:55 | 字符数: 679</div>
                 </div>
-                <div class="feature-item">
-                    <span class="feature-icon">🧠</span>
-                    <span>spaCy智能人名匿名化</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">✨</span>
-                    <span>OpenRouter AI内容生成</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">👁️</span>
-                    <span>文件夹自动监控</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">⚡</span>
-                    <span>API限流保护</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">🌐</span>
-                    <span>GitHub Pages自动发布</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="demo-section">
-            <h2>📱 演示内容</h2>
-            <div class="demo-item">
-                <h3>🎯 架构模块化</h3>
-                <div class="demo-meta">完成时间: 2025-01-21 | 重构成果</div>
-                <div class="demo-content">
-                    将954行的单文件拆分为6个核心模块，代码可维护性提升68%，建立清晰的架构边界。
-                </div>
-            </div>
-            
-            <div class="demo-item">
-                <h3>⚡ 性能优化</h3>
-                <div class="demo-meta">优化成果: API响应时间优化40倍</div>
-                <div class="demo-content">
-                    从3分钟优化到4.4秒，集成Google Gemma 3N模型，同时实现API限流保护机制。
-                </div>
-            </div>
-            
-            <div class="demo-item">
-                <h3>🧪 测试驱动开发</h3>
-                <div class="demo-meta">测试策略: TDD + 持续集成</div>
-                <div class="demo-content">
-                    实施测试优先开发，建立单元测试+集成测试双重保障，测试覆盖率超过90%。
-                </div>
+                <a href="audio1.html" class="view-btn">查看详情</a>
             </div>
         </div>
         
@@ -284,7 +145,6 @@
     </div>
 
     <script>
-        // 主题切换功能
         function toggleTheme() {
             const body = document.body;
             const themeToggle = document.querySelector('.theme-toggle');
@@ -300,7 +160,6 @@
             }
         }
         
-        // 初始化主题
         function initTheme() {
             const savedTheme = localStorage.getItem('theme');
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -311,7 +170,6 @@
             }
         }
         
-        // 页面加载时初始化主题
         initTheme();
     </script>
 </body>
