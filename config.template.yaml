@@ -20,9 +20,9 @@ api:
         credit_to_requests_ratio: 100  # 每个credit允许100个请求/天
 
 paths:
-  watch_folder: "./watch_folder"
-  data_folder: "./data"
-  output_folder: "./output"
+  watch_folder: "./watch_folder"  # 音频文件监控目录
+  data_folder: "./data"  # 数据存储目录 (转录文本、日志等)
+  output_folder: "./data/output"  # 处理结果输出目录
 
 spacy:
   model: "zh_core_web_sm"
@@ -36,9 +36,14 @@ whisperkit:
   # - openai-large-v3: 143.9秒 (4.2x实时，支持中文) 🎯 推荐中文/混合内容
   model_path: "/Users/me/Documents/huggingface/models/argmaxinc/whisperkit-coreml"
 
+# 系统配置
+system:
+  debug: false  # 调试模式开关
+  
 logging:
-  level: "INFO"
+  level: "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
   file: "./data/logs/app.log"
+  console: true  # 是否在控制台输出日志
 
 # Phase 4: 网络集成配置
 network:
@@ -85,3 +90,61 @@ network:
     auth_token: "${SECURE_FILE_SERVER_TOKEN}"  # 从环境变量读取
     enable_upload: true  # 是否允许文件上传
     enable_download: true  # 是否允许文件下载
+
+# Phase 5: GitHub Pages 自动发布配置
+github:
+  # GitHub仓库信息
+  username: "${GITHUB_USERNAME}"  # 你的GitHub用户名（从环境变量读取）
+  repo_name: "Project_Bach"  # 仓库名
+  pages_branch: "gh-pages"  # GitHub Pages部署分支
+  
+  # Git配置 (使用SSH认证，无需token)
+  remote_url: "git@github.com:${GITHUB_USERNAME}/Project_Bach.git"  # SSH远程地址
+  
+  # Git用户配置 (如果系统没有全局配置时使用的默认值)
+  default_user_name: "Project Bach Bot"  # 默认用户名
+  default_user_email: "bot@project-bach.com"  # 默认邮箱
+  
+  # 网站配置
+  website:
+    title: "Project Bach - 智能音频处理系统"
+    description: "基于 WhisperKit + OpenRouter + spaCy 的智能音频处理与内容生成系统"
+    theme: "dark"  # 默认主题: light, dark, auto
+    
+  # 部署设置
+  publishing:
+    auto_deploy: true  # 是否自动部署到GitHub Pages
+    include_source: false  # 网站分支是否包含源代码 (推荐: false)
+    clean_deploy: true  # 每次部署前清理网站分支 (推荐: true)
+    max_files_per_deploy: 50  # 每次部署最多包含的音频结果文件数
+    
+  # 内容过滤
+  content_filter:
+    exclude_patterns:  # 不发布包含这些模式的文件
+      - "*private*"
+      - "*confidential*" 
+      - "*test*"
+    min_content_length: 100  # 最小内容长度 (字符)
+    anonymize_names: true  # 是否在发布前进行人名匿名化
+
+# 模板配置
+templates:
+  base_dir: "./templates"  # 模板文件目录
+  
+  # 页面模板
+  homepage: "index.html.j2"  # 主页模板
+  content: "content.html.j2"  # 内容页面模板
+  error: "error.html.j2"  # 错误页面模板
+  
+  # 样式配置
+  css:
+    primary_color: "#0066cc"  # 主色调
+    dark_primary_color: "#4fc3f7"  # 深色模式主色调
+    font_family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    
+  # 功能开关
+  features:
+    theme_toggle: true  # 主题切换按钮
+    search: false  # 搜索功能 (未来功能)
+    rss_feed: false  # RSS订阅 (未来功能)
+    comments: false  # 评论系统 (未来功能)

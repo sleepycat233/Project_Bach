@@ -72,6 +72,7 @@ coverage.xml
 
 # Audio files (usually large)
 *.mp3
+*.mp4
 *.wav
 *.m4a
 *.flac
@@ -89,6 +90,7 @@ output/
 results/
 transcriptions/
 logs/
+audio/
 *.md
 !README.md
 !doc/*.md

@@ -26,7 +26,7 @@ class TemplateEngine:
         self.logger = logging.getLogger('project_bach.template_engine')
         
         # 模板配置
-        self.template_dir = Path(config.get('template_dir', './templates'))
+        self.template_dir = Path(config.get('base_dir', config.get('template_dir', './templates')))
         self.theme = config.get('theme', 'default')
         self.site_title = config.get('site_title', 'Project Bach')
         self.site_description = config.get('site_description', 'AI音频处理结果发布')

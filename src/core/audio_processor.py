@@ -16,6 +16,7 @@ from .ai_generation import AIContentGenerator
 from ..storage.transcript_storage import TranscriptStorage
 from ..storage.result_storage import ResultStorage
 from ..monitoring.file_monitor import FileMonitor
+from ..publishing.publishing_workflow import PublishingWorkflow
 from ..utils.config import ConfigManager
 
 
@@ -37,6 +38,7 @@ class AudioProcessor:
         self.ai_generation_service: Optional[AIContentGenerator] = None
         self.transcript_storage: Optional[TranscriptStorage] = None
         self.result_storage: Optional[ResultStorage] = None
+        self.publishing_workflow: Optional[PublishingWorkflow] = None
         
         # 文件监控器（可选）
         self.file_monitor: Optional[FileMonitor] = None
@@ -86,7 +88,15 @@ class AudioProcessor:
             monitor: 文件监控器实例
         """
         self.file_monitor = monitor
-        self.logger.debug("文件监控器已设置")
+    
+    def set_publishing_workflow(self, workflow: PublishingWorkflow):
+        """设置发布工作流
+        
+        Args:
+            workflow: 发布工作流实例
+        """
+        self.publishing_workflow = workflow
+        self.logger.debug("发布工作流已设置")
     
     def process_audio_file(self, audio_path: str) -> bool:
         """处理单个音频文件的完整流程
@@ -144,12 +154,38 @@ class AudioProcessor:
             self.result_storage.save_markdown_result(audio_path.stem, results)
             self.result_storage.save_json_result(audio_path.stem, results)
             
+            # 步骤5: 自动部署到GitHub Pages (如果配置了)
+            if self.publishing_workflow and self._should_auto_deploy():
+                self.logger.info("步骤5: 开始自动部署到GitHub Pages")
+                try:
+                    deploy_result = self.publishing_workflow.deploy_to_github_pages()
+                    if deploy_result.get('success'):
+                        self.logger.info("✅ 自动部署成功!")
+                        if 'website_url' in deploy_result:
+                            self.logger.info(f"🔗 网站地址: {deploy_result['website_url']}")
+                    else:
+                        self.logger.warning(f"⚠️  自动部署失败: {deploy_result.get('error', '未知错误')}")
+                except Exception as e:
+                    self.logger.error(f"❌ 自动部署异常: {e}")
+            
             elapsed = time.time() - start_time
             self.logger.info(f"处理完成: {audio_path.name} (耗时: {elapsed:.2f}秒)")
             return True
             
         except Exception as e:
             self.logger.error(f"处理失败: {audio_path.name} - {str(e)}")
+            return False
+    
+    def _should_auto_deploy(self) -> bool:
+        """检查是否应该自动部署
+        
+        Returns:
+            是否应该自动部署
+        """
+        try:
+            config = self.config_manager.get_full_config()
+            return config.get('github', {}).get('publishing', {}).get('auto_deploy', False)
+        except Exception:
             return False
     
     def _validate_dependencies(self) -> bool:

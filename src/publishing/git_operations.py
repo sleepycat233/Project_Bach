@@ -26,16 +26,60 @@ class GitOperations:
         self.logger = logging.getLogger('project_bach.git_operations')
         
         # Git配置
-        self.user_name = config.get('user_name', 'Project Bach Bot')
-        self.user_email = config.get('user_email', 'bot@project-bach.com')
         self.remote_name = config.get('remote_name', 'origin')
         self.commit_message_template = config.get('commit_message_template', '🤖 Auto-publish: {title}')
+        
+        # 检查并设置Git用户信息（如果系统没有设置的话）
+        self.default_user_name = config.get('default_user_name', 'Project Bach Bot')
+        self.default_user_email = config.get('default_user_email', 'bot@project-bach.com')
         
         # 超时配置
         self.default_timeout = config.get('timeout', 300)  # 5分钟
         self.clone_timeout = config.get('clone_timeout', 600)  # 10分钟
         
         self.logger.info("Git操作服务初始化完成")
+    
+    def _check_git_user_config(self) -> Dict[str, str]:
+        """检查Git全局用户配置
+        
+        Returns:
+            包含用户名和邮箱的字典
+        """
+        user_config = {}
+        
+        try:
+            # 检查全局用户名
+            result = subprocess.run(
+                ['git', 'config', '--global', 'user.name'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                user_config['name'] = result.stdout.strip()
+            else:
+                user_config['name'] = self.default_user_name
+                self.logger.info(f"未找到全局Git用户名，使用默认值: {self.default_user_name}")
+            
+            # 检查全局邮箱
+            result = subprocess.run(
+                ['git', 'config', '--global', 'user.email'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                user_config['email'] = result.stdout.strip()
+            else:
+                user_config['email'] = self.default_user_email
+                self.logger.info(f"未找到全局Git邮箱，使用默认值: {self.default_user_email}")
+                
+        except Exception as e:
+            self.logger.warning(f"检查Git全局配置失败: {e}，使用默认值")
+            user_config['name'] = self.default_user_name
+            user_config['email'] = self.default_user_email
+        
+        return user_config
     
     def clone_repository(self, repo_url: str, local_path: str, branch: Optional[str] = None) -> Dict[str, Any]:
         """克隆Git仓库
@@ -119,10 +163,13 @@ class GitOperations:
             配置结果
         """
         try:
-            # 配置用户信息
+            # 检查并配置Git用户信息
+            user_config = self._check_git_user_config()
+            
+            # 配置Git设置
             config_commands = [
-                ['git', 'config', 'user.name', self.user_name],
-                ['git', 'config', 'user.email', self.user_email],
+                ['git', 'config', 'user.name', user_config['name']],
+                ['git', 'config', 'user.email', user_config['email']],
                 ['git', 'config', 'core.autocrlf', 'input'],  # 处理换行符
                 ['git', 'config', 'core.safecrlf', 'warn'],
             ]

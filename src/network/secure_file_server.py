@@ -239,7 +239,7 @@ if __name__ == "__main__":
         'port': 8080,
         'allowed_dirs': [
             './watch_folder',
-            './output'  # 只允许访问这两个目录
+            './data/output'  # 只允许访问这两个目录
         ],
         'auth_token': 'your-secure-token-here'
     }

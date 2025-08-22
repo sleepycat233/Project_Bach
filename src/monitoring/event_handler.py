@@ -25,7 +25,7 @@ class AudioFileHandler(FileSystemEventHandler):
         
         # 支持的音频格式
         self.supported_formats: Set[str] = {
-            '.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg'
+            '.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg', '.mp4'
         }
         
         # 忽略的文件模式

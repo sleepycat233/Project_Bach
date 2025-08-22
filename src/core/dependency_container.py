@@ -15,6 +15,7 @@ from .audio_processor import AudioProcessor
 from ..storage.transcript_storage import TranscriptStorage
 from ..storage.result_storage import ResultStorage
 from ..monitoring.file_monitor import FileMonitor
+from ..publishing.publishing_workflow import PublishingWorkflow
 
 
 class DependencyContainer:
@@ -110,7 +111,7 @@ class DependencyContainer:
         """
         if 'result_storage' not in self._services:
             paths_config = self.config_manager.get_paths_config()
-            output_folder = paths_config.get('output_folder', './output')
+            output_folder = paths_config.get('output_folder', './data/output')
             self._services['result_storage'] = ResultStorage(output_folder)
             self.logger.debug("创建结果存储服务实例")
         
@@ -138,6 +139,19 @@ class DependencyContainer:
         
         return self._services['file_monitor']
     
+    def get_publishing_workflow(self) -> PublishingWorkflow:
+        """获取发布工作流实例
+        
+        Returns:
+            发布工作流实例
+        """
+        if 'publishing_workflow' not in self._services:
+            config = self.config_manager.get_full_config()
+            self._services['publishing_workflow'] = PublishingWorkflow(config)
+            self.logger.debug("创建发布工作流实例")
+        
+        return self._services['publishing_workflow']
+    
     def get_audio_processor(self) -> AudioProcessor:
         """获取音频处理器实例（完全装配的）
         
@@ -156,6 +170,7 @@ class DependencyContainer:
                 self.get_transcript_storage(),
                 self.get_result_storage()
             )
+            processor.set_publishing_workflow(self.get_publishing_workflow())
             
             self._services['audio_processor'] = processor
             self.logger.debug("创建并装配音频处理器实例")
