@@ -381,17 +381,40 @@ class PublishingWorkflow:
                 for cmd in git_config_cmds:
                     subprocess.run(cmd, cwd=temp_dir, timeout=10)
                 
-                # 3. 复制结果文件到临时目录
-                self.logger.info(f"复制 {len(result_files)} 个结果文件...")
-                copied_files = []
-                for result_file in result_files:
-                    target_path = Path(temp_dir) / result_file.name
-                    shutil.copy2(result_file, target_path)
-                    copied_files.append(result_file.name)
-                    self.logger.debug(f"复制文件: {result_file.name}")
+                # 3. 为每个结果文件生成HTML页面
+                self.logger.info(f"为 {len(result_files)} 个结果文件生成HTML页面...")
+                generated_files = []
+                result_metadata = []
                 
-                # 4. 更新index.html（如果需要）
-                self._update_index_html(Path(temp_dir), copied_files)
+                for result_file in result_files:
+                    # 解析Markdown文件内容
+                    content_data = self._parse_markdown_result(result_file)
+                    if content_data:
+                        # 使用模板引擎生成HTML
+                        html_result = self.template_engine.render_content_page(content_data)
+                        if html_result['success']:
+                            # 写入HTML文件到临时目录
+                            html_filename = result_file.stem + '.html'
+                            html_path = Path(temp_dir) / html_filename
+                            html_path.write_text(html_result['content'], encoding='utf-8')
+                            generated_files.append(html_filename)
+                            
+                            # 保存元数据用于index页面
+                            result_metadata.append({
+                                'title': content_data.get('title', '未命名'),
+                                'file': html_filename,
+                                'date': content_data.get('processed_time', ''),
+                                'summary': content_data.get('summary', '')[:100] + '...' if content_data.get('summary') else ''
+                            })
+                            
+                            self.logger.debug(f"生成HTML文件: {html_filename}")
+                        else:
+                            self.logger.warning(f"模板渲染失败: {result_file.name}")
+                    else:
+                        self.logger.warning(f"解析失败: {result_file.name}")
+                
+                # 4. 生成并更新index.html页面
+                self._generate_index_html(Path(temp_dir), result_metadata)
                 
                 # 5. 检查是否有更改
                 status_cmd = ['git', 'status', '--porcelain']
@@ -410,7 +433,7 @@ class PublishingWorkflow:
                 add_cmd = ['git', 'add', '.']
                 subprocess.run(add_cmd, cwd=temp_dir, timeout=30)
                 
-                commit_message = f"🤖 Auto-deploy: {len(copied_files)} new audio results ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
+                commit_message = f"🤖 Auto-deploy: {len(generated_files)} new audio results ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
                 commit_cmd = ['git', 'commit', '-m', commit_message]
                 result = subprocess.run(commit_cmd, cwd=temp_dir, capture_output=True, text=True)
                 
@@ -436,8 +459,8 @@ class PublishingWorkflow:
                 self.logger.info("✅ GitHub Pages部署成功!")
                 return {
                     'success': True,
-                    'message': f'成功部署 {len(copied_files)} 个音频结果',
-                    'files_deployed': copied_files,
+                    'message': f'成功部署 {len(generated_files)} 个音频结果HTML页面',
+                    'files_deployed': generated_files,
                     'website_url': f"https://{username}.github.io/{repo_name}",
                     'commit_message': commit_message
                 }
@@ -456,59 +479,163 @@ class PublishingWorkflow:
                 'files_ready': len(result_files)
             }
     
-    def _update_index_html(self, temp_dir: Path, new_files: List[str]):
-        """更新index.html文件
+    def _parse_markdown_result(self, result_file: Path) -> Optional[Dict[str, Any]]:
+        """解析Markdown结果文件，提取内容用于HTML生成
+        
+        Args:
+            result_file: 结果文件路径
+            
+        Returns:
+            解析后的内容数据，失败返回None
+        """
+        try:
+            content = result_file.read_text(encoding='utf-8')
+            
+            # 简单解析Markdown格式的结果文件
+            lines = content.split('\n')
+            data = {
+                'title': '未命名',
+                'processed_time': '',
+                'original_file': '',
+                'summary': '',
+                'mindmap': '',
+                'anonymized_names': {}
+            }
+            
+            current_section = None
+            content_lines = []
+            
+            for line in lines:
+                line = line.strip()
+                
+                if line.startswith('# '):
+                    data['title'] = line[2:]
+                elif line.startswith('**处理时间**:'):
+                    data['processed_time'] = line.split(':', 1)[1].strip()
+                elif line.startswith('**原始文件**:'):
+                    data['original_file'] = line.split(':', 1)[1].strip()
+                elif line.startswith('## 内容摘要'):
+                    current_section = 'summary'
+                    content_lines = []
+                elif line.startswith('## 思维导图'):
+                    if current_section == 'summary':
+                        data['summary'] = '\n'.join(content_lines).strip()
+                    current_section = 'mindmap'
+                    content_lines = []
+                elif line.startswith('## '):
+                    # 保存当前部分
+                    if current_section == 'summary':
+                        data['summary'] = '\n'.join(content_lines).strip()
+                    elif current_section == 'mindmap':
+                        data['mindmap'] = '\n'.join(content_lines).strip()
+                    current_section = None
+                    content_lines = []
+                elif current_section:
+                    content_lines.append(line)
+            
+            # 保存最后一个部分
+            if current_section == 'summary':
+                data['summary'] = '\n'.join(content_lines).strip()
+            elif current_section == 'mindmap':
+                data['mindmap'] = '\n'.join(content_lines).strip()
+            
+            return data
+            
+        except Exception as e:
+            self.logger.error(f"解析Markdown文件失败 {result_file}: {e}")
+            return None
+    
+    def _generate_index_html(self, temp_dir: Path, result_metadata: List[Dict[str, Any]]):
+        """生成index.html页面
         
         Args:
             temp_dir: 临时工作目录
-            new_files: 新添加的文件列表
+            result_metadata: 结果元数据列表
         """
         try:
-            index_path = temp_dir / 'index.html'
+            # 使用模板引擎生成index页面
+            stats = {
+                'this_month': len(result_metadata),
+                'this_week': len(result_metadata)
+            }
             
-            # 如果index.html不存在，创建一个简单的
-            if not index_path.exists():
-                self.logger.info("创建index.html")
-                github_config = self.config['github']
-                username = github_config['username']
+            index_result = self.template_engine.render_index_page(result_metadata, stats)
+            if index_result['success']:
+                index_path = temp_dir / 'index.html'
+                index_path.write_text(index_result['content'], encoding='utf-8')
+                self.logger.info(f"生成index.html页面，包含 {len(result_metadata)} 个结果")
+            else:
+                # 如果模板渲染失败，创建简单的HTML页面
+                self._create_simple_index_html(temp_dir, result_metadata)
                 
-                html_content = f"""<!DOCTYPE html>
-<html lang="en">
+        except Exception as e:
+            self.logger.warning(f"生成index.html失败，使用简单版本: {e}")
+            self._create_simple_index_html(temp_dir, result_metadata)
+    
+    def _create_simple_index_html(self, temp_dir: Path, result_metadata: List[Dict[str, Any]]):
+        """创建简单的index.html页面
+        
+        Args:
+            temp_dir: 临时工作目录
+            result_metadata: 结果元数据列表
+        """
+        try:
+            github_config = self.config['github']
+            username = github_config['username']
+            
+            results_html = ""
+            for result in result_metadata:
+                results_html += f"""
+                <div class="file-item">
+                    <h3><a href="{result['file']}">{result['title']}</a></h3>
+                    <p><small>{result['date']}</small></p>
+                    <p>{result['summary']}</p>
+                </div>
+                """
+            
+            html_content = f"""<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project Bach - Audio Processing Results</title>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
-        .container {{ max-width: 800px; margin: 0 auto; padding: 20px; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; }}
+        .container {{ max-width: 800px; margin: 0 auto; }}
         .file-list {{ margin-top: 20px; }}
-        .file-item {{ margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }}
+        .file-item {{ margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; }}
+        .file-item h3 {{ margin: 0 0 10px 0; }}
+        .file-item a {{ color: #007AFF; text-decoration: none; }}
+        .file-item a:hover {{ text-decoration: underline; }}
+        footer {{ margin-top: 40px; text-align: center; color: #666; border-top: 1px solid #eee; padding-top: 20px; }}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Project Bach - Audio Processing Results</h1>
-        <p>AI-powered audio processing results generated automatically.</p>
+        <h1>🎵 Project Bach - 音频处理结果</h1>
+        <p>AI智能音频处理与内容分析平台，共收录 <strong>{len(result_metadata)}</strong> 个处理结果。</p>
         
         <div class="file-list">
-            <h2>Latest Results:</h2>
-            <!-- Results will be listed here -->
+            <h2>📋 最新结果</h2>
+            {results_html}
         </div>
         
-        <footer style="margin-top: 40px; text-align: center; color: #666;">
+        <footer>
+            <p><strong>Project Bach</strong> - AI音频处理与内容分析</p>
             <p>Generated by Project Bach | {username}</p>
         </footer>
     </div>
 </body>
 </html>"""
-                
-                with open(index_path, 'w', encoding='utf-8') as f:
-                    f.write(html_content)
             
-            self.logger.debug(f"Index.html updated with {len(new_files)} new files")
+            index_path = temp_dir / 'index.html'
+            with open(index_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            self.logger.info(f"创建简单index.html页面，包含 {len(result_metadata)} 个结果")
             
         except Exception as e:
-            self.logger.warning(f"更新index.html失败: {e}")
+            self.logger.error(f"创建简单index.html失败: {e}")
     
     def get_publish_status(self) -> Dict[str, Any]:
         """获取发布状态 (SSH模式)"""
