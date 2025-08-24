@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 
 # 添加src目录到Python路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 from storage.transcript_storage import TranscriptStorage
 from storage.result_storage import ResultStorage

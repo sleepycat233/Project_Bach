@@ -14,7 +14,7 @@ from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime
 
 import sys
-sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent.parent))
 
 from src.utils.config import ConfigManager
 from src.publishing.content_formatter import ContentFormatter

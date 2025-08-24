@@ -13,7 +13,7 @@ from unittest.mock import patch, MagicMock
 
 # 添加src目录到Python路径
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 from utils.config import ConfigManager, LoggingSetup, DirectoryManager
 

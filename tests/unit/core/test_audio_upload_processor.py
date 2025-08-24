@@ -15,7 +15,7 @@ from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timedelta
 
 import sys
-sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent.parent))
 
 from src.utils.config import ConfigManager
 from src.web_frontend.processors.audio_upload_processor import AudioUploadProcessor

@@ -14,7 +14,7 @@ from pathlib import Path
 from unittest.mock import patch, Mock
 
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 from utils.env_manager import EnvironmentManager, setup_project_environment
 

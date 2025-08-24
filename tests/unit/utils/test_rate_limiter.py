@@ -12,7 +12,7 @@ import time
 from datetime import datetime, timedelta
 
 # 添加src目录到Python路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 from utils.rate_limiter import (
     RateLimiter,
