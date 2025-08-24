@@ -1,0 +1,14 @@
+{% extends "github_pages/lectures.html" %}
+
+{% block title %}Articles - Project Bach{% endblock %}
+{% block description %}RSS feeds and written content analyzed with AI-powered insights{% endblock %}
+
+{% block page_title %}📰 Articles{% endblock %}
+{% block page_subtitle %}RSS feeds and written content{% endblock %}
+
+{% set content_items = articles %}
+{% set content_type = 'article' %}
+{% set empty_icon = '📰' %}
+{% set empty_title = 'No Articles Yet' %}
+{% set empty_description = 'Add RSS feeds or upload articles to get started.' %}
+{% set upload_text = '📤 Add Content' %}

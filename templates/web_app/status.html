@@ -1,0 +1,199 @@
+{% extends "base/web_app_base.html" %}
+
+{% block title %}Processing Status - Project Bach{% endblock %}
+{% block app_title %}Processing Status{% endblock %}
+{% block app_subtitle %}Monitor your content processing progress{% endblock %}
+
+{% block app_content %}
+<main id="status-container" class="status-page">
+    <header class="header">
+        <h1>Processing Status</h1>
+        <div class="processing-id">ID: {{ processing_id }}</div>
+    </header>
+    
+    {% if status %}
+    <div class="status-card status-{{ status.stage }}">
+        <div class="status-header">
+            <span class="status-icon">
+                {% if status.stage == 'uploaded' %}📤
+                {% elif status.stage == 'transcribing' %}🎤
+                {% elif status.stage == 'anonymizing' %}🔒
+                {% elif status.stage == 'ai_generating' %}🤖
+                {% elif status.stage == 'publishing' %}🌐
+                {% elif status.stage == 'completed' %}✅
+                {% elif status.stage == 'failed' %}❌
+                {% else %}❓{% endif %}
+            </span>
+            <div class="status-info">
+                <h2>{{ status.stage.replace('_', ' ').title() }}</h2>
+                <div class="status-message">{{ status.message or 'Processing your content...' }}</div>
+            </div>
+        </div>
+        
+        {% if status.stage in ['uploaded', 'transcribing', 'anonymizing', 'ai_generating', 'publishing'] %}
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ status.progress or 0 }}%"></div>
+            </div>
+            <div class="progress-text">{{ status.progress or 0 }}% Complete</div>
+        </div>
+        {% endif %}
+        
+        <div class="status-details">
+            <div class="detail-item">
+                <div class="detail-label">Content Type</div>
+                <div class="detail-value">{{ status.content_type.title() }}</div>
+            </div>
+            
+            <div class="detail-item">
+                <div class="detail-label">Privacy Level</div>
+                <div class="detail-value">
+                    {% if status.privacy_level == 'public' %}🌐 Public
+                    {% elif status.privacy_level == 'private' %}🔒 Private
+                    {% else %}{{ status.privacy_level.title() }}{% endif %}
+                </div>
+            </div>
+            
+            <div class="detail-item">
+                <div class="detail-label">Started At</div>
+                <div class="detail-value">{{ status.created_time[:19] if status.created_time else 'Unknown' }}</div>
+            </div>
+            
+            <div class="detail-item">
+                <div class="detail-label">Last Updated</div>
+                <div class="detail-value">{{ status.updated_time[:19] if status.updated_time else 'Unknown' }}</div>
+            </div>
+            
+            {% if status.stage == 'completed' and status.result_url %}
+            <div class="detail-item">
+                <div class="detail-label">Result</div>
+                <div class="detail-value">
+                    <a href="{{ status.result_url }}" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.9rem;">View Result</a>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if status.stage == 'failed' and status.error_message %}
+            <div class="detail-item" style="grid-column: 1 / -1;">
+                <div class="detail-label">Error Details</div>
+                <div class="detail-value" style="color: #dc3545; font-family: monospace; font-size: 0.9rem; word-break: break-word;">
+                    {{ status.error_message }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% if status.processing_logs %}
+        <div style="margin-top: 30px;">
+            <h3 style="color: #333; margin-bottom: 15px;">📋 Processing Logs</h3>
+            <div id="logs-container" style="background: #f8f9fa; border-radius: 6px; padding: 15px; max-height: 300px; overflow-y: auto;">
+                {% for log in status.processing_logs %}
+                <div class="log-entry" style="margin-bottom: 8px; padding: 8px; border-left: 3px solid 
+                    {% if log.level == 'error' %}#dc3545
+                    {% elif log.level == 'warning' %}#fd7e14
+                    {% elif log.level == 'success' %}#28a745
+                    {% else %}#007bff{% endif %}; 
+                    background: white; border-radius: 3px; font-size: 0.9rem;">
+                    <span style="color: #666; font-family: monospace;">[{{ log.timestamp[11:19] }}]</span>
+                    <span style="color: #333;">{{ log.message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="status-card status-error">
+        <div class="status-header">
+            <span class="status-icon">❓</span>
+            <div class="status-info">
+                <h2>Unknown Status</h2>
+                <div class="status-message">Could not find processing information for this ID.</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="actions">
+        <a href="/" class="btn btn-secondary">Upload More Content</a>
+        <button onclick="refreshStatus()" class="btn btn-primary">Refresh Status</button>
+    </div>
+    
+    {% if status and status.stage in ['uploaded', 'transcribing', 'anonymizing', 'ai_generating', 'publishing'] %}
+    <div class="auto-refresh">
+        <p>🔄 Auto-refreshing every second</p>
+    </div>
+    {% endif %}
+</main>
+
+<script>
+function refreshStatus() {
+    window.location.reload();
+}
+
+// Auto-refresh for in-progress items with real-time API updates
+{% if status and status.stage in ['uploaded', 'transcribing', 'anonymizing', 'ai_generating', 'publishing'] %}
+
+// Function to update status via API
+function updateStatusFromAPI() {
+    fetch('/api/status/{{ processing_id }}')
+        .then(response => response.json())
+        .then(data => {
+            // Update logs if available
+            if (data.processing_logs && data.processing_logs.length > 0) {
+                updateLogs(data.processing_logs);
+            }
+            
+            if (data.stage !== '{{ status.stage }}' || data.progress !== {{ status.progress or 0 }}) {
+                // Status changed, reload page
+                window.location.reload();
+            }
+        })
+        .catch(error => {
+            console.log('Status check failed:', error);
+            // Fallback to page reload on error
+            setTimeout(() => window.location.reload(), 5000);
+        });
+}
+
+// Update logs in real-time
+function updateLogs(logs) {
+    const logsContainer = document.getElementById('logs-container');
+    if (!logsContainer) return;
+    
+    // Clear existing logs
+    logsContainer.innerHTML = '';
+    
+    // Add new logs
+    logs.forEach(log => {
+        const logDiv = document.createElement('div');
+        logDiv.className = 'log-entry';
+        logDiv.style.cssText = `margin-bottom: 8px; padding: 8px; border-left: 3px solid 
+            ${log.level === 'error' ? '#dc3545' : 
+              log.level === 'warning' ? '#fd7e14' : 
+              log.level === 'success' ? '#28a745' : '#007bff'}; 
+            background: white; border-radius: 3px; font-size: 0.9rem;`;
+        
+        logDiv.innerHTML = `
+            <span style="color: #666; font-family: monospace;">[${log.timestamp.slice(11,19)}]</span>
+            <span style="color: #333;">${log.message}</span>
+        `;
+        
+        logsContainer.appendChild(logDiv);
+    });
+    
+    // Auto-scroll to bottom
+    logsContainer.scrollTop = logsContainer.scrollHeight;
+}
+
+// Check status every 1 second via API
+setInterval(updateStatusFromAPI, 1000);
+
+// Fallback full page reload every 10 seconds
+setTimeout(function() {
+    window.location.reload();
+}, 10000);
+
+{% endif %}
+</script>
+{% endblock %}

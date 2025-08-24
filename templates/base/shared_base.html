@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{% block description %}Project Bach - AI-powered content processing and analysis{% endblock %}">
+    <title>{% block title %}Project Bach{% endblock %}</title>
+    
+    <!-- Shared CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
+    {% block additional_css %}{% endblock %}
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='assets/favicon.ico') }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    {% block body_content %}{% endblock %}
+    
+    <!-- Shared JavaScript -->
+    <script type="module" src="{{ url_for('static', filename='js/shared.js') }}"></script>
+    {% block additional_js %}{% endblock %}
+</body>
+</html>

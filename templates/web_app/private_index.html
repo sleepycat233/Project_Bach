@@ -1,0 +1,288 @@
+{% extends "base/web_app_base.html" %}
+
+{% block title %}Private Content - Project Bach{% endblock %}
+{% block app_title %}Private Content Hub{% endblock %}
+{% block app_subtitle %}Access your processed content and analysis{% endblock %}
+
+{% block app_content %}
+<nav class="private-nav-tabs">
+    <button class="tab-button active" data-tab="recent">📋 Recent</button>
+    <button class="tab-button" data-tab="categories">📁 Categories</button>
+    <button class="tab-button" data-tab="search">🔍 Search</button>
+</nav>
+
+<section id="recent-tab" class="tab-content active">
+    <div class="content-header">
+        <h3>📋 Recent Content</h3>
+        <div class="header-actions">
+            <a href="{{ url_for('upload_page') }}" class="btn btn-primary btn-sm">
+                📤 Upload New
+            </a>
+            <button onclick="window.location.reload()" class="btn btn-secondary btn-sm">
+                🔄 Refresh
+            </button>
+        </div>
+    </div>
+    
+    {% if recent_content %}
+    <div class="content-grid">
+        {% for item in recent_content %}
+        <article class="content-card card content-{{ item.content_type }}">
+            <header class="content-card-header">
+                <div class="content-title">
+                    <h4>
+                        {% if item.github_url %}
+                        <a href="{{ item.github_url }}" target="_blank">{{ item.title or item.filename }}</a>
+                        {% else %}
+                        {{ item.title or item.filename }}
+                        {% endif %}
+                    </h4>
+                </div>
+                <span class="content-type-badge">
+                    {% if item.content_type == 'lecture' %}🎓
+                    {% elif item.content_type == 'youtube' %}📺
+                    {% elif item.content_type == 'rss' %}📰
+                    {% elif item.content_type == 'podcast' %}🎙️
+                    {% else %}📝
+                    {% endif %}
+                    {{ item.content_type | title }}
+                </span>
+            </header>
+            
+            <div class="content-meta">
+                <span class="meta-item">
+                    📅 {{ item.created_at | timeago if item.created_at else 'Recently' }}
+                </span>
+                {% if item.duration %}
+                <span class="meta-item">⏱️ {{ item.duration }}</span>
+                {% endif %}
+                {% if item.language %}
+                <span class="meta-item">🌍 {{ item.language | title }}</span>
+                {% endif %}
+            </div>
+            
+            {% if item.summary %}
+            <div class="content-summary">
+                {{ item.summary | truncate(120) }}
+            </div>
+            {% endif %}
+            
+            <footer class="content-actions">
+                {% if item.github_url %}
+                <a href="{{ item.github_url }}" class="btn btn-primary btn-sm" target="_blank">
+                    🌐 View on GitHub Pages
+                </a>
+                {% endif %}
+                {% if item.result_file %}
+                <a href="{{ item.result_file }}" class="btn btn-secondary btn-sm" download>
+                    📥 Download
+                </a>
+                {% endif %}
+            </footer>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📝</div>
+        <h3>No Content Yet</h3>
+        <p>Upload your first piece of content to get started!</p>
+        <a href="{{ url_for('upload_page') }}" class="btn btn-primary">
+            📤 Upload Content
+        </a>
+    </div>
+    {% endif %}
+</section>
+
+<section id="categories-tab" class="tab-content">
+    <div class="categories-grid">
+        <div class="category-card card" data-category="lecture">
+            <div class="category-icon">🎓</div>
+            <div class="category-info">
+                <h4>Lectures</h4>
+                <div class="category-count">{{ content_counts.lecture or 0 }} items</div>
+                <p>Academic content and course materials</p>
+            </div>
+            <a href="{{ url_for('lectures') }}" class="category-link">View All →</a>
+        </div>
+        
+        <div class="category-card card" data-category="youtube">
+            <div class="category-icon">📺</div>
+            <div class="category-info">
+                <h4>Videos</h4>
+                <div class="category-count">{{ content_counts.youtube or 0 }} items</div>
+                <p>YouTube and multimedia content</p>
+            </div>
+            <a href="{{ url_for('videos') }}" class="category-link">View All →</a>
+        </div>
+        
+        <div class="category-card card" data-category="rss">
+            <div class="category-icon">📰</div>
+            <div class="category-info">
+                <h4>Articles</h4>
+                <div class="category-count">{{ content_counts.rss or 0 }} items</div>
+                <p>RSS feeds and written content</p>
+            </div>
+            <a href="{{ url_for('articles') }}" class="category-link">View All →</a>
+        </div>
+        
+        <div class="category-card card" data-category="podcast">
+            <div class="category-icon">🎙️</div>
+            <div class="category-info">
+                <h4>Podcasts</h4>
+                <div class="category-count">{{ content_counts.podcast or 0 }} items</div>
+                <p>Audio content and interviews</p>
+            </div>
+            <a href="{{ url_for('podcasts') }}" class="category-link">View All →</a>
+        </div>
+    </div>
+</section>
+
+<section id="search-tab" class="tab-content">
+    <div class="search-section">
+        <div class="search-box">
+            <input type="search" id="content-search" placeholder="Search your content..." class="form-input">
+            <button class="search-btn btn btn-primary">🔍 Search</button>
+        </div>
+        
+        <div class="search-filters">
+            <select id="search-category" class="form-select">
+                <option value="">All Categories</option>
+                <option value="lecture">Lectures</option>
+                <option value="youtube">Videos</option>
+                <option value="rss">Articles</option>
+                <option value="podcast">Podcasts</option>
+            </select>
+            
+            <select id="search-language" class="form-select">
+                <option value="">All Languages</option>
+                <option value="english">English</option>
+                <option value="multilingual">Multilingual</option>
+            </select>
+        </div>
+    </div>
+    
+    <div id="search-results" class="search-results">
+        <div class="search-placeholder">
+            <div class="placeholder-icon">🔍</div>
+            <p>Enter search terms to find your content</p>
+        </div>
+    </div>
+</section>
+
+<aside class="stats-sidebar">
+    <div class="stats-card card">
+        <h3>📊 Your Statistics</h3>
+        <div class="stats-list">
+            <div class="stat-row">
+                <span class="stat-label">Total Processed:</span>
+                <span class="stat-value">{{ stats.total_processed or 0 }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">This Month:</span>
+                <span class="stat-value">{{ stats.this_month or 0 }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Processing Hours:</span>
+                <span class="stat-value">{{ stats.total_hours or '0h' }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Success Rate:</span>
+                <span class="stat-value">{{ stats.success_rate or '100%' }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="quick-actions card">
+        <h3>⚡ Quick Actions</h3>
+        <div class="action-buttons">
+            <a href="{{ url_for('upload_page') }}" class="btn btn-primary btn-block">
+                📤 Upload New Content
+            </a>
+            <a href="{{ url_for('status_page') }}" class="btn btn-secondary btn-block">
+                📊 Check Status
+            </a>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary btn-block">
+                🌐 GitHub Pages
+            </a>
+        </div>
+    </div>
+</aside>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab functionality
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const tabName = this.dataset.tab;
+            
+            // Update active button
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update active content
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === tabName + '-tab') {
+                    content.classList.add('active');
+                }
+            });
+        });
+    });
+    
+    // Search functionality
+    const searchInput = document.getElementById('content-search');
+    const searchBtn = document.querySelector('.search-btn');
+    const searchResults = document.getElementById('search-results');
+    
+    function performSearch() {
+        const query = searchInput.value.trim();
+        const category = document.getElementById('search-category').value;
+        const language = document.getElementById('search-language').value;
+        
+        if (!query) {
+            searchResults.innerHTML = `
+                <div class="search-placeholder">
+                    <div class="placeholder-icon">🔍</div>
+                    <p>Enter search terms to find your content</p>
+                </div>
+            `;
+            return;
+        }
+        
+        searchResults.innerHTML = `
+            <div class="search-loading">
+                <div class="loading-spinner"></div>
+                <p>Searching your content...</p>
+            </div>
+        `;
+        
+        // Simulate search (replace with actual search implementation)
+        setTimeout(() => {
+            searchResults.innerHTML = `
+                <div class="search-empty">
+                    <div class="empty-icon">🔍</div>
+                    <p>No results found for "${query}"</p>
+                    <small>Try different keywords or check the category filters</small>
+                </div>
+            `;
+        }, 1000);
+    }
+    
+    if (searchBtn) {
+        searchBtn.addEventListener('click', performSearch);
+    }
+    
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

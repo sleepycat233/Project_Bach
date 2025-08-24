@@ -894,6 +894,14 @@
                     customInput.value = '';
                 }
             });
+            
+            // 初始化时检查默认选择的content type
+            const initialType = contentTypeSelect.value;
+            if (initialType && contentTypeData[initialType] && contentTypeData[initialType].subcategories && contentTypeData[initialType].subcategories.length > 0) {
+                // 触发change事件来显示subcategory选项
+                const event = new Event('change');
+                contentTypeSelect.dispatchEvent(event);
+            }
         }
         
         // Model selection functionality

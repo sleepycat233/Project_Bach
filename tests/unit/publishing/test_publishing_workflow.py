@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch, MagicMock, call
 from pathlib import Path
 
 # 添加src目录到Python路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'src'))
 
 from .test_base import PublishingTestBase
 

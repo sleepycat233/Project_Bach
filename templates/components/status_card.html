@@ -1,0 +1,57 @@
+{% macro render_status_card(status, title="Processing Status", show_progress=True) -%}
+<div class="status-card card {% if status %}status-{{ status.status }}{% endif %}">
+    <div class="status-header">
+        <span class="status-icon">
+            {% if status and status.status == 'processing' %}🔄
+            {% elif status and status.status == 'completed' %}✅
+            {% elif status and status.status == 'failed' %}❌
+            {% elif status and status.status == 'pending' %}⏳
+            {% else %}📝
+            {% endif %}
+        </span>
+        <h3 class="status-title">{{ title }}</h3>
+    </div>
+    
+    {% if status %}
+        <div class="status-message">
+            {{ status.message or "Processing in progress..." }}
+        </div>
+        
+        {% if show_progress and status.progress is defined %}
+        <div class="status-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ status.progress or 0 }}%"></div>
+            </div>
+            <div class="progress-text">{{ status.progress or 0 }}%</div>
+        </div>
+        {% endif %}
+        
+        {% if status.created_at %}
+        <div class="status-time">
+            <small>Started: {{ status.created_at | timeago }}</small>
+        </div>
+        {% endif %}
+    {% else %}
+        <div class="status-message">No active processing tasks</div>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro render_status_list(status_list, title="Processing Queue") -%}
+<div class="status-section">
+    <h3>{{ title }}</h3>
+    {% if status_list and status_list|length > 0 %}
+        <div class="status-list">
+            {% for item in status_list %}
+                {{ render_status_card(item, item.filename or "Task " ~ loop.index, False) }}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📝</div>
+            <div class="empty-title">No Tasks</div>
+            <div class="empty-description">All processing tasks are complete</div>
+        </div>
+    {% endif %}
+</div>
+{%- endmacro %}

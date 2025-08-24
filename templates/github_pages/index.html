@@ -1,0 +1,130 @@
+{% extends "base/github_base.html" %}
+
+{% block title %}Project Bach - Content Analysis Hub{% endblock %}
+{% block description %}AI-powered content processing and analysis for lectures, videos, articles, and podcasts{% endblock %}
+
+{% block page_title %}Welcome to Project Bach{% endblock %}
+{% block page_subtitle %}Your AI-powered content analysis hub{% endblock %}
+
+{% block main_content %}
+<section class="quick-nav card">
+    <h2>🚀 Quick Access</h2>
+    <div class="quick-nav-grid">
+        <a href="{{ url_for('lectures') }}" class="quick-nav-item">
+            <span class="icon">🎓</span>
+            <div class="title">Lectures</div>
+            <div class="description">Academic content and course materials</div>
+            <span class="nav-count">{{ lecture_count or 0 }}</span>
+        </a>
+        
+        <a href="{{ url_for('videos') }}" class="quick-nav-item">
+            <span class="icon">📺</span>
+            <div class="title">Videos</div>
+            <div class="description">YouTube and video content analysis</div>
+            <span class="nav-count">{{ video_count or 0 }}</span>
+        </a>
+        
+        <a href="{{ url_for('articles') }}" class="quick-nav-item">
+            <span class="icon">📰</span>
+            <div class="title">Articles</div>
+            <div class="description">RSS feeds and written content</div>
+            <span class="nav-count">{{ article_count or 0 }}</span>
+        </a>
+        
+        <a href="{{ url_for('podcasts') }}" class="quick-nav-item">
+            <span class="icon">🎙️</span>
+            <div class="title">Podcasts</div>
+            <div class="description">Audio content and interviews</div>
+            <span class="nav-count">{{ podcast_count or 0 }}</span>
+        </a>
+    </div>
+</section>
+
+{% if recent_content %}
+<section class="recent-content">
+    <h2>📋 Recent Analysis</h2>
+    <div class="result-list">
+        {% for item in recent_content %}
+        <article class="result-item card">
+            <header class="result-header">
+                <div class="result-title">
+                    <h3><a href="{{ item.url or '#' }}">{{ item.title or item.filename }}</a></h3>
+                </div>
+                <span class="result-type">{{ item.content_type or 'content' }}</span>
+            </header>
+            
+            <div class="result-meta">
+                <span class="meta-item">
+                    <span class="meta-icon">📅</span>
+                    {{ item.created_at | timeago if item.created_at else 'Recently' }}
+                </span>
+                {% if item.duration %}
+                <span class="meta-item">
+                    <span class="meta-icon">⏱️</span>
+                    {{ item.duration }}
+                </span>
+                {% endif %}
+                {% if item.language %}
+                <span class="meta-item">
+                    <span class="meta-icon">🌍</span>
+                    {{ item.language | title }}
+                </span>
+                {% endif %}
+            </div>
+            
+            {% if item.summary %}
+            <div class="result-summary">
+                {{ item.summary | truncate(200) }}
+            </div>
+            {% endif %}
+            
+            {% if item.tags %}
+            <div class="result-tags">
+                {% for tag in item.tags %}
+                <a href="#" class="result-tag">{{ tag }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+    
+    <div class="view-all">
+        <a href="{{ url_for('all_content') }}" class="btn btn-secondary">View All Content →</a>
+    </div>
+</section>
+{% else %}
+<section class="empty-state">
+    <div class="empty-icon">📝</div>
+    <h3 class="empty-title">No Content Yet</h3>
+    <p class="empty-description">
+        Start by uploading your first piece of content for AI-powered analysis.
+    </p>
+    <a href="{{ url_for('upload_page') }}" class="btn btn-primary">
+        📤 Upload Content
+    </a>
+</section>
+{% endif %}
+
+<section class="stats-overview card">
+    <h2>📊 Processing Statistics</h2>
+    <div class="stats-grid">
+        <div class="stat-item">
+            <div class="stat-value">{{ total_processed or 0 }}</div>
+            <div class="stat-label">Total Processed</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ total_this_month or 0 }}</div>
+            <div class="stat-label">This Month</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ avg_processing_time or '0m' }}</div>
+            <div class="stat-label">Avg Processing Time</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ languages_supported or 2 }}</div>
+            <div class="stat-label">Languages Supported</div>
+        </div>
+    </div>
+</section>
+{% endblock %}

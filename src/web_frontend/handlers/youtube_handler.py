@@ -74,79 +74,102 @@ class YouTubeHandler:
             
         with ProcessingTracker('youtube', privacy_level, tracker_metadata) as tracker:
             try:
+                # 获取processing service用于日志记录
+                try:
+                    from ...core.processing_service import get_processing_service
+                    processing_service = get_processing_service()
+                except ImportError:
+                    processing_service = None
+                
                 tracker.update_stage(ProcessingStage.TRANSCRIBING, 10, "Downloading and extracting YouTube subtitles")
                 
-                # 使用YouTubeProcessor + AudioProcessor完整处理流程
-                if self.youtube_processor:
-                    logger.info(f"Processing YouTube video: {url} (Privacy level: {privacy_level})")
-                    result = self.youtube_processor.process_youtube_url(url)
-                    
-                    if result.get('success'):
-                        tracker.update_stage(ProcessingStage.AI_GENERATING, 50, "YouTube content extracted, starting AI content generation")
-                        
-                        # 集成AudioProcessor进行AI内容生成
-                        from ...core.dependency_container import DependencyContainer
-                        container = DependencyContainer(self.config_manager)
-                        audio_processor = container.get_audio_processor()
-                        
-                        # 调用完整的YouTube内容处理
-                        success = audio_processor.process_youtube_content(
-                            youtube_result=result,
-                            privacy_level=privacy_level
-                        )
-                        
-                        if success:
-                            video_metadata = result.get('video_metadata', {})
+                if processing_service:
+                    processing_service.add_log(tracker.processing_id, f"Processing YouTube video: {url} (Privacy level: {privacy_level})", 'info')
+                
+                # 启动后台异步处理
+                import threading
+                def background_process():
+                    try:
+                        # 使用YouTubeProcessor + AudioProcessor完整处理流程
+                        if self.youtube_processor:
+                            logger.info(f"Processing YouTube video: {url} (Privacy level: {privacy_level})")
+                            result = self.youtube_processor.process_youtube_url(url)
                             
-                            # 生成结果URL
-                            if privacy_level == 'public':
-                                result_url = f"https://sleepycat233.github.io/Project_Bach/youtube_{video_id}_result.html"
+                            if result.get('success'):
+                                tracker.update_stage(ProcessingStage.AI_GENERATING, 50, "YouTube content extracted, starting AI content generation")
+                                
+                                # 集成AudioProcessor进行AI内容生成
+                                from ...core.dependency_container import DependencyContainer
+                                container = DependencyContainer(self.config_manager)
+                                audio_processor = container.get_audio_processor()
+                                
+                                # 调用完整的YouTube内容处理
+                                success = audio_processor.process_youtube_content(
+                                    youtube_result=result,
+                                    privacy_level=privacy_level
+                                )
+                                
+                                if success:
+                                    video_metadata = result.get('video_metadata', {})
+                                    
+                                    # 生成结果URL
+                                    if privacy_level == 'public':
+                                        result_url = f"https://sleepycat233.github.io/Project_Bach/youtube_{video_id}_result.html"
+                                    else:
+                                        result_url = f"/private/youtube_{video_id}_result.html"
+                                    
+                                    if processing_service:
+                                        processing_service.add_log(tracker.processing_id, f"YouTube processing completed, result: {result_url}", 'success')
+                                    tracker.set_completed(result_url)
+                                else:
+                                    error_msg = 'YouTube processing failed during AI content generation'
+                                    if processing_service:
+                                        processing_service.add_log(tracker.processing_id, error_msg, 'error')
+                                    tracker.set_error(error_msg)
                             else:
-                                result_url = f"/private/youtube_{video_id}_result.html"
+                                error_msg = f'YouTube URL processing failed: {result.get("error", "Unknown error")}'
+                                if processing_service:
+                                    processing_service.add_log(tracker.processing_id, error_msg, 'error')
+                                tracker.set_error(error_msg)
+                        else:
+                            # 模拟处理（当processor不可用时）
+                            logger.info(f"Simulating YouTube processing for {url}")
+                            tracker.update_stage(ProcessingStage.AI_GENERATING, 80, "Simulating AI content generation")
                             
+                            # 模拟处理时间
+                            import time
+                            time.sleep(2)
+                            
+                            result_url = f"/private/youtube_{video_id}_result.html" if privacy_level == 'private' else f"https://sleepycat233.github.io/Project_Bach/youtube_{video_id}_result.html"
+                            if processing_service:
+                                processing_service.add_log(tracker.processing_id, f"Mock YouTube processing completed, result: {result_url}", 'success')
                             tracker.set_completed(result_url)
                             
-                            return {
-                                'status': 'success',
-                                'processing_id': tracker.processing_id,
-                                'video_id': video_id,
-                                'video_title': video_metadata.get('title', 'Unknown Title'),
-                                'estimated_time': self.estimate_processing_time(video_metadata.get('duration', 0)),
-                                'privacy_level': privacy_level,
-                                'result_url': result_url,
-                                'message': f'YouTube video processed and AI analysis completed ({"Private" if privacy_level == "private" else "Public"})'
-                            }
-                        else:
-                            tracker.set_error('AI content generation failed')
-                            return {
-                                'status': 'error',
-                                'message': 'AI content generation failed'
-                            }
-                    else:
-                        error_msg = result.get('error', 'YouTube processing failed')
+                    except Exception as proc_e:
+                        error_msg = f'YouTube processing exception: {str(proc_e)}'
+                        if processing_service:
+                            processing_service.add_log(tracker.processing_id, error_msg, 'error')
                         tracker.set_error(error_msg)
-                        return {
-                            'status': 'error',
-                            'message': error_msg
-                        }
-                else:
-                    # 模拟处理（当processor不可用时）
-                    logger.info(f"Simulating YouTube processing for {url}")
-                    
-                    tracker.update_stage(ProcessingStage.AI_GENERATING, 80, "Simulating AI content generation")
-                    tracker.set_completed()
-                    
-                    return {
-                        'status': 'success',
-                        'processing_id': tracker.processing_id,
-                        'video_id': video_id,
-                        'video_title': 'Test Video Title',
-                        'estimated_time': 600,
-                        'message': 'YouTube video queued (simulation mode)'
-                    }
+                        logger.error(f"Background YouTube processing error: {proc_e}")
+                
+                # 启动后台线程
+                thread = threading.Thread(target=background_process, daemon=True)
+                thread.start()
+                
+                # 立即返回成功状态，用户可以查看处理进度
+                return {
+                    'status': 'success',
+                    'processing_id': tracker.processing_id,
+                    'video_id': video_id,
+                    'estimated_time': 30,
+                    'privacy_level': privacy_level,
+                    'message': f'YouTube video added to processing queue ({"Private" if privacy_level == "private" else "Public"})'
+                }
                     
             except Exception as e:
                 error_msg = f'YouTube processing failed: {str(e)}'
+                if processing_service:
+                    processing_service.add_log(tracker.processing_id, error_msg, 'error')
                 tracker.set_error(error_msg)
                 logger.error(f"YouTube URL processing error: {e}")
                 return {

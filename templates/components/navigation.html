@@ -1,0 +1,75 @@
+<nav class="sidebar-nav" role="navigation">
+    <div class="nav-header">
+        <h2 class="nav-title">Project Bach</h2>
+        <p class="nav-subtitle">Content Analysis</p>
+    </div>
+    
+    <section class="nav-section">
+        <h3 class="nav-section-title">Content Types</h3>
+        <ul class="nav-links">
+            <li>
+                <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
+                    <span class="nav-icon content-lecture">🎓</span>
+                    Lectures
+                    <span class="nav-count">{{ lecture_count or 0 }}</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('videos') }}" class="{% if request.endpoint == 'videos' %}active{% endif %}">
+                    <span class="nav-icon content-youtube">📺</span>
+                    Videos
+                    <span class="nav-count">{{ video_count or 0 }}</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('articles') }}" class="{% if request.endpoint == 'articles' %}active{% endif %}">
+                    <span class="nav-icon content-rss">📰</span>
+                    Articles
+                    <span class="nav-count">{{ article_count or 0 }}</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('podcasts') }}" class="{% if request.endpoint == 'podcasts' %}active{% endif %}">
+                    <span class="nav-icon content-podcast">🎙️</span>
+                    Podcasts
+                    <span class="nav-count">{{ podcast_count or 0 }}</span>
+                </a>
+            </li>
+        </ul>
+    </section>
+    
+    <section class="nav-section">
+        <h3 class="nav-section-title">Tools</h3>
+        <ul class="nav-links">
+            <li>
+                <a href="{{ url_for('upload_page') }}">
+                    <span class="nav-icon">📤</span>
+                    Upload Content
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('status_page') }}">
+                    <span class="nav-icon">📊</span>
+                    Processing Status
+                </a>
+            </li>
+        </ul>
+    </section>
+    
+    <section class="nav-section">
+        <h3 class="nav-section-title">Quick Stats</h3>
+        <div class="stats-overview card">
+            <h4>📈 Overview</h4>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">{{ total_processed or 0 }}</div>
+                    <div class="stat-label">Processed</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ total_this_month or 0 }}</div>
+                    <div class="stat-label">This Month</div>
+                </div>
+            </div>
+        </div>
+    </section>
+</nav>

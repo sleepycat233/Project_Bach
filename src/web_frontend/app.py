@@ -60,7 +60,7 @@ def create_app(config=None):
             config_manager = SimpleNamespace()
             config_manager.config = config
             # 为测试环境添加必需的方法
-            config_manager.get_nested_config = lambda section: config.get(section, {})
+            config_manager.get_nested_config = lambda section, key=None: config.get(section, {}).get(key, {}) if key else config.get(section, {})
             config_manager.get_full_config = lambda: config
         else:
             # 使用默认配置管理器

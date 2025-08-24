@@ -1,0 +1,31 @@
+{% extends "base/shared_base.html" %}
+
+{% block additional_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/web-app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+{% endblock %}
+
+{% block body_class %}web-app-body{% endblock %}
+
+{% block body_content %}
+<div class="web-app-container">
+    <header class="web-app-header">
+        <div class="private-nav">
+            <a href="{{ url_for('private_index') }}" class="private-btn">
+                🔒 Private Content
+            </a>
+        </div>
+        <h1>{% block app_title %}Project Bach{% endblock %}</h1>
+        <p>{% block app_subtitle %}Upload and process your content{% endblock %}</p>
+    </header>
+    
+    <main class="web-app-main">
+        {% block app_content %}{% endblock %}
+    </main>
+</div>
+{% endblock %}
+
+{% block additional_js %}
+<script type="module" src="{{ url_for('static', filename='js/web-app.js') }}"></script>
+{% endblock %}

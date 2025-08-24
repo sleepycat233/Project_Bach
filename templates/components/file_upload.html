@@ -1,0 +1,155 @@
+{% macro render_file_upload(form_id="upload-form", accept="audio/*,video/*", title="Upload File") -%}
+<div class="upload-section">
+    <h3>{{ title }}</h3>
+    
+    <form id="{{ form_id }}" method="POST" enctype="multipart/form-data" class="upload-form">
+        <div class="form-group">
+            <div id="audio-drop-zone" class="drop-zone">
+                <div class="drop-zone-content">
+                    <span class="drop-icon">📁</span>
+                    <div class="drop-text">Click to select a file or drag & drop</div>
+                    <div class="drop-hint">
+                        Supported formats: MP3, WAV, M4A, MP4, FLAC<br>
+                        Maximum file size: 500MB
+                    </div>
+                </div>
+                <input type="file" 
+                       id="audio-file-input" 
+                       name="file" 
+                       accept="{{ accept }}" 
+                       class="file-input"
+                       required>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="content_type" class="form-label">Content Type *</label>
+            <select name="content_type" class="form-select" required>
+                <option value="">Select content type...</option>
+                <option value="lecture">📚 Lecture</option>
+                <option value="meeting">👥 Meeting</option>
+                <option value="interview">🎤 Interview</option>
+                <option value="presentation">📊 Presentation</option>
+                <option value="others">📝 Others</option>
+            </select>
+        </div>
+        
+        <div id="subcategory-container" class="form-group" style="display: none;">
+            <label id="subcategory-label" class="form-label">Subcategory</label>
+            <select id="subcategory-select" name="subcategory" class="form-select">
+                <option value="">Select subcategory...</option>
+            </select>
+            <input type="text" 
+                   id="custom-subcategory-input" 
+                   name="custom_subcategory" 
+                   class="form-input" 
+                   placeholder="Enter custom subcategory" 
+                   style="display: none; margin-top: var(--spacing-sm);">
+        </div>
+        
+        <div class="form-group">
+            <label for="language" class="form-label">Language</label>
+            <select id="languageSelect" name="language" class="form-select">
+                <option value="multilingual">🌍 Auto-detect (Multilingual)</option>
+                <option value="english">🇺🇸 English</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="model" class="form-label">AI Model</label>
+            <select id="modelSelect" name="model" class="form-select">
+                <option value="">Loading models...</option>
+            </select>
+            <div id="modelInfoContent" class="model-info" style="margin-top: var(--spacing-md);">
+                <!-- Model information will be displayed here -->
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="description" class="form-label">Context (Optional)</label>
+            <textarea name="description" 
+                      class="form-textarea" 
+                      rows="3" 
+                      placeholder="Provide context to improve transcription accuracy (e.g., technical terms, speaker names, topic)"></textarea>
+            <small class="form-hint">This context helps Whisper better understand specific terms and improve accuracy.</small>
+        </div>
+        
+        <div class="form-buttons">
+            <button type="submit" class="btn btn-primary">
+                📤 Upload and Process
+            </button>
+        </div>
+        
+        <div id="upload-message" class="upload-message" style="display: none;"></div>
+    </form>
+</div>
+{%- endmacro %}
+
+{% macro render_youtube_upload(form_id="youtube-form") -%}
+<div class="upload-section">
+    <h3>📺 YouTube Video</h3>
+    
+    <form id="{{ form_id }}" method="POST" class="upload-form">
+        <div class="form-group">
+            <label for="youtube-url-input" class="form-label">YouTube URL *</label>
+            <div class="url-input-group">
+                <input type="url" 
+                       id="youtube-url-input" 
+                       name="url" 
+                       class="form-input" 
+                       placeholder="https://www.youtube.com/watch?v=..." 
+                       required>
+                <div id="youtube-loading-indicator" class="youtube-loading-indicator hidden"></div>
+            </div>
+            <button type="button" id="youtube-cancel-button" class="cancel-btn" style="display: none;">Cancel</button>
+        </div>
+        
+        <div id="context-suggestions" class="context-suggestions" style="display: none;">
+            <h4>💡 Smart Context Suggestions</h4>
+            <div id="metadata-loading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <span>Loading video information...</span>
+            </div>
+            <div id="metadata-error" style="display: none; color: var(--color-error);"></div>
+            
+            <div id="suggestion-title" class="suggestion-item" style="display: none;">
+                <div class="suggestion-header">🎯 Video Title:</div>
+                <div class="suggestion-content">
+                    <span id="video-title-text"></span>
+                </div>
+            </div>
+            
+            <div id="suggestion-description" class="suggestion-item" style="display: none;">
+                <div class="suggestion-header">📝 Video Description:</div>
+                <div class="suggestion-content">
+                    <span id="video-description-text"></span>
+                </div>
+            </div>
+            
+            <div id="suggestion-combined" class="suggestion-item" style="display: none;">
+                <div class="suggestion-header">🎯 Combined (Recommended):</div>
+                <div class="suggestion-content">
+                    <span style="color: var(--color-success);">Click to add both title and description as context</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="youtube-context" class="form-label">Context (Optional)</label>
+            <textarea name="description" 
+                      id="youtube-context" 
+                      class="form-textarea" 
+                      rows="3" 
+                      placeholder="Provide context for transcription accuracy"></textarea>
+        </div>
+        
+        <div class="form-buttons">
+            <button type="submit" class="btn btn-primary">
+                🎬 Process YouTube Video
+            </button>
+        </div>
+        
+        <div id="youtube-upload-message" class="upload-message" style="display: none;"></div>
+    </form>
+</div>
+{%- endmacro %}
