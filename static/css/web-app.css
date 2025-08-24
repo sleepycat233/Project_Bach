@@ -43,17 +43,86 @@
     position: absolute;
     top: 0;
     right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    align-items: flex-end;
+    z-index: 10; /* 确保在其他元素之上 */
 }
 
+/* 导航按钮通用样式 */
+.github-pages-btn,
+.private-btn {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--border-radius-md);
+    text-decoration: none;
+    font-size: var(--font-size-xs);
+    transition: var(--transition-fast);
+    font-weight: 500;
+    min-width: 120px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    box-sizing: border-box;
+    line-height: 1.2;
+}
+
+/* 深色模式切换按钮 */
+.dark-mode-toggle-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-xs);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
+.dark-mode-toggle-btn:hover {
+    background: var(--bg-secondary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dark-mode-toggle-btn:active {
+    transform: translateY(0);
+}
+
+.dark-mode-toggle-btn .dark-mode-icon {
+    font-size: 1.1em;
+    transition: transform 0.2s ease;
+}
+
+.dark-mode-toggle-btn:hover .dark-mode-icon {
+    transform: scale(1.1);
+}
+
+/* GitHub Pages 按钮 */
+.github-pages-btn {
+    background: var(--color-primary);
+    color: white;
+}
+
+.github-pages-btn:hover {
+    background: var(--color-secondary);
+    text-decoration: none;
+    color: white;
+}
+
+/* Private Content 按钮 */
 .private-btn {
     background: var(--text-secondary);
     color: white;
-    padding: var(--spacing-sm) var(--spacing-lg);
-    border-radius: var(--border-radius-md);
-    text-decoration: none;
-    font-size: var(--font-size-sm);
-    transition: var(--transition-fast);
-    font-weight: 500;
 }
 
 .private-btn:hover {
@@ -244,6 +313,153 @@
     color: var(--color-info);
 }
 
+/* ===== YouTube URL输入容器 ===== */
+.youtube-input-container {
+    position: relative;
+    display: block;
+}
+
+.youtube-input-container input {
+    width: 100%;
+    padding-right: 80px; /* 为加载指示器和取消按钮预留空间 */
+}
+
+/* YouTube加载指示器 */
+.youtube-loading-indicator {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: var(--transition-fast);
+}
+
+.youtube-loading-indicator.hidden {
+    display: none;
+}
+
+.youtube-loading-indicator.loading {
+    background: var(--color-info);
+    color: white;
+}
+
+.youtube-loading-indicator.success {
+    background: var(--color-success);
+    color: white;
+    font-weight: bold;
+}
+
+.youtube-loading-indicator.error {
+    background: var(--color-error);
+    color: white;
+}
+
+.youtube-loading-indicator .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* YouTube取消按钮 */
+.youtube-cancel-button {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: var(--color-error);
+    color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+    transition: var(--transition-fast);
+}
+
+.youtube-cancel-button.visible {
+    display: block;
+}
+
+.youtube-cancel-button:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
+/* ===== 字幕检测结果样式 ===== */
+.subtitle-status-container {
+    background: var(--bg-card);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-lg);
+    border: 1px solid var(--border-color);
+}
+
+.subtitle-status-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.subtitle-status-header .status-icon {
+    margin-right: var(--spacing-sm);
+    font-size: var(--font-size-lg);
+}
+
+.subtitle-details {
+    background: var(--bg-primary);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-md);
+}
+
+.subtitle-found,
+.subtitle-auto,
+.subtitle-none {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+}
+
+.subtitle-found .subtitle-icon {
+    color: var(--color-success);
+    font-size: var(--font-size-xl);
+}
+
+.subtitle-auto .subtitle-icon {
+    color: var(--color-warning);
+    font-size: var(--font-size-xl);
+}
+
+.subtitle-none .subtitle-icon {
+    color: var(--color-error);
+    font-size: var(--font-size-xl);
+}
+
+.subtitle-text {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.subtitle-text strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.subtitle-text small {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
 /* ===== YouTube建议样式 ===== */
 .context-suggestions {
     background: var(--bg-secondary);
@@ -330,8 +546,47 @@
         min-height: 100vh;
     }
     
+    .web-app-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
     .web-app-header h1 {
         font-size: var(--font-size-xxl);
+        margin-right: 0; /* 移除右边距 */
+        padding-right: 0; /* 移除右内边距 */
+        order: 2; /* 标题在导航按钮后 */
+    }
+    
+    .web-app-header p {
+        order: 3; /* 副标题最后 */
+    }
+    
+    /* 移动端导航按钮调整 */
+    .private-nav {
+        position: static;
+        display: flex;
+        flex-direction: row;
+        gap: var(--spacing-sm);
+        justify-content: center;
+        margin-bottom: var(--spacing-md);
+        order: 1; /* 导航按钮在最前 */
+        width: 100%;
+    }
+    
+    .github-pages-btn,
+    .private-btn {
+        font-size: var(--font-size-xs);
+        padding: var(--spacing-xs) var(--spacing-sm);
+        flex: 1;
+        text-align: center;
+        max-width: 140px; /* 限制最大宽度 */
+    }
+    
+    .dark-mode-toggle-btn {
+        margin-top: 2px; /* 稍微对齐 */
     }
     
     .tab-buttons {

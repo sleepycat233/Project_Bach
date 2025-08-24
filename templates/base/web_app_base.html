@@ -12,9 +12,15 @@
 <div class="web-app-container">
     <header class="web-app-header">
         <div class="private-nav">
-            <a href="{{ url_for('private_index') }}" class="private-btn">
+            <a href="https://sleepycat233.github.io/Project_Bach" target="_blank" class="github-pages-btn">
+                🌐 GitHub Pages
+            </a>
+            <a href="{{ url_for('private_content') }}" class="private-btn">
                 🔒 Private Content
             </a>
+            <button type="button" class="dark-mode-toggle-btn" data-dark-mode-toggle="" aria-label="Toggle dark mode">
+                <span class="dark-mode-icon">🌙</span>
+            </button>
         </div>
         <h1>{% block app_title %}Project Bach{% endblock %}</h1>
         <p>{% block app_subtitle %}Upload and process your content{% endblock %}</p>

@@ -28,7 +28,7 @@
                 </div>
                 
                 <div class="form-group">
-                    <small style="color: #666; text-align: center; display: block;">Supported: MP3, WAV, M4A, MP4, FLAC, AAC, OGG (Max 500MB)</small>
+                    <small style="color: var(--text-secondary); text-align: center; display: block;">Supported: MP3, WAV, M4A, MP4, FLAC, AAC, OGG (Max 500MB)</small>
                 </div>
                 
                 <!-- Upload success/error message area -->
@@ -60,7 +60,7 @@
                     <label class="form-label">Transcription Context (optional)</label>
                     <textarea name="description" class="form-input" rows="3" 
                               placeholder="Provide context for Whisper transcription (e.g., technical terms, speaker names, topic domain)"></textarea>
-                    <small style="color: #666; font-size: 0.85rem; margin-top: 5px; display: block;">
+                    <small style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 5px; display: none;">
                         This context will be used as system prompt for Whisper to improve transcription accuracy of specific terms and names
                     </small>
                 </div>
@@ -71,7 +71,7 @@
                     
                     <!-- Language Selection -->
                     <div style="margin-bottom: 15px;">
-                        <label style="font-size: 0.9rem; color: #666; margin-bottom: 5px; display: block;">Audio Language</label>
+                        <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; display: block;">Audio Language</label>
                         <select name="audio_language" id="languageSelect" class="form-select" required style="margin-bottom: 10px;">
                             <option value="english">🇺🇸 English Only</option>
                             <option value="multilingual">🌍 Multilingual</option>
@@ -80,14 +80,14 @@
                     
                     <!-- Model Selection -->
                     <div>
-                        <label style="font-size: 0.9rem; color: #666; margin-bottom: 5px; display: block;">Model</label>
+                        <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; display: block;">Model</label>
                         <select name="whisper_model" id="modelSelect" class="form-select" required>
                             <!-- Options will be populated by JavaScript -->
                         </select>
                     </div>
                     
                     <!-- Model Info Display -->
-                    <div id="modelInfo" style="background: #f0f4ff; border: 1px solid #667eea; border-radius: 6px; padding: 12px; margin-top: 10px;">
+                    <div id="modelInfo" style="background: var(--bg-card); border: 1px solid var(--color-primary); border-radius: 6px; padding: 12px; margin-top: 10px;">
                         <div id="modelInfoContent">
                             <!-- Model details will be populated by JavaScript -->
                         </div>
@@ -95,8 +95,8 @@
                 </div>
                 
                 <!-- Privacy Selection -->
-                <div class="form-group" style="background: #f8f9ff; padding: 15px; border-radius: 6px; border: 1px solid #e3e6f0;">
-                    <label class="form-label" style="color: #5a5c69; font-weight: 600;">
+                <div class="form-group" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <label class="form-label" style="color: var(--text-primary); font-weight: 600;">
                         🔒 Privacy Setting
                     </label>
                     <div style="margin-top: 10px;">
@@ -111,7 +111,7 @@
                             <span>🔒 <strong>Private</strong> - Keep local only, accessible via Tailscale</span>
                         </label>
                     </div>
-                    <small style="color: #6c757d; font-style: italic;">
+                    <small style="color: var(--text-secondary); font-style: italic;">
                         Private content is saved locally and only accessible through Tailscale network
                     </small>
                 </div>
@@ -145,39 +145,52 @@
                     </div>
                 </div>
                 
+                <!-- 字幕信息显示 -->
+                <div id="subtitle-info" class="form-group" style="display: none;">
+                    <div class="subtitle-status-container">
+                        <div id="subtitle-status-header" class="subtitle-status-header">
+                            <span class="status-icon">📄</span>
+                            <span class="status-text">Subtitle Detection Result</span>
+                        </div>
+                        <div id="subtitle-details" class="subtitle-details">
+                            <!-- 字幕详情将在这里动态填充 -->
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Context Suggestions -->
                 <div id="context-suggestions" class="form-group" style="display: none;">
                     <label class="form-label">💡 Context Suggestions</label>
-                    <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; border: 1px solid #e0e0e0;">
+                    <div style="background: var(--bg-secondary); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
                         <div id="suggestion-title" class="suggestion-item" style="display: none;">
-                            <div style="font-weight: 600; color: #495057; margin-bottom: 4px;">📺 Video Title:</div>
-                            <div class="suggestion-content" style="background: white; padding: 8px; border-radius: 4px; border: 1px solid #dee2e6; cursor: pointer; margin-bottom: 8px;">
+                            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">📺 Video Title:</div>
+                            <div class="suggestion-content" style="background: var(--bg-card); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; margin-bottom: 8px;">
                                 <span id="video-title-text"></span>
-                                <small style="float: right; color: #6c757d;">Click to add</small>
+                                <small style="float: right; color: var(--text-secondary);">Click to add</small>
                             </div>
                         </div>
                         
                         <div id="suggestion-description" class="suggestion-item" style="display: none;">
-                            <div style="font-weight: 600; color: #495057; margin-bottom: 4px;">📝 Video Description:</div>
-                            <div class="suggestion-content" style="background: white; padding: 8px; border-radius: 4px; border: 1px solid #dee2e6; cursor: pointer; margin-bottom: 8px; max-height: 100px; overflow-y: auto;">
+                            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">📝 Video Description:</div>
+                            <div class="suggestion-content" style="background: var(--bg-card); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; margin-bottom: 8px; max-height: 100px; overflow-y: auto;">
                                 <span id="video-description-text"></span>
-                                <small style="float: right; color: #6c757d;">Click to add</small>
+                                <small style="float: right; color: var(--text-secondary);">Click to add</small>
                             </div>
                         </div>
                         
                         <div id="suggestion-combined" class="suggestion-item" style="display: none;">
-                            <div style="font-weight: 600; color: #495057; margin-bottom: 4px;">🎯 Combined (Title + Description):</div>
-                            <div class="suggestion-content" style="background: white; padding: 8px; border-radius: 4px; border: 1px solid #dee2e6; cursor: pointer;">
-                                <span style="color: #28a745;">Click to add both title and description as context</span>
-                                <small style="float: right; color: #6c757d;">Recommended</small>
+                            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">🎯 Combined (Title + Description):</div>
+                            <div class="suggestion-content" style="background: var(--bg-card); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer;">
+                                <span style="color: var(--color-success);">Click to add both title and description as context</span>
+                                <small style="float: right; color: var(--text-secondary);">Recommended</small>
                             </div>
                         </div>
                         
-                        <div id="metadata-loading" style="text-align: center; color: #6c757d; display: none;">
+                        <div id="metadata-loading" style="text-align: center; color: var(--text-secondary); display: none;">
                             🔄 Loading video information...
                         </div>
                         
-                        <div id="metadata-error" style="color: #dc3545; display: none;">
+                        <div id="metadata-error" style="color: var(--color-error); display: none;">
                             ❌ Could not load video information. Please check the URL or enter context manually.
                         </div>
                     </div>
@@ -187,14 +200,14 @@
                     <label class="form-label">Transcription Context (optional)</label>
                     <textarea name="description" id="youtube-context" class="form-input" rows="3" 
                               placeholder="Provide context for Whisper transcription (e.g., technical terms, speaker names, topic domain)"></textarea>
-                    <small style="color: #666; font-size: 0.85rem; margin-top: 5px; display: block;">
+                    <small style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 5px; display: none;">
                         This context will be used as system prompt for Whisper to improve transcription accuracy of specific terms and names
                     </small>
                 </div>
                 
                 <!-- Privacy Selection -->
-                <div class="form-group" style="background: #f8f9ff; padding: 15px; border-radius: 6px; border: 1px solid #e3e6f0;">
-                    <label class="form-label" style="color: #5a5c69; font-weight: 600;">
+                <div class="form-group" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <label class="form-label" style="color: var(--text-primary); font-weight: 600;">
                         🔒 Privacy Setting
                     </label>
                     <div style="margin-top: 10px;">
@@ -209,7 +222,7 @@
                             <span>🔒 <strong>Private</strong> - Keep local only, accessible via Tailscale</span>
                         </label>
                     </div>
-                    <small style="color: #6c757d; font-style: italic;">
+                    <small style="color: var(--text-secondary); font-style: italic;">
                         Private content (political, sensitive topics, etc.) is saved locally only and accessible via Tailscale network
                     </small>
                 </div>
@@ -317,66 +330,7 @@
         `;
     }
 
-    // Subcategory selection handling
-    function setupSubcategorySelection() {
-        const contentTypeSelect = document.querySelector('select[name="content_type"]');
-        const subcategoryContainer = document.getElementById('subcategory-container');
-        const subcategorySelect = document.getElementById('subcategory-select');
-        const subcategoryLabel = document.getElementById('subcategory-label');
-        const customInput = document.getElementById('custom-subcategory-input');
-        
-        if (!contentTypeSelect || !subcategoryContainer) return;
-        
-        // Content types with subcategories (from config)
-        const contentTypeData = {{ content_types | tojson }};
-        
-        contentTypeSelect.addEventListener('change', (e) => {
-            const selectedType = e.target.value;
-            const typeConfig = contentTypeData[selectedType];
-            
-            if (typeConfig && typeConfig.subcategories && typeConfig.subcategories.length > 0) {
-                // Show subcategory section
-                subcategoryContainer.style.display = 'block';
-                subcategoryLabel.textContent = selectedType === 'lecture' ? 'Course Selection' : 'Subcategory';
-                
-                // Clear and populate subcategory options
-                subcategorySelect.innerHTML = '<option value="">Select a ' + 
-                    (selectedType === 'lecture' ? 'course' : 'subcategory') + '...</option>';
-                
-                typeConfig.subcategories.forEach(sub => {
-                    const option = document.createElement('option');
-                    option.value = sub;
-                    option.textContent = sub;
-                    subcategorySelect.appendChild(option);
-                });
-                
-                // Add "Other" option
-                const otherOption = document.createElement('option');
-                otherOption.value = 'other';
-                otherOption.textContent = 'Other (specify below)';
-                subcategorySelect.appendChild(otherOption);
-                
-            } else {
-                // Hide subcategory section
-                subcategoryContainer.style.display = 'none';
-                customInput.style.display = 'none';
-                customInput.required = false;
-                customInput.value = '';
-            }
-        });
-        
-        // Handle subcategory selection
-        subcategorySelect.addEventListener('change', (e) => {
-            if (e.target.value === 'other') {
-                customInput.style.display = 'block';
-                customInput.required = true;
-            } else {
-                customInput.style.display = 'none';
-                customInput.required = false;
-                customInput.value = '';
-            }
-        });
-    }
+    // Subcategory selection is now handled by web-app.js
 
     // Model selection functionality
     function setupModelSelection() {
@@ -534,15 +488,15 @@
                 modelInfo.innerHTML = `
                     <div style="margin-bottom: 15px;">
                         <div style="margin-bottom: 8px;">
-                            <strong style="color: #667eea; font-size: 1.1em;">${selectedModel.display_name || selectedModel.name}</strong>
+                            <strong style="color: var(--color-primary); font-size: 1.1em;">${selectedModel.display_name || selectedModel.name}</strong>
                         </div>
-                        <div style="display: flex; gap: 20px; font-size: 0.9em; color: #495057; margin-bottom: 10px;">
+                        <div style="display: flex; gap: 20px; font-size: 0.9em; color: var(--text-primary); margin-bottom: 10px;">
                             <div><strong>📦 Size:</strong> ${modelSize}</div>
                             ${selectedModel.provider ? `<div><strong>🔗 Provider:</strong> ${selectedModel.provider}</div>` : ''}
                         </div>
-                        <div style="margin-top: 8px; padding: 6px 10px; border-radius: 4px; font-size: 0.8rem; background: #f8f9fa; border: 1px solid #dee2e6;">
+                        <div style="margin-top: 8px; padding: 6px 10px; border-radius: 4px; font-size: 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color);">
                             📊 <strong>Performance Benchmarks:</strong> 
-                            <a href="https://huggingface.co/spaces/argmaxinc/whisperkit-benchmarks" target="_blank" style="color: #667eea; text-decoration: none;">
+                            <a href="https://huggingface.co/spaces/argmaxinc/whisperkit-benchmarks" target="_blank" style="color: var(--color-primary); text-decoration: none;">
                                 View WhisperKit Benchmarks →
                             </a>
                         </div>
@@ -760,18 +714,18 @@
         function highlightSelected(selectedElement) {
             // Remove highlight from other suggestions
             document.querySelectorAll('.suggestion-content').forEach(elem => {
-                elem.style.background = 'white';
-                elem.style.borderColor = '#dee2e6';
+                elem.style.background = 'var(--bg-card)';
+                elem.style.borderColor = 'var(--border-color)';
             });
             
             // Highlight current selection
-            selectedElement.style.background = '#e8f5e8';
-            selectedElement.style.borderColor = '#28a745';
+            selectedElement.style.background = 'var(--color-success)';
+            selectedElement.style.borderColor = 'var(--color-success)';
             
             // Restore normal style after 3 seconds
             setTimeout(() => {
-                selectedElement.style.background = 'white';
-                selectedElement.style.borderColor = '#dee2e6';
+                selectedElement.style.background = 'var(--bg-card)';
+                selectedElement.style.borderColor = 'var(--border-color)';
             }, 3000);
         }
     }
@@ -779,7 +733,7 @@
     // Initialize all functionality on page load
     document.addEventListener('DOMContentLoaded', () => {
         setupDragAndDrop();
-        setupSubcategorySelection();
+        // setupSubcategorySelection handled by web-app.js
         setupModelSelection();
         setupFormSubmission();
         setupYouTubeFunctionality();

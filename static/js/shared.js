@@ -639,6 +639,190 @@ export const domUtils = {
     }
 };
 
+/**
+ * 深色模式管理器
+ */
+export class DarkModeManager {
+    constructor() {
+        this.key = 'darkMode';
+        this.prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        this.currentMode = this.getStoredMode() || (this.prefersDark ? 'dark' : 'light');
+        this.init();
+    }
+
+    init() {
+        this.applyMode(this.currentMode);
+        this.setupSystemListener();
+        this.bindExistingButtons();
+    }
+
+    getStoredMode() {
+        try {
+            return localStorage.getItem(this.key);
+        } catch {
+            return null;
+        }
+    }
+
+    setStoredMode(mode) {
+        try {
+            localStorage.setItem(this.key, mode);
+        } catch {
+            // localStorage不可用时静默失败
+        }
+    }
+
+    applyMode(mode) {
+        const root = document.documentElement;
+        
+        if (mode === 'dark') {
+            root.classList.add('dark-mode');
+            root.classList.remove('light-mode');
+        } else {
+            root.classList.add('light-mode');
+            root.classList.remove('dark-mode');
+        }
+        
+        this.currentMode = mode;
+        this.updateToggleButtons();
+        this.dispatchModeChange();
+    }
+
+    toggle() {
+        const newMode = this.currentMode === 'dark' ? 'light' : 'dark';
+        this.setMode(newMode);
+    }
+
+    setMode(mode) {
+        if (mode !== 'light' && mode !== 'dark') return;
+        
+        this.setStoredMode(mode);
+        this.applyMode(mode);
+    }
+
+    getCurrentMode() {
+        return this.currentMode;
+    }
+
+    isDarkMode() {
+        return this.currentMode === 'dark';
+    }
+
+    setupSystemListener() {
+        // 监听系统偏好变化，但只在没有手动设置时响应
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            const stored = this.getStoredMode();
+            if (!stored) {
+                // 只有没有手动设置时才跟随系统
+                this.applyMode(e.matches ? 'dark' : 'light');
+            }
+        });
+    }
+
+    bindExistingButtons() {
+        // 绑定页面中现有的深色模式切换按钮
+        const buttons = document.querySelectorAll('[data-dark-mode-toggle]');
+        buttons.forEach(button => {
+            // 避免重复绑定事件
+            if (!button.hasAttribute('data-dark-mode-bound')) {
+                button.addEventListener('click', () => {
+                    this.toggle();
+                });
+                button.setAttribute('data-dark-mode-bound', 'true');
+            }
+        });
+    }
+
+    updateToggleButtons() {
+        const buttons = document.querySelectorAll('[data-dark-mode-toggle]');
+        buttons.forEach(button => {
+            const isDark = this.isDarkMode();
+            
+            // 更新图标
+            const icon = button.querySelector('.dark-mode-icon');
+            if (icon) {
+                icon.textContent = isDark ? '☀️' : '🌙';
+            }
+            
+            // 更新文本
+            const text = button.querySelector('.dark-mode-text');
+            if (text) {
+                text.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+            }
+            
+            // 更新aria属性
+            button.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+        });
+    }
+
+    dispatchModeChange() {
+        const event = new CustomEvent('darkmodechange', {
+            detail: { mode: this.currentMode, isDark: this.isDarkMode() }
+        });
+        window.dispatchEvent(event);
+    }
+
+    createToggleButton(options = {}) {
+        const {
+            className = 'dark-mode-toggle',
+            showText = false,
+            position = 'relative'
+        } = options;
+
+        const button = document.createElement('button');
+        button.className = className;
+        button.setAttribute('data-dark-mode-toggle', '');
+        button.setAttribute('type', 'button');
+        button.style.cssText = `
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius-md);
+            padding: var(--spacing-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            font-family: inherit;
+            font-size: var(--font-size-sm);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+            position: ${position};
+        `;
+
+        const icon = document.createElement('span');
+        icon.className = 'dark-mode-icon';
+        icon.style.fontSize = '1.1em';
+        button.appendChild(icon);
+
+        if (showText) {
+            const text = document.createElement('span');
+            text.className = 'dark-mode-text';
+            button.appendChild(text);
+        }
+
+        // 悬停效果
+        button.addEventListener('mouseenter', () => {
+            button.style.backgroundColor = 'var(--bg-secondary)';
+            button.style.transform = 'translateY(-1px)';
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            button.style.backgroundColor = 'var(--bg-card)';
+            button.style.transform = 'translateY(0)';
+        });
+
+        // 点击事件
+        button.addEventListener('click', () => {
+            this.toggle();
+        });
+
+        // 初始状态
+        this.updateToggleButtons();
+
+        return button;
+    }
+}
+
 // 全局实例，供非模块化代码使用
 if (typeof window !== 'undefined') {
     window.ProjectBach = {
@@ -646,6 +830,7 @@ if (typeof window !== 'undefined') {
         NotificationManager,
         LoadingManager,
         FormValidator,
+        DarkModeManager,
         urlUtils,
         fileUtils,
         timeUtils,
@@ -656,6 +841,9 @@ if (typeof window !== 'undefined') {
 
     // 创建全局通知管理器实例
     window.notifications = new NotificationManager();
+    
+    // 创建全局深色模式管理器实例
+    window.darkMode = new DarkModeManager();
     
     // 添加全局CSS动画
     const style = document.createElement('style');

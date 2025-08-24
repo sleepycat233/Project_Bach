@@ -7,7 +7,8 @@ import {
     ApiClient, 
     NotificationManager, 
     LoadingManager, 
-    FormValidator 
+    FormValidator,
+    DarkModeManager 
 } from './shared.js';
 
 import { FileUploadComponent } from './components/FileUploadComponent.js';
@@ -24,6 +25,7 @@ class WebApp {
         this.apiClient = new ApiClient();
         this.notifications = new NotificationManager();
         this.loadingManager = new LoadingManager();
+        this.darkModeManager = new DarkModeManager();
         
         this.components = {};
         this.forms = {};
@@ -175,6 +177,12 @@ class WebApp {
         const subcategoryContainer = document.getElementById('subcategory-container');
         
         if (!contentTypeSelect || !subcategoryContainer) return;
+
+        // 初始化：检查默认选中的content type
+        const initialType = contentTypeSelect.value;
+        if (initialType) {
+            this.updateSubcategoryOptions(initialType);
+        }
 
         contentTypeSelect.addEventListener('change', async (e) => {
             const selectedType = e.target.value;
