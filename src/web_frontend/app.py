@@ -60,7 +60,7 @@ def create_app(config=None):
             config_manager = SimpleNamespace()
             config_manager.config = config
             # 为测试环境添加必需的方法
-            config_manager.get_nested_config = lambda section, key: config.get(section, {}).get(key, {})
+            config_manager.get_nested_config = lambda section: config.get(section, {})
             config_manager.get_full_config = lambda: config
         else:
             # 使用默认配置管理器
@@ -461,12 +461,7 @@ def create_app(config=None):
             # 使用YouTube处理器获取视频元数据
             handler = app.config.get('YOUTUBE_HANDLER')
             if not handler:
-                # 创建临时YouTube处理器实例来获取元数据
-                from ..web_frontend.handlers.youtube_handler import YouTubeHandler
-                from ..utils.config import ConfigManager
-                config_manager = ConfigManager()
-                config = config_manager.load_config()
-                handler = YouTubeHandler(config)
+                return jsonify({'error': 'YouTube handler not available'}), 503
             
             metadata = handler.get_video_metadata(url)
             

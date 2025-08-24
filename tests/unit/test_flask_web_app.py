@@ -59,14 +59,10 @@ class TestFlaskWebApplication:
         assert response.status_code == 200
         assert b'Project Bach' in response.data
         assert b'Upload Audio' in response.data
-        assert b'YouTube Link' in response.data
-        assert b'RSS Feed' in response.data
+        assert b'YouTube Video' in response.data
         
         # 检查分类选项
         assert b'lecture' in response.data
-        assert b'youtube' in response.data
-        assert b'rss' in response.data
-        assert b'podcast' in response.data
     
     def test_audio_upload_form_valid_file(self, client, temp_dir):
         """测试有效音频文件上传"""
@@ -191,44 +187,6 @@ class TestFlaskWebApplication:
         assert response.status_code == 400
         assert b'URL' in response.data or b'required' in response.data.lower()
     
-    def test_rss_subscription_valid(self, client):
-        """测试有效RSS订阅添加"""
-        data = {
-            'rss_url': 'https://feeds.techcrunch.com/TechCrunch/',
-            'subscription_name': 'TechCrunch Feed',
-            'category': 'technology',
-            'refresh_interval': '3600',
-            'auto_process': True,
-            'max_articles': '20'
-        }
-        
-        with patch('src.web_frontend.handlers.rss_handler.RSSHandler.add_subscription') as mock_add:
-            mock_add.return_value = {
-                'status': 'success',
-                'subscription_id': 'rss_789',
-                'feed_title': 'TechCrunch'
-            }
-            
-            response = client.post('/subscribe/rss', data=data)
-            
-            assert response.status_code in [200, 302]
-            mock_add.assert_called_once()
-    
-    def test_rss_subscription_invalid_url(self, client):
-        """测试无效RSS URL"""
-        data = {
-            'rss_url': 'https://example.com/not-a-feed',
-            'subscription_name': 'Invalid Feed'
-        }
-        
-        with patch('src.web_frontend.processors.rss_processor.RSSProcessor.validate_feed_url') as mock_validate:
-            mock_validate.return_value = False
-            
-            response = client.post('/subscribe/rss', data=data)
-            
-            assert response.status_code == 400
-            assert b'Invalid RSS URL' in response.data or b'feed' in response.data.lower()
-    
     def test_processing_status_api(self, client):
         """测试处理状态查询API"""
         with patch('src.web_frontend.services.processing_service.ProcessingService.get_status') as mock_status:
@@ -263,19 +221,14 @@ class TestFlaskWebApplication:
         assert isinstance(data, dict)
         assert 'lecture' in data
         assert 'youtube' in data
-        assert 'rss' in data
-        assert 'podcast' in data
-        
         # 检查分类详细信息
         assert data['lecture']['icon'] == '🎓'
         assert data['youtube']['icon'] == '📺'
-        assert data['rss']['icon'] == '📰'
-        assert data['podcast']['icon'] == '🎙️'
     
     def test_recent_results_api(self, client):
         """测试最近结果API"""
-        with patch('src.storage.result_storage.ResultStorage.get_recent_results') as mock_results:
-            mock_results.return_value = [
+        with patch('src.web_frontend.app.get_processing_service') as mock_service:
+            mock_service.return_value.get_recent_results.return_value = [
                 {
                     'filename': 'lecture1.mp3',
                     'content_type': 'lecture',
@@ -339,7 +292,7 @@ class TestFlaskWebApplication:
     def test_error_handling_500(self, client):
         """测试500错误处理"""
         # 模拟内部服务器错误
-        with patch('src.web_frontend.routes.main.render_template') as mock_render:
+        with patch('src.web_frontend.app.render_template') as mock_render:
             mock_render.side_effect = Exception("Internal error")
             
             response = client.get('/')

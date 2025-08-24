@@ -103,9 +103,9 @@ class TestCodeCleanup(unittest.TestCase):
         if app_path.exists():
             content = app_path.read_text()
             
-            # 应该包含简化的排序逻辑
-            self.assertIn('apply_simplified_model_sorting', content)
-            self.assertIn('get_model_complexity', content)
+            # 应该包含models API相关功能
+            self.assertIn('/api/models/', content)
+            self.assertIn('api_available_models', content)
             
     def test_youtube_metadata_api_added(self):
         """测试YouTube元数据API已添加"""

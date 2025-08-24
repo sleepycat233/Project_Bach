@@ -78,6 +78,10 @@ TAILSCALE_AUTH_KEY=tskey-auth-your-actual-auth-key-here
 # 安全文件服务器令牌 (自动生成，或自定义)
 SECURE_FILE_SERVER_TOKEN=your-secure-token-here
 
+# GitHub配置 (用于API访问和Pages部署)
+GITHUB_USERNAME=your-github-username
+GITHUB_TOKEN=ghp_your-github-personal-access-token-here
+
 # 可选：调试模式
 DEBUG=false
 
@@ -135,6 +139,8 @@ LOG_LEVEL=INFO
                     f.write("OPENROUTER_API_KEY=\n")
                     f.write("TAILSCALE_AUTH_KEY=\n")
                     f.write(f"SECURE_FILE_SERVER_TOKEN={self.generate_secure_token()}\n")
+                    f.write("GITHUB_USERNAME=\n")
+                    f.write("GITHUB_TOKEN=\n")
                 
                 self.logger.info(f"创建了基础.env文件: {self.env_file}")
                 
@@ -196,7 +202,7 @@ LOG_LEVEL=INFO
             env_vars = self.load_env_file()
             
             # 添加系统环境变量
-            for key in ['OPENROUTER_API_KEY', 'TAILSCALE_AUTH_KEY', 'SECURE_FILE_SERVER_TOKEN']:
+            for key in ['OPENROUTER_API_KEY', 'TAILSCALE_AUTH_KEY', 'SECURE_FILE_SERVER_TOKEN', 'GITHUB_USERNAME', 'GITHUB_TOKEN']:
                 if key in os.environ:
                     env_vars[key] = os.environ[key]
             
@@ -290,7 +296,8 @@ LOG_LEVEL=INFO
         sensitive_fields = [
             ['api', 'openrouter', 'key'],
             ['network', 'tailscale', 'auth_key'],
-            ['network', 'secure_file_server', 'auth_token']
+            ['network', 'secure_file_server', 'auth_token'],
+            ['github', 'token']
         ]
         
         for field_path in sensitive_fields:

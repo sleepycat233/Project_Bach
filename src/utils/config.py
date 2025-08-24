@@ -35,6 +35,10 @@ class ConfigManager:
         
         # 回退到原有方式
         self.config = self.load_config(config_path)
+        
+        # 应用环境变量覆盖
+        self.apply_env_overrides()
+        
         self.validate_config(self.config)
         
     def load_config(self, path: str) -> Dict[str, Any]:
@@ -100,6 +104,29 @@ class ConfigManager:
                 raise ValueError(f"路径配置缺少: {path_key}")
         
         return True
+    
+    def apply_env_overrides(self):
+        """应用环境变量覆盖配置"""
+        import os
+        
+        # GitHub用户名和令牌
+        if 'GITHUB_USERNAME' in os.environ:
+            if 'github' not in self.config:
+                self.config['github'] = {}
+            self.config['github']['username'] = os.environ['GITHUB_USERNAME']
+            
+        if 'GITHUB_TOKEN' in os.environ:
+            if 'github' not in self.config:
+                self.config['github'] = {}
+            self.config['github']['token'] = os.environ['GITHUB_TOKEN']
+            
+        # OpenRouter API Key
+        if 'OPENROUTER_API_KEY' in os.environ:
+            if 'api' not in self.config:
+                self.config['api'] = {}
+            if 'openrouter' not in self.config['api']:
+                self.config['api']['openrouter'] = {}
+            self.config['api']['openrouter']['key'] = os.environ['OPENROUTER_API_KEY']
     
     def get_api_config(self) -> Dict[str, Any]:
         """获取API配置

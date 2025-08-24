@@ -72,17 +72,21 @@ class TestConfigManager(unittest.TestCase):
     
     def test_load_nonexistent_config(self):
         """测试加载不存在的配置文件"""
+        # 直接测试load_config方法，这样可以绕过env_manager的fallback逻辑
+        manager = ConfigManager()
         with self.assertRaises(FileNotFoundError):
-            ConfigManager('nonexistent.yaml')
+            manager.load_config('nonexistent.yaml')
     
     def test_load_invalid_yaml(self):
         """测试加载无效的YAML文件"""
+        # 直接测试load_config方法
+        manager = ConfigManager()
         invalid_yaml_path = os.path.join(self.test_dir, 'invalid.yaml')
         with open(invalid_yaml_path, 'w') as f:
             f.write('invalid: yaml: content: [')
         
         with self.assertRaises(ValueError):
-            ConfigManager(invalid_yaml_path)
+            manager.load_config(invalid_yaml_path)
     
     @patch('utils.env_manager.setup_project_environment')
     def test_validate_missing_required_keys(self, mock_setup_env):
@@ -156,6 +160,85 @@ class TestConfigManager(unittest.TestCase):
             saved_config = yaml.safe_load(f)
         
         self.assertEqual(saved_config['api']['openrouter']['key'], 'updated-key')
+    
+    @patch('utils.env_manager.setup_project_environment')
+    def test_get_content_classification_config(self, mock_setup_env):
+        """测试获取内容分类配置"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
+        
+        # 添加内容分类配置到测试配置
+        self.valid_config['content_classification'] = {
+            'content_types': {
+                'lecture': {
+                    'icon': '🎓',
+                    'display_name': 'Academic Lecture',
+                    'subcategories': ['PHYS101', 'CS101', 'ML301']
+                },
+                'meeting': {
+                    'icon': '🏢', 
+                    'display_name': 'Meeting Recording',
+                    'subcategories': ['team_meeting', 'project_review']
+                }
+            }
+        }
+        
+        # 更新测试配置文件
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(self.valid_config, f)
+        
+        manager = ConfigManager(self.config_path)
+        content_types = manager.get_nested_config('content_classification', 'content_types')
+        
+        # 验证内容类型配置
+        self.assertIn('lecture', content_types)
+        self.assertIn('meeting', content_types)
+        
+        # 验证lecture配置
+        lecture_config = content_types['lecture']
+        self.assertEqual(lecture_config['icon'], '🎓')
+        self.assertEqual(lecture_config['display_name'], 'Academic Lecture')
+        self.assertIn('PHYS101', lecture_config['subcategories'])
+        self.assertIn('CS101', lecture_config['subcategories'])
+        self.assertIn('ML301', lecture_config['subcategories'])
+        
+        # 验证meeting配置
+        meeting_config = content_types['meeting']
+        self.assertEqual(meeting_config['icon'], '🏢')
+        self.assertIn('team_meeting', meeting_config['subcategories'])
+        self.assertIn('project_review', meeting_config['subcategories'])
+    
+    @patch('utils.env_manager.setup_project_environment')
+    def test_uploads_folder_path_consistency(self, mock_setup_env):
+        """测试uploads目录路径一致性"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
+        
+        # 更新配置使watch_folder和upload_folder一致
+        self.valid_config['web_frontend'] = {
+            'upload': {
+                'upload_folder': './uploads',
+                'organize_by_category': True,
+                'create_subcategory_folders': True
+            }
+        }
+        self.valid_config['paths']['watch_folder'] = './uploads'
+        
+        # 更新测试配置文件
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(self.valid_config, f)
+        
+        manager = ConfigManager(self.config_path)
+        
+        # 获取路径配置
+        paths_config = manager.get_paths_config()
+        upload_config = manager.get_nested_config('web_frontend', 'upload')
+        
+        # 验证一致性
+        watch_folder = paths_config.get('watch_folder')
+        upload_folder = upload_config.get('upload_folder')
+        
+        self.assertEqual(watch_folder, './uploads')
+        self.assertEqual(upload_folder, './uploads')
+        self.assertEqual(watch_folder, upload_folder)
 
 
 class TestLoggingSetup(unittest.TestCase):

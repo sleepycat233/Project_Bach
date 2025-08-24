@@ -101,3 +101,6 @@ anonymized_*
 processed_*
 result_*
 *_result.*
+
+# WhisperKit models - large files, should not be in git
+models/

@@ -16,19 +16,11 @@ from src.web_frontend.app import create_app
 def main():
     """启动开发服务器"""
     
-    # 简化配置，跳过安全检查
-    test_config = {
-        'TESTING': True,  # 跳过Tailscale安全检查
-        'SECRET_KEY': 'dev-secret-key',
-        'WTF_CSRF_ENABLED': False,
-        'UPLOAD_FOLDER': './temp/uploads',
-        'MAX_CONTENT_LENGTH': 500 * 1024 * 1024,  # 500MB
-        'ALLOWED_EXTENSIONS': {'.mp3', '.wav', '.m4a', '.mp4', '.flac', '.aac', '.ogg'},
-        'TAILSCALE_NETWORK': '100.64.0.0/10',
-        'RATE_LIMIT_PER_MINUTE': 60
-    }
+    # 不传入config参数，让create_app使用默认ConfigManager加载config.yaml
+    app = create_app()
     
-    app = create_app(test_config)
+    # 设置测试模式以跳过Tailscale安全检查
+    app.config['TESTING'] = True
     
     print("🚀 启动Project Bach Web界面")
     print("📱 访问地址: http://localhost:8080")

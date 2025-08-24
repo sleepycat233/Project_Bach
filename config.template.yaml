@@ -28,32 +28,70 @@ spacy:
   model: "zh_core_web_sm"
 
 whisperkit:
-  model: "large-v3"    # 可选: tiny, small, base, medium, large-v3
-  language: "auto"  # auto: 基于用户选择自动切换
-  model_path: "/Users/me/Documents/huggingface/models/argmaxinc/whisperkit-coreml"
-  
-  # 语言特定配置
-  language_configs:
-    english:
-      model_prefix: "distil"  # Distil模型：英文专用，高性能
-      language_code: "en"
-      performance: "18x realtime"  # ~32.9秒处理10分钟音频
-      description: "English-only optimized, fastest processing"
-      
-    multilingual:
-      model_prefix: "openai"   # OpenAI模型：多语言支持，较慢
-      language_code: "auto"    # 自动检测语言
-      performance: "4x realtime"   # ~143.9秒处理10分钟音频  
-      description: "Supports Chinese/mixed languages, slower processing"
-      
-  # 性能对比（10分钟音频测试）：
-  # - distil-large-v3: 32.9秒 (18x实时，仅英文)  ⚡ 推荐英文内容
-  # - openai-large-v3: 143.9秒 (4.2x实时，支持中文) 🎯 推荐中文/混合内容
+  # 模型路径配置
+  model_path: "./models"  # 项目本地模型目录
+
+  # 模型提供商配置 - 支持本地和API服务（可扩展）
+  providers:
+    local:
+      enabled: true
+      type: "whisperkit_local"
+      path: "./models/whisperkit-coreml"
+      # 自动发现本地模型，读取config.json
+      auto_discovery: true
+
+    # 未来API支持（可配置启用）
+    openai_api:
+      enabled: false  # 当前未启用
+      type: "openai_whisper_api"
+      api_key: "${OPENAI_API_KEY}"
+      base_url: "https://api.openai.com/v1"
+      display_info:
+        provider_name: "OpenAI"
+      models:
+        - name: "whisper-1"
+          display_name: "Whisper V1"
+          multilingual_support: true
+          english_support: true
+        - name: "whisper-large-v3-turbo"
+          display_name: "Whisper Large V3 Turbo"
+          multilingual_support: true
+          english_support: true
+
+    elevenlabs_api:
+      enabled: false  # 当前未启用
+      type: "elevenlabs_api"
+      api_key: "${ELEVENLABS_API_KEY}"
+      base_url: "https://api.elevenlabs.io/v1"
+      display_info:
+        provider_name: "ElevenLabs"
+      models:
+        - name: "speech"
+          display_name: "Speech Recognition"
+          multilingual_support: true
+          english_support: true
+
+    azure_speech:
+      enabled: false  # 当前未启用
+      type: "azure_cognitive_services"
+      api_key: "${AZURE_SPEECH_KEY}"
+      region: "eastus"
+      display_info:
+        provider_name: "Azure"
+      models:
+        - name: "speech"
+          display_name: "Speech Recognition"
+          multilingual_support: true
+          english_support: true
+
+  # 参考性能数据（从实际测试获得）：
+  # - distil-large-v3: 18x实时 (英文专用)
+  # - openai-large-v3: 4x实时 (多语言)
 
 # 系统配置
 system:
   debug: false  # 调试模式开关
-  
+
 logging:
   level: "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
   file: "./data/logs/app.log"
@@ -111,32 +149,35 @@ github:
   username: "${GITHUB_USERNAME}"  # 你的GitHub用户名（从环境变量读取）
   repo_name: "Project_Bach"  # 仓库名
   pages_branch: "gh-pages"  # GitHub Pages部署分支
-  
+
+  # API访问配置 (用于查询仓库状态等)
+  token: "${GITHUB_TOKEN}"  # GitHub Personal Access Token (从环境变量读取)
+
   # Git配置 (使用SSH认证，无需token)
   remote_url: "git@github.com:${GITHUB_USERNAME}/Project_Bach.git"  # SSH远程地址
-  
+
   # Git用户配置 (如果系统没有全局配置时使用的默认值)
   default_user_name: "Project Bach Bot"  # 默认用户名
   default_user_email: "bot@project-bach.com"  # 默认邮箱
-  
+
   # 网站配置
   website:
     title: "Project Bach - 智能音频处理系统"
     description: "基于 WhisperKit + OpenRouter + spaCy 的智能音频处理与内容生成系统"
     theme: "dark"  # 默认主题: light, dark, auto
-    
+
   # 部署设置
   publishing:
     auto_deploy: true  # 是否自动部署到GitHub Pages
     include_source: false  # 网站分支是否包含源代码 (推荐: false)
     clean_deploy: true  # 每次部署前清理网站分支 (推荐: true)
     max_files_per_deploy: 50  # 每次部署最多包含的音频结果文件数
-    
+
   # 内容过滤
   content_filter:
     exclude_patterns:  # 不发布包含这些模式的文件
       - "*private*"
-      - "*confidential*" 
+      - "*confidential*"
       - "*test*"
     min_content_length: 100  # 最小内容长度 (字符)
     anonymize_names: true  # 是否在发布前进行人名匿名化
@@ -144,18 +185,18 @@ github:
 # 模板配置
 templates:
   base_dir: "./templates"  # 模板文件目录
-  
+
   # 页面模板
   homepage: "index.html.j2"  # 主页模板
   content: "content.html.j2"  # 内容页面模板
   error: "error.html.j2"  # 错误页面模板
-  
+
   # 样式配置
   css:
     primary_color: "#0066cc"  # 主色调
     dark_primary_color: "#4fc3f7"  # 深色模式主色调
     font_family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    
+
   # 功能开关
   features:
     theme_toggle: true  # 主题切换按钮
@@ -168,7 +209,7 @@ content_classification:
   # 课程配置 (用于lecture_series多选)
   courses:
     - "PHYS101"
-    - "CS101" 
+    - "CS101"
     - "ML301"
     - "PHYS401"
   # 支持的内容类型定义
@@ -176,39 +217,33 @@ content_classification:
     lecture:      # 🎓 学术讲座
       icon: "🎓"
       display_name: "Academic Lecture"
-      description: "Academic lectures, course recordings, educational content"
-      auto_detect_patterns:
-        filename: ["lecture", "course", "教授", "professor", "university", "class", "lesson", "academic", "seminar", "workshop", "tutorial", "education"]
-        content: ["education", "university", "classroom", "professor", "course", "lecture", "academic", "research", "study", "learning", "teaching", "student", "knowledge", "theory", "concept", "principle", "学习", "教授", "课程", "学术", "研究", "教育", "知识"]
-        url: []
-      supported_formats: ["mp3", "wav", "m4a", "mp4", "flac"]
-      default_tags: ["education", "learning"]
-      
+      recommendations:
+        english:
+          - "distil-whisper_distil-large-v3"  # 英文快速模型
+        multilingual:
+          - "openai_whisper-large-v3"         # 多语言高精度
+
     meeting:      # 🏢 会议录音
       icon: "🏢"
-      display_name: "Meeting Recording"
-      description: "Meeting recordings, discussion records (Limited support, requires ElevenLabs speaker diarization)"
-      auto_detect_patterns:
-        filename: ["meeting", "conference", "discussion", "call", "会议", "讨论", "电话会议"]
-        content: ["meeting", "conference", "discussion", "agenda", "participants", "会议", "讨论", "议程"]
-        url: []
-      supported_formats: ["mp3", "wav", "m4a", "mp4", "flac"]
-      default_tags: ["meeting", "discussion"]
-      processing:
-        requires_speaker_diarization: true
-        api_service: "elevenlabs"  # 需要ElevenLabs API
-        support_level: "limited"
-        
+      display_name: "Meeting Recording (Limited support, requires ElevenLabs speaker diarization)"
+      recommendations:
+        english:
+          - "openai_whisper-large-v3"         # 英文高精度多人对话
+          - "elevenlabs_api_speech"            # 英文说话者分离
+        multilingual:
+          - "openai_whisper-large-v3"         # 多语言高精度多人对话
+          - "elevenlabs_api_speech"            # 多语言说话者分离
+
     others:       # 📄 其他内容
       icon: "📄"
       display_name: "Others"
-      description: "Other types of audio content"
-      auto_detect_patterns:
-        filename: ["other", "misc", "general"]
-        content: ["other", "miscellaneous", "general"]
-        url: []
-      supported_formats: ["mp3", "wav", "m4a", "mp4", "flac", "aac", "ogg"]
-      default_tags: ["other"]
+      recommendations:
+        english:
+          - "distil-whisper_distil-large-v3"  # 英文快速处理
+          - "openai_whisper-medium"            # 英文平衡选择
+        multilingual:
+          - "openai_whisper-large-v3"         # 多语言平衡选择
+          - "openai_whisper-medium"            # 多语言备选方案
 
   # 分类算法配置
   classification:
@@ -217,20 +252,20 @@ content_classification:
     enable_auto_tagging: true        # 启用自动标签提取
     default_category: "lecture"      # 默认分类
     enable_manual_override: true     # 允许手动覆盖分类
-    
+
     # 权重配置 (优先级: URL > 文件名 > 内容)
     scoring_weights:
       url_match: 0.6      # URL模式匹配权重
-      filename_match: 0.3 # 文件名模式匹配权重  
+      filename_match: 0.3 # 文件名模式匹配权重
       content_match: 0.1  # 内容分析权重
-    
+
     # 标签提取配置
     tag_extraction:
       max_tags: 10                    # 最大标签数量
       min_tag_length: 2               # 最小标签长度
       exclude_common_words: true      # 排除常见词汇
       include_technical_terms: true   # 包含技术术语
-      
+
   # 内容过滤配置
   content_filter:
     exclude_patterns:     # 排除模式
@@ -251,6 +286,8 @@ content_classification:
       - "教程"
     min_quality_score: 0.5  # 最小质量分数
 
+  # 模型推荐策略已移至各content_type下的model_recommendations配置
+
 # Phase 6: Web前端配置
 web_frontend:
   # Flask应用配置
@@ -259,7 +296,7 @@ web_frontend:
     port: 8080                   # 服务端口
     debug: false                 # 调试模式
     secret_key_env: "FLASK_SECRET_KEY"  # 从环境变量读取密钥
-    
+
   # 文件上传配置
   upload:
     max_file_size: 104857600     # 100MB
@@ -268,7 +305,7 @@ web_frontend:
     temp_folder: "./temp"
     auto_cleanup: true           # 自动清理临时文件
     cleanup_interval: 3600       # 清理间隔(秒)
-    
+
   # 安全配置
   security:
     tailscale_only: true         # 仅允许Tailscale网络访问
@@ -276,7 +313,7 @@ web_frontend:
     rate_limit_per_hour: 1000    # 每小时请求限制
     enable_csrf: true            # 启用CSRF保护
     session_timeout: 3600        # 会话超时(秒)
-    
+
   # UI配置
   ui:
     theme: "dark"                # 默认主题
@@ -296,22 +333,26 @@ youtube:
     output_format: "mp3"         # 输出格式
     output_dir: "./temp/youtube" # 输出目录
     timeout: 600                 # 下载超时(秒)
-    
+
   # 内容验证
   validation:
     check_availability: true     # 检查视频可用性
     validate_duration: true      # 验证时长
     skip_private: true           # 跳过私有视频
     skip_age_restricted: false   # 跳过年龄限制视频
-    
+
   # 元数据提取
   metadata:
     extract_thumbnail: true      # 提取缩略图
     extract_description: true    # 提取描述
     extract_tags: true           # 提取标签
+    # 字幕语言优先级设置
+    preferred_subtitle_languages: ["zh-CN", "zh", "en"]  # 优先检测的字幕语言
+    subtitle_fallback_to_transcription: true             # 无字幕时回退到音频转录
+    quick_metadata_timeout: 8                            # 快速元数据获取超时(秒)
     extract_comments: false      # 提取评论(耗时)
 
-# RSS处理器配置  
+# RSS处理器配置
 rss:
   # 订阅管理
   subscriptions:
@@ -319,7 +360,7 @@ rss:
     default_refresh_interval: 3600  # 默认刷新间隔(秒)
     auto_refresh: true           # 自动刷新
     storage_file: "./data/rss_subscriptions.json"  # 订阅存储文件
-    
+
   # 内容处理
   processing:
     max_articles_per_feed: 20    # 每个feed最大文章数
@@ -327,14 +368,14 @@ rss:
     content_length_max: 50000    # 最大内容长度
     enable_summarization: true   # 启用AI摘要
     preserve_html: false         # 保留HTML格式
-    
+
   # 过滤配置
   filtering:
     exclude_duplicates: true     # 排除重复文章
     exclude_old_articles: true   # 排除旧文章
     max_age_days: 30            # 最大文章年龄(天)
     spam_detection: true         # 垃圾检测
-    
+
   # 网络配置
   network:
     timeout: 30                  # 请求超时(秒)

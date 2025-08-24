@@ -76,8 +76,8 @@ class ProcessingStatus:
         self.stage = ProcessingStage.COMPLETED
         self.progress = 100
         self.result_url = result_url
-        self.message = "处理完成" + (f" - {result_url}" if result_url else "")
-        self.add_log(f"✅ 处理完成" + (f" - {result_url}" if result_url else ""), 'success')
+        self.message = "Processing completed" + (f" - {result_url}" if result_url else "")
+        self.add_log(f"✅ Processing completed" + (f" - {result_url}" if result_url else ""), 'success')
         self.updated_time = datetime.now()
         
     def to_dict(self) -> Dict[str, Any]:
@@ -195,7 +195,7 @@ class ProcessingService:
             status = self._statuses[processing_id]
             status.set_completed(result_url)
             
-        self.logger.info(f"处理完成: {processing_id}")
+        self.logger.info(f"Processing completed: {processing_id}")
         return True
         
     def get_status(self, processing_id: str) -> Optional[Dict[str, Any]]:
