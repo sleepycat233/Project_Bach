@@ -196,7 +196,8 @@ class AudioProcessor:
                         if 'website_url' in deploy_result:
                             self.logger.info(f"🔗 网站地址: {deploy_result['website_url']}")
                             if processing_id:
-                                self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, f"Deployment successful! Website: {deploy_result['website_url']}")
+                                # 保持PUBLISHING状态，让deployment monitor检查真实部署状态
+                                self.processing_service.update_status(processing_id, ProcessingStage.PUBLISHING, 95, f"Code pushed to GitHub, verifying deployment...")
                     else:
                         self.logger.warning(f"⚠️  自动部署失败: {deploy_result.get('error', '未知错误')}")
                         if processing_id:

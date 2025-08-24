@@ -11,6 +11,21 @@ from typing import Dict, List, Optional
 
 from .github_deployment_monitor import create_deployment_monitor, GitHubDeploymentMonitor
 
+# Import ProcessingStage from core module
+try:
+    from ...core.audio_processor import ProcessingStage
+except ImportError:
+    # Fallback enum if import fails
+    from enum import Enum
+    class ProcessingStage(Enum):
+        UPLOADED = "uploaded"
+        TRANSCRIBING = "transcribing"
+        ANONYMIZING = "anonymizing"
+        AI_GENERATING = "ai_generating"
+        PUBLISHING = "publishing"
+        COMPLETED = "completed"
+        FAILED = "failed"
+
 logger = logging.getLogger(__name__)
 
 
@@ -363,6 +378,12 @@ class ProcessingService:
             
             for item_id, item in self._processing_items.items():
                 started_at = datetime.fromisoformat(item['started_at'])
+                
+                # 特殊处理PUBLISHING状态的项目 - 检查GitHub deployment状态
+                if item.get('stage') == ProcessingStage.PUBLISHING.value and item.get('progress', 0) >= 90:
+                    if not item.get('deployment_checked', False):
+                        self._check_github_deployment(item_id)
+                        continue  # 跳过过期检查，让deployment check完成
                 
                 # 如果处理时间超过预估时间的2倍，认为已过期
                 max_time = timedelta(seconds=item.get('estimated_time', 300) * 2)
