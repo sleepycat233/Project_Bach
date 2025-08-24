@@ -1,0 +1,848 @@
+openapi: 3.0.3
+info:
+  title: Project Bach API
+  description: |
+    Project Bach Web API - Multi-media content processing system supporting audio files and YouTube URLs.
+    
+    Features:
+    - Audio file upload with automatic transcription and AI analysis
+    - YouTube URL processing with subtitle extraction and content analysis
+    - Real-time processing status tracking
+    - GitHub Pages deployment integration
+    - Privacy-aware content handling (public/private)
+    
+    The API supports both public content (published to GitHub Pages) and private content (accessible only via Tailscale network).
+  version: 1.0.0
+  contact:
+    name: Project Bach
+    url: https://github.com/sleepycat233/Project_Bach
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://100.x.x.x:8080
+    description: Tailscale network access (replace x.x.x with actual IP)
+
+security:
+  - TailscaleAuth: []
+
+paths:
+  /:
+    get:
+      summary: Main Upload Interface
+      description: Renders the main upload page with content type options and configuration
+      tags:
+        - Web Interface
+      responses:
+        '200':
+          description: Upload page rendered successfully
+          content:
+            text/html:
+              schema:
+                type: string
+                description: HTML upload interface
+        '403':
+          $ref: '#/components/responses/TailscaleAccessDenied'
+
+  /upload/audio:
+    post:
+      summary: Upload Audio File
+      description: |
+        Upload an audio file for processing. Supports various audio formats including MP3, WAV, M4A, FLAC, AAC, and OGG.
+        
+        The processing includes:
+        1. Audio transcription using WhisperKit
+        2. Name anonymization using spaCy
+        3. AI content generation (summary + mind map)
+        4. Automatic GitHub Pages publishing (if public)
+        
+        Processing happens asynchronously in the background.
+      tags:
+        - Audio Processing
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - audio_file
+                - content_type
+              properties:
+                audio_file:
+                  type: string
+                  format: binary
+                  description: Audio file to upload (max 500MB)
+                content_type:
+                  type: string
+                  enum: [lecture, meeting, others]
+                  description: Content classification type
+                privacy_level:
+                  type: string
+                  enum: [public, private]
+                  default: public
+                  description: Privacy level for the content
+                subcategory:
+                  type: string
+                  description: Subcategory for content organization (e.g., PHYS101, CS101)
+                custom_subcategory:
+                  type: string
+                  description: Custom subcategory if 'other' is selected
+                audio_language:
+                  type: string
+                  enum: [english, multilingual]
+                  default: english
+                  description: Language mode for transcription
+                whisper_model:
+                  type: string
+                  default: "large-v3|distil"
+                  description: Whisper model selection in format "model|prefix"
+                description:
+                  type: string
+                  description: Optional description for the content
+            encoding:
+              audio_file:
+                contentType: audio/mp3, audio/wav, audio/m4a, audio/mp4, audio/flac, audio/aac, audio/ogg
+      responses:
+        '302':
+          description: Redirect to processing status page
+          headers:
+            Location:
+              schema:
+                type: string
+                example: "/status/uuid-processing-id"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '413':
+          description: File too large (max 500MB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /upload/youtube:
+    post:
+      summary: Submit YouTube URL
+      description: |
+        Submit a YouTube URL for processing. The system will:
+        1. Download video and extract audio/subtitles
+        2. Perform transcription if no suitable subtitles found
+        3. Apply name anonymization
+        4. Generate AI content analysis
+        5. Publish to GitHub Pages or private area
+      tags:
+        - YouTube Processing
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - youtube_url
+              properties:
+                youtube_url:
+                  type: string
+                  format: uri
+                  description: Valid YouTube video URL
+                  example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                privacy_level:
+                  type: string
+                  enum: [public, private]
+                  default: public
+                tags:
+                  type: string
+                  description: Comma-separated tags for the video
+                description:
+                  type: string
+                  description: Optional description for the content
+      responses:
+        '302':
+          description: Redirect to processing status page
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /status/{processing_id}:
+    get:
+      summary: Processing Status Page
+      description: Display processing status page for a specific processing session
+      tags:
+        - Status Tracking
+      parameters:
+        - name: processing_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique processing session identifier
+      responses:
+        '200':
+          description: Status page rendered successfully
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Processing session not found
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /api/status/processing:
+    get:
+      summary: Get All Active Processing Sessions
+      description: Retrieve status information for all active processing sessions
+      tags:
+        - Status API
+      responses:
+        '200':
+          description: Active sessions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active_sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProcessingStatus'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/status/{processing_id}:
+    get:
+      summary: Get Single Processing Status
+      description: Get detailed status information for a specific processing session
+      tags:
+        - Status API
+      parameters:
+        - name: processing_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Processing status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingStatus'
+        '404':
+          description: Processing session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/categories:
+    get:
+      summary: Get Content Categories
+      description: Retrieve available content type categories and their metadata
+      tags:
+        - Configuration API
+      responses:
+        '200':
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/ContentCategory'
+              example:
+                lecture:
+                  icon: "🎓"
+                  name: "Academic Lecture"
+                youtube:
+                  icon: "📺"
+                  name: "YouTube Video"
+
+  /api/results/recent:
+    get:
+      summary: Get Recent Results
+      description: Retrieve a list of recently processed content
+      tags:
+        - Content API
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Maximum number of results to return
+      responses:
+        '200':
+          description: Recent results retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProcessedContent'
+
+  /api/github/pages-status:
+    get:
+      summary: GitHub Pages Deployment Status
+      description: |
+        Get real-time GitHub Pages deployment status using GitHub REST API.
+        Provides detailed information about the latest deployment.
+      tags:
+        - GitHub Integration
+      responses:
+        '200':
+          description: GitHub Pages status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubPagesStatus'
+        '408':
+          description: GitHub API request timeout
+        '503':
+          description: Network error accessing GitHub API
+
+  /api/youtube/metadata:
+    get:
+      summary: Get YouTube Video Metadata
+      description: |
+        Retrieve metadata for a YouTube video including title, description, duration,
+        and subtitle availability. Uses optimized yt-dlp calls for fast response.
+      tags:
+        - YouTube Processing
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: YouTube video URL
+          example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+      responses:
+        '200':
+          description: Video metadata retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/YouTubeMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/models/check:
+    get:
+      summary: Check Model Availability
+      description: |
+        Check if a specific Whisper model is available locally and ready for use.
+        Validates model files and directory structure.
+      tags:
+        - Model Management
+      parameters:
+        - name: model
+          in: query
+          schema:
+            type: string
+            default: "large-v3"
+          description: Model name
+        - name: prefix
+          in: query
+          schema:
+            type: string
+            default: "distil"
+          description: Model prefix
+      responses:
+        '200':
+          description: Model status checked successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelStatus'
+
+  /api/models/available:
+    get:
+      summary: Get Available Models
+      description: |
+        Retrieve information about all available Whisper models (both local and API-based).
+        Includes model specifications, sizes, and capabilities.
+      tags:
+        - Model Management
+      responses:
+        '200':
+          description: Available models retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailableModels'
+
+  /api/models/smart-config:
+    get:
+      summary: Get Smart Model Configuration
+      description: |
+        Get intelligent model recommendations based on content types and current model availability.
+        Provides optimized model selection with language-specific recommendations.
+      tags:
+        - Model Management
+      responses:
+        '200':
+          description: Smart configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ModelRecommendation'
+
+  /private/:
+    get:
+      summary: Private Content Index
+      description: |
+        Access private content area (Tailscale-only). Shows list of private processed content
+        organized by date and content type.
+      tags:
+        - Private Content
+      responses:
+        '200':
+          description: Private content index rendered
+          content:
+            text/html:
+              schema:
+                type: string
+        '403':
+          $ref: '#/components/responses/TailscaleAccessDenied'
+
+  /private/{filepath}:
+    get:
+      summary: Private Content File
+      description: Access specific private content files (HTML, MD formats)
+      tags:
+        - Private Content
+      parameters:
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Path to private content file
+      responses:
+        '200':
+          description: Private content file served
+          content:
+            text/html:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+        '403':
+          description: Access denied or path traversal attempt
+        '404':
+          description: Private content file not found
+
+components:
+  securitySchemes:
+    TailscaleAuth:
+      type: http
+      scheme: bearer
+      description: Tailscale network access control (IP-based authentication)
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+        message:
+          type: string
+          description: Detailed error description
+      example:
+        error: "Invalid file type"
+        message: "File type .txt not allowed"
+
+    ProcessingStatus:
+      type: object
+      properties:
+        processing_id:
+          type: string
+          format: uuid
+          description: Unique processing session identifier
+        status:
+          type: string
+          enum: [uploaded, transcribing, anonymizing, ai_generating, publishing, completed, error]
+          description: Current processing stage
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Processing progress percentage
+        message:
+          type: string
+          description: Current status message
+        content_type:
+          type: string
+          enum: [audio, youtube]
+          description: Type of content being processed
+        privacy_level:
+          type: string
+          enum: [public, private]
+        metadata:
+          type: object
+          description: Additional processing metadata
+        created_at:
+          type: string
+          format: date-time
+          description: Processing session creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last status update timestamp
+        result_url:
+          type: string
+          format: uri
+          description: URL to final processed content (if completed)
+        estimated_time:
+          type: integer
+          description: Estimated processing time in seconds
+
+    ContentCategory:
+      type: object
+      properties:
+        icon:
+          type: string
+          description: Unicode emoji icon
+        name:
+          type: string
+          description: Display name for the category
+      example:
+        icon: "🎓"
+        name: "Academic Lecture"
+
+    ProcessedContent:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Content title
+        file:
+          type: string
+          description: Path to processed content file
+        date:
+          type: string
+          format: date-time
+          description: Processing completion date
+        file_size:
+          type: integer
+          description: File size in bytes
+        summary:
+          type: string
+          description: Brief content summary
+        content_type:
+          type: string
+          description: Type of processed content
+
+    GitHubPagesStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [deployed, deploying, error, not_enabled, api_error, timeout, network_error]
+          description: Current deployment status
+        message:
+          type: string
+          description: Status description
+        last_checked:
+          type: string
+          format: date-time
+          description: Last status check timestamp
+        api_method:
+          type: string
+          description: Method used to retrieve status
+        repository:
+          type: string
+          description: GitHub repository identifier
+        deployment_info:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Deployment ID
+            state:
+              type: string
+              description: GitHub deployment state
+            description:
+              type: string
+              description: Deployment description
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            environment_url:
+              type: string
+              format: uri
+              description: Live environment URL
+        pages_info:
+          type: object
+          properties:
+            status:
+              type: string
+              description: GitHub Pages status
+            html_url:
+              type: string
+              format: uri
+              description: GitHub Pages site URL
+            source:
+              type: object
+              description: Pages source configuration
+            https_enforced:
+              type: boolean
+              description: Whether HTTPS is enforced
+
+    YouTubeMetadata:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Video title
+        description:
+          type: string
+          description: Video description (truncated to 2000 characters)
+        duration:
+          type: string
+          description: Video duration
+        uploader:
+          type: string
+          description: Video uploader/channel name
+        tags:
+          type: array
+          items:
+            type: string
+          maxItems: 10
+          description: Video tags (max 10)
+        subtitle_info:
+          type: object
+          properties:
+            available:
+              type: boolean
+              description: Whether subtitles are available
+            has_manual_subtitles:
+              type: boolean
+              description: Whether manual subtitles exist
+            subtitles:
+              type: object
+              description: Available manual subtitles by language
+            auto_captions:
+              type: object
+              description: Available auto-generated captions by language
+            available_subtitles:
+              type: array
+              items:
+                type: string
+              description: List of available subtitle languages
+            total_languages:
+              type: integer
+              description: Total number of subtitle languages
+            fallback_to_transcription:
+              type: boolean
+              description: Whether to use transcription as fallback
+
+    ModelStatus:
+      type: object
+      properties:
+        exists:
+          type: boolean
+          description: Whether model exists locally
+        status:
+          type: string
+          enum: [ready, incomplete, missing]
+          description: Model availability status
+        message:
+          type: string
+          description: Status description
+        path:
+          type: string
+          description: Local model path
+
+    AvailableModels:
+      type: object
+      properties:
+        local_models:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocalModel'
+          description: Locally available models
+        api_models:
+          type: array
+          items:
+            $ref: '#/components/schemas/APIModel'
+          description: API-based models
+        recommendations:
+          type: object
+          description: Content-type specific recommendations
+        total_models:
+          type: integer
+          description: Total number of available models
+
+    LocalModel:
+      type: object
+      properties:
+        value:
+          type: string
+          description: Model identifier value
+        name:
+          type: string
+          description: Model name
+        display_name:
+          type: string
+          description: Human-readable display name
+        size:
+          type: string
+          description: Model size (e.g., "1.5GB")
+        multilingual_support:
+          type: boolean
+          description: Whether model supports multiple languages
+        english_support:
+          type: boolean
+          description: Whether model supports English
+        config_info:
+          type: object
+          properties:
+            vocab_size:
+              type: integer
+            encoder_layers:
+              type: integer
+            decoder_layers:
+              type: integer
+            d_model:
+              type: integer
+        available:
+          type: boolean
+          description: Whether model is ready for use
+
+    APIModel:
+      type: object
+      properties:
+        value:
+          type: string
+          description: Model identifier value
+        name:
+          type: string
+          description: Model name
+        display_name:
+          type: string
+          description: Human-readable display name with provider icon
+        provider:
+          type: string
+          description: API provider name
+        multilingual_support:
+          type: boolean
+        english_support:
+          type: boolean
+        available:
+          type: boolean
+        requires_api_key:
+          type: boolean
+          description: Whether model requires API key configuration
+
+    ModelRecommendation:
+      type: object
+      properties:
+        value:
+          type: string
+          description: Model identifier
+        name:
+          type: string
+          description: Model name
+        display_name:
+          type: string
+          description: Display name
+        recommended:
+          type: boolean
+          description: Whether model is recommended for this content type
+        language_mode:
+          type: string
+          enum: [english, multilingual, general]
+          description: Language optimization mode
+        is_english_recommended:
+          type: boolean
+          description: Recommended for English content
+        is_multilingual_recommended:
+          type: boolean
+          description: Recommended for multilingual content
+        downloaded:
+          type: boolean
+          description: Whether model is locally available
+        config_info:
+          type: object
+          description: Model configuration details
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid parameters or missing required fields
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    TailscaleAccessDenied:
+      description: Access denied - not connected to Tailscale network
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+            example:
+              error: "Access denied"
+              message: "This service is only available within Tailscale network"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+            example:
+              error: "Internal server error"
+
+tags:
+  - name: Web Interface
+    description: HTML web interface endpoints
+  - name: Audio Processing
+    description: Audio file upload and processing
+  - name: YouTube Processing
+    description: YouTube URL processing and content extraction
+  - name: Status Tracking
+    description: Processing status monitoring
+  - name: Status API
+    description: REST API for processing status
+  - name: Configuration API
+    description: System configuration and metadata
+  - name: Content API
+    description: Processed content access
+  - name: GitHub Integration
+    description: GitHub Pages deployment integration
+  - name: Model Management
+    description: Whisper model management and selection
+  - name: Private Content
+    description: Private content access (Tailscale-only)
+
+externalDocs:
+  description: Project Bach GitHub Repository
+  url: https://github.com/sleepycat233/Project_Bach
