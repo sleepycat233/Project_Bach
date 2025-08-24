@@ -217,6 +217,11 @@ content_classification:
     lecture:      # 🎓 学术讲座
       icon: "🎓"
       display_name: "Academic Lecture"
+      subcategories:  # 课程子分类
+        - "PHYS101"
+        - "CS101" 
+        - "ML301"
+        - "PHYS401"
       recommendations:
         english:
           - "distil-whisper_distil-large-v3"  # 英文快速模型
@@ -226,6 +231,11 @@ content_classification:
     meeting:      # 🏢 会议录音
       icon: "🏢"
       display_name: "Meeting Recording (Limited support, requires ElevenLabs speaker diarization)"
+      subcategories:  # 会议子分类
+        - "team_meeting"
+        - "project_review"
+        - "client_call"
+        - "standup"
       recommendations:
         english:
           - "openai_whisper-large-v3"         # 英文高精度多人对话
@@ -237,6 +247,11 @@ content_classification:
     others:       # 📄 其他内容
       icon: "📄"
       display_name: "Others"
+      subcategories:  # 其他子分类
+        - "podcast"
+        - "interview"
+        - "presentation"
+        - "training"
       recommendations:
         english:
           - "distil-whisper_distil-large-v3"  # 英文快速处理
@@ -301,10 +316,13 @@ web_frontend:
   upload:
     max_file_size: 104857600     # 100MB
     allowed_extensions: [".mp3", ".wav", ".m4a", ".mp4", ".flac", ".aac", ".ogg"]
-    upload_folder: "./uploads"
+    upload_folder: "./uploads"   # 上传目录，也是文件监控目录
     temp_folder: "./temp"
     auto_cleanup: true           # 自动清理临时文件
     cleanup_interval: 3600       # 清理间隔(秒)
+    # 文件组织配置
+    organize_by_category: true   # 启用按分类组织文件
+    create_subcategory_folders: true  # 为subcategory创建子文件夹
 
   # 安全配置
   security:

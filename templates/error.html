@@ -1,129 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Bach - Error {{ error_code }}</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        
-        .error-container {
-            text-align: center;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            padding: 60px 40px;
-            max-width: 500px;
-            width: 100%;
-        }
-        
-        .error-icon {
-            font-size: 4rem;
-            margin-bottom: 20px;
-        }
-        
-        .error-code {
-            font-size: 3rem;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .error-message {
-            font-size: 1.2rem;
-            color: #666;
-            margin-bottom: 30px;
-        }
-        
-        .error-description {
-            font-size: 1rem;
-            color: #888;
-            margin-bottom: 40px;
-            line-height: 1.5;
-        }
-        
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: transform 0.2s ease;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-        }
-        
-        @media (max-width: 768px) {
-            .error-container {
-                padding: 40px 20px;
-            }
-            
-            .error-code {
-                font-size: 2.5rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="error-container">
-        <div class="error-icon">
-            {% if error_code == 404 %}🔍
-            {% elif error_code == 403 %}🚫
-            {% elif error_code == 413 %}📁
-            {% elif error_code == 429 %}⏱️
-            {% elif error_code == 500 %}⚠️
-            {% else %}❌{% endif %}
-        </div>
-        
-        <div class="error-code">{{ error_code }}</div>
-        
-        <div class="error-message">
-            {% if error_code == 404 %}Page Not Found
-            {% elif error_code == 403 %}Access Denied
-            {% elif error_code == 413 %}File Too Large
-            {% elif error_code == 429 %}Too Many Requests
-            {% elif error_code == 500 %}Internal Server Error
-            {% else %}Something Went Wrong{% endif %}
-        </div>
-        
-        <div class="error-description">
-            {% if error_code == 404 %}
-                The page you're looking for doesn't exist or has been moved.
-            {% elif error_code == 403 %}
-                You don't have permission to access this resource. This service is only available within the Tailscale network.
-            {% elif error_code == 413 %}
-                The file you're trying to upload is too large. Please try a smaller file.
-            {% elif error_code == 429 %}
-                You've made too many requests. Please wait a moment and try again.
-            {% elif error_code == 500 %}
-                We're experiencing technical difficulties. Please try again later.
-            {% else %}
-                {{ error_message or "An unexpected error occurred." }}
-            {% endif %}
-        </div>
-        
-        <a href="/" class="btn">Go Home</a>
+{% extends "base.html" %}
+
+{% block content %}
+<div class="error-page card" style="text-align: center; margin-top: 30px;">
+    <div style="font-size: 4em; color: var(--error-color);">⚠️</div>
+    <h1 style="margin-top: 20px; color: var(--error-color);">出现错误</h1>
+    
+    {% if error_message %}
+    <p style="margin-top: 15px; color: var(--text-secondary);">{{ error_message }}</p>
+    {% endif %}
+    
+    <div style="margin-top: 30px;">
+        <a href="index.html" class="btn btn-primary">🔙 返回首页</a>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}
