@@ -28,7 +28,10 @@ logger = logging.getLogger(__name__)
 
 def create_app(config=None):
     """创建Flask应用工厂函数"""
-    app = Flask(__name__)
+    import os
+    # 设置模板文件夹为项目根目录的templates
+    template_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'templates')
+    app = Flask(__name__, template_folder=template_dir)
     
     # 默认配置
     app.config.update({
@@ -51,7 +54,17 @@ def create_app(config=None):
     
     # 初始化配置管理器
     try:
-        config_manager = ConfigManager()
+        if config:
+            # 使用提供的配置创建配置管理器
+            from types import SimpleNamespace
+            config_manager = SimpleNamespace()
+            config_manager.config = config
+            # 为测试环境添加必需的方法
+            config_manager.get_nested_config = lambda section, key: config.get(section, {}).get(key, {})
+            config_manager.get_full_config = lambda: config
+        else:
+            # 使用默认配置管理器
+            config_manager = ConfigManager()
         app.config['CONFIG_MANAGER'] = config_manager
     except Exception as e:
         logger.warning(f"Failed to load config manager: {e}")
@@ -70,6 +83,11 @@ def create_app(config=None):
     def security_middleware():
         if app.config.get('TESTING'):
             return  # 测试环境跳过安全检查
+            
+        # 检查配置管理器中的Tailscale设置
+        config_manager = app.config.get('CONFIG_MANAGER')
+        if config_manager and config_manager.config.get('tailscale', {}).get('enabled', True) == False:
+            return  # Tailscale安全检查被禁用
             
         remote_ip = request.environ.get('REMOTE_ADDR', request.remote_addr)
         
@@ -1002,38 +1020,111 @@ def create_app(config=None):
         try:
             from pathlib import Path
             import os
+            import re
+            from datetime import datetime
             
             # 私人内容根目录
-            private_root = Path('./data/output/private')
+            config_manager = app.config.get('CONFIG_MANAGER')
+            if config_manager and hasattr(config_manager, 'config'):
+                output_folder = config_manager.config.get('paths', {}).get('output_folder', './data/output')
+            else:
+                output_folder = './data/output'
+            private_root = Path(output_folder) / 'private'
             
             if not private_root.exists():
                 private_root.mkdir(parents=True, exist_ok=True)
-                
-            # 检查index.html是否存在，不存在则从templates复制
-            index_file = private_root / 'index.html'
-            if not index_file.exists():
-                template_file = Path('./templates/private_index.html')
-                if template_file.exists():
-                    import shutil
-                    shutil.copy2(template_file, index_file)
-                    logger.info(f"从templates复制private index.html: {index_file}")
-                else:
-                    # 如果模板文件也不存在，创建简单版本
-                    index_content = '''
-                    <html>
-                    <head><title>🔒 Private Content</title></head>
-                    <body>
-                        <h1>🔒 Private Content</h1>
-                        <p>No private content available yet.</p>
-                        <p><a href="/">← Back to Main</a></p>
-                    </body>
-                    </html>
-                    '''
-                    index_file.write_text(index_content, encoding='utf-8')
             
             if filepath is None:
-                # 显示私人内容目录
-                filepath = 'index.html'
+                # 动态生成私人内容列表
+                content_files = []
+                audio_count = 0
+                youtube_count = 0
+                
+                # 扫描私人目录中的HTML文件
+                for html_file in private_root.glob('*.html'):
+                    # 跳过index.html
+                    if html_file.name == 'index.html':
+                        continue
+                    
+                    # 解析文件名获取信息
+                    filename = html_file.name
+                    
+                    # 解析日期 (格式: 20250824_034746_...)
+                    date_match = re.match(r'(\d{8})_(\d{6})_', filename)
+                    if date_match:
+                        date_str = date_match.group(1)
+                        time_str = date_match.group(2)
+                        try:
+                            parsed_date = datetime.strptime(f"{date_str}_{time_str}", "%Y%m%d_%H%M%S")
+                            formatted_date = parsed_date.strftime("%Y-%m-%d %H:%M")
+                        except:
+                            formatted_date = "Unknown"
+                    else:
+                        formatted_date = "Unknown"
+                    
+                    # 生成显示标题
+                    if 'youtube' in filename:
+                        title = filename.replace('youtube_', '').replace('_result.html', '').replace('_', ' ')
+                        youtube_count += 1
+                    elif 'LEC' in filename:
+                        # 提取讲座标题
+                        title_match = re.search(r'LEC_(.+?)_result\.html', filename)
+                        if title_match:
+                            title = title_match.group(1).replace('_', ' ')
+                        else:
+                            title = filename.replace('_result.html', '').replace('_', ' ')
+                        audio_count += 1
+                    else:
+                        title = filename.replace('_result.html', '').replace('_', ' ')
+                        audio_count += 1
+                    
+                    content_files.append({
+                        'filename': filename,
+                        'title': title,
+                        'date': formatted_date,
+                        'size': html_file.stat().st_size
+                    })
+                
+                # 按日期倒序排列 (最新的在前)
+                content_files.sort(key=lambda x: x['date'], reverse=True)
+                
+                # 转换为与公开模板兼容的格式
+                results = []
+                for file_info in content_files:
+                    # 尝试从HTML文件中提取摘要
+                    html_path = private_root / file_info['filename']
+                    summary = "私人内容摘要"  # 默认摘要
+                    
+                    try:
+                        # 简单提取HTML中的第一段内容作为摘要
+                        content = html_path.read_text(encoding='utf-8')
+                        import re
+                        # 查找第一个段落内容
+                        summary_match = re.search(r'<p[^>]*>(.*?)</p>', content, re.DOTALL)
+                        if summary_match:
+                            summary_text = re.sub(r'<[^>]+>', '', summary_match.group(1))
+                            summary = summary_text.strip()[:150] + "..." if len(summary_text) > 150 else summary_text.strip()
+                    except:
+                        pass
+                    
+                    # 转换为模板期望的格式
+                    results.append({
+                        'title': file_info['title'],
+                        'file': f"/private/{file_info['filename']}",
+                        'date': file_info['date'],
+                        'file_size': file_info['size'],
+                        'summary': summary
+                    })
+                
+                # 使用现有的index模板，但传入私有内容数据
+                return render_template('index.html', 
+                                     title="🔒 Private Content",
+                                     site_title="Project Bach",
+                                     description="私人内容区域 - 仅通过Tailscale网络访问",
+                                     results=results,
+                                     audio_count=audio_count,
+                                     youtube_count=youtube_count,
+                                     is_private=True)  # 添加标志以便模板识别
             
             # 安全检查：防止目录穿越攻击
             safe_path = private_root / filepath
@@ -1125,6 +1216,45 @@ def create_app(config=None):
     @app.errorhandler(429)
     def ratelimit_handler(e):
         return jsonify({'error': 'Rate limit exceeded'}), 429
+    
+    # 添加模板过滤器
+    @app.template_filter('format_date')
+    def format_date(date_string, format_str=None):
+        """格式化日期字符串"""
+        try:
+            if isinstance(date_string, str):
+                return date_string
+            return str(date_string)
+        except:
+            return "Unknown"
+    
+    @app.template_filter('file_size')
+    def format_file_size(size_bytes):
+        """格式化文件大小"""
+        try:
+            if size_bytes < 1024:
+                return f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                return f"{size_bytes / 1024:.1f} KB"
+            elif size_bytes < 1024 * 1024 * 1024:
+                return f"{size_bytes / (1024 * 1024):.1f} MB"
+            else:
+                return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+        except:
+            return "Unknown"
+    
+    @app.template_filter('truncate_words')
+    def truncate_words(text, max_words=30):
+        """截断文本到指定单词数"""
+        try:
+            if not text:
+                return ""
+            words = text.split()
+            if len(words) <= max_words:
+                return text
+            return ' '.join(words[:max_words]) + '...'
+        except:
+            return str(text)[:100] + '...' if len(str(text)) > 100 else str(text)
     
     return app
 

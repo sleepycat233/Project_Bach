@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Bach - Upload Content</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        
+        .header {
+            position: relative;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+        
+        .private-nav {
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+        
+        .private-btn {
+            background: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .private-btn:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .tab-container {
+            margin-bottom: 30px;
+        }
+        
+        .tab-nav {
+            display: flex;
+            border-bottom: 2px solid #eee;
+            margin-bottom: 30px;
+        }
+        
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            cursor: pointer;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            flex: 1;
+        }
+        
+        .tab-button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .tab-button:hover {
+            color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .upload-section {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 40px;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-section:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .drop-zone {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 60px 40px;
+            text-align: center;
+            background: #f8f9ff;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .drop-zone:hover {
+            background: #f0f4ff;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+        }
+        
+        .drop-zone.dragover {
+            border-color: #5a67d8;
+            background: #e6f3ff;
+            transform: scale(1.02);
+        }
+        
+        .drop-zone-content {
+            pointer-events: none;
+        }
+        
+        .drop-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+        
+        .drop-text {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .drop-hint {
+            color: #666;
+            font-size: 1rem;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            background: white;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .upload-message {
+            border: 1px solid;
+            font-size: 14px;
+        }
+        
+        .upload-message.success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .upload-message.error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            /* 手机端导航按钮调整，避免与logo重叠 */
+            .private-nav {
+                position: static;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                margin-top: 15px;
+                align-items: center;
+            }
+            
+            .private-btn {
+                width: 100%;
+                max-width: 250px;
+                text-align: center;
+                margin-bottom: 0;
+            }
+            
+            .tab-button {
+                padding: 12px 20px;
+                font-size: 1rem;
+            }
+            
+            .drop-zone {
+                padding: 40px 20px;
+                min-height: 150px;
+            }
+            
+            .drop-text {
+                font-size: 1.2rem;
+            }
+            
+            .drop-icon {
+                font-size: 3rem;
+            }
+        }
+        
+        .alert {
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Project Bach</h1>
+            <p>Upload Audio files or process YouTube videos</p>
+            
+            <div class="private-nav">
+                <a href="https://{{ config.get('github', {}).get('username', 'username') }}.github.io/{{ config.get('github', {}).get('repo_name', 'repo') }}" target="_blank" class="private-btn" style="background: #667eea; margin-bottom: 8px; display: block; box-sizing: border-box;">
+                    🌐 GitHub Page
+                </a>
+                <a href="/private/" class="private-btn" style="display: block; box-sizing: border-box;">
+                    🔒 Private Content
+                </a>
+            </div>
+        </div>
+        
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'error' }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <!-- Tab Navigation -->
+        <div class="tab-container">
+            <div class="tab-nav">
+                <button class="tab-button active" onclick="switchTab('audio')">🎵 Upload Audio</button>
+                <button class="tab-button" onclick="switchTab('youtube')">📺 YouTube Video</button>
+            </div>
+        </div>
+        
+        <!-- Tab Content -->
+        <div class="upload-sections">
+            <!-- Audio Upload Tab -->
+            <div id="audio-tab" class="tab-content active">
+                <div class="upload-section">
+                    <form action="/upload/audio" method="POST" enctype="multipart/form-data" id="audio-form">
+                        <!-- Drag & Drop Zone -->
+                        <div class="drop-zone" id="audio-drop-zone">
+                            <div class="drop-zone-content">
+                                <span class="drop-icon">📁</span>
+                                <div class="drop-text">Drag audio file here</div>
+                                <div class="drop-hint">or click to select file</div>
+                            </div>
+                            <input type="file" name="audio_file" id="audio-file-input" 
+                                   accept=".mp3,.wav,.m4a,.mp4,.flac,.aac,.ogg" required
+                                   style="display: none;">
+                        </div>
+                        
+                        <div class="form-group">
+                            <small style="color: #666; text-align: center; display: block;">Supported: MP3, WAV, M4A, MP4, FLAC, AAC, OGG (Max 500MB)</small>
+                        </div>
+                        
+                        <!-- Upload success/error message area -->
+                        <div id="audio-upload-message" class="upload-message" style="display: none; margin-top: 10px; padding: 10px; border-radius: 6px; text-align: center; font-weight: 500;">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Content Type</label>
+                            <select name="content_type" class="form-select" required>
+                                {% for key, type_info in content_types.items() %}
+                                <option value="{{ key }}">{{ type_info.icon }} {{ type_info.display_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Subcategory Selection (dynamic based on content type) -->
+                        <div class="form-group" id="subcategory-container" style="display: none;">
+                            <label class="form-label" id="subcategory-label">Subcategory</label>
+                            <select name="subcategory" class="form-select" id="subcategory-select">
+                                <option value="">Select a subcategory...</option>
+                            </select>
+                            <input type="text" name="custom_subcategory" class="form-input" 
+                                   placeholder="Enter custom subcategory" 
+                                   style="margin-top: 10px; display: none;" 
+                                   id="custom-subcategory-input">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Transcription Context (optional)</label>
+                            <textarea name="description" class="form-input" rows="3" 
+                                      placeholder="Provide context for Whisper transcription (e.g., technical terms, speaker names, topic domain)"></textarea>
+                            <small style="color: #666; font-size: 0.85rem; margin-top: 5px; display: block;">
+                                This context will be used as system prompt for Whisper to improve transcription accuracy of specific terms and names
+                            </small>
+                        </div>
+                        
+                        <!-- Language & Model Selection -->
+                        <div class="form-group">
+                            <label class="form-label">🎯 Language & Model Selection</label>
+                            
+                            <!-- Language Selection -->
+                            <div style="margin-bottom: 15px;">
+                                <label style="font-size: 0.9rem; color: #666; margin-bottom: 5px; display: block;">Audio Language</label>
+                                <select name="audio_language" id="languageSelect" class="form-select" required style="margin-bottom: 10px;">
+                                    <option value="english">🇺🇸 English Only</option>
+                                    <option value="multilingual">🌍 Multilingual</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Model Selection -->
+                            <div>
+                                <label style="font-size: 0.9rem; color: #666; margin-bottom: 5px; display: block;">Model</label>
+                                <select name="whisper_model" id="modelSelect" class="form-select" required>
+                                    <!-- Options will be populated by JavaScript -->
+                                </select>
+                            </div>
+                            
+                            <!-- Model Info Display -->
+                            <div id="modelInfo" style="background: #f0f4ff; border: 1px solid #667eea; border-radius: 6px; padding: 12px; margin-top: 10px;">
+                                <div id="modelInfoContent">
+                                    <!-- Model details will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Privacy Selection -->
+                        <div class="form-group" style="background: #f8f9ff; padding: 15px; border-radius: 6px; border: 1px solid #e3e6f0;">
+                            <label class="form-label" style="color: #5a5c69; font-weight: 600;">
+                                🔒 Privacy Setting
+                            </label>
+                            <div style="margin-top: 10px;">
+                                <label style="display: flex; align-items: center; margin-bottom: 8px; cursor: pointer;">
+                                    <input type="radio" name="privacy_level" value="public" 
+                                           style="margin-right: 10px;" checked>
+                                    <span>🌐 <strong>Public</strong> - Will be published to GitHub Pages website</span>
+                                </label>
+                                <label style="display: flex; align-items: center; cursor: pointer;">
+                                    <input type="radio" name="privacy_level" value="private" 
+                                           style="margin-right: 10px;">
+                                    <span>🔒 <strong>Private</strong> - Keep local only, accessible via Tailscale</span>
+                                </label>
+                            </div>
+                            <small style="color: #6c757d; font-style: italic;">
+                                Private content is saved locally and only accessible through Tailscale network
+                            </small>
+                        </div>
+                        
+                        <button type="submit" class="btn">🚀 Process Audio</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- YouTube URL Tab -->
+            <div id="youtube-tab" class="tab-content">
+                <div class="upload-section">
+                    <form action="/upload/youtube" method="POST">
+                        <div class="form-group">
+                            <label class="form-label">YouTube URL</label>
+                            <input type="url" name="youtube_url" id="youtube-url-input" class="form-input" 
+                                   placeholder="https://www.youtube.com/watch?v=..." required>
+                            <button type="button" id="get-metadata-btn" class="btn-secondary" 
+                                    style="margin-top: 8px; padding: 6px 12px; font-size: 0.85rem;">
+                                📋 Get Video Info
+                            </button>
+                        </div>
+                        
+                        <!-- Context Suggestions -->
+                        <div id="context-suggestions" class="form-group" style="display: none;">
+                            <label class="form-label">💡 Context Suggestions</label>
+                            <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; border: 1px solid #e0e0e0;">
+                                <div id="suggestion-title" class="suggestion-item" style="display: none;">
+                                    <div style="font-weight: 600; color: #495057; margin-bottom: 4px;">📺 Video Title:</div>
+                                    <div class="suggestion-content" style="background: white; padding: 8px; border-radius: 4px; border: 1px solid #dee2e6; cursor: pointer; margin-bottom: 8px;">
+                                        <span id="video-title-text"></span>
+                                        <small style="float: right; color: #6c757d;">Click to add</small>
+                                    </div>
+                                </div>
+                                
+                                <div id="suggestion-description" class="suggestion-item" style="display: none;">
+                                    <div style="font-weight: 600; color: #495057; margin-bottom: 4px;">📝 Video Description:</div>
+                                    <div class="suggestion-content" style="background: white; padding: 8px; border-radius: 4px; border: 1px solid #dee2e6; cursor: pointer; margin-bottom: 8px; max-height: 100px; overflow-y: auto;">
+                                        <span id="video-description-text"></span>
+                                        <small style="float: right; color: #6c757d;">Click to add</small>
+                                    </div>
+                                </div>
+                                
+                                <div id="suggestion-combined" class="suggestion-item" style="display: none;">
+                                    <div style="font-weight: 600; color: #495057; margin-bottom: 4px;">🎯 Combined (Title + Description):</div>
+                                    <div class="suggestion-content" style="background: white; padding: 8px; border-radius: 4px; border: 1px solid #dee2e6; cursor: pointer;">
+                                        <span style="color: #28a745;">Click to add both title and description as context</span>
+                                        <small style="float: right; color: #6c757d;">Recommended</small>
+                                    </div>
+                                </div>
+                                
+                                <div id="metadata-loading" style="text-align: center; color: #6c757d; display: none;">
+                                    🔄 Loading video information...
+                                </div>
+                                
+                                <div id="metadata-error" style="color: #dc3545; display: none;">
+                                    ❌ Could not load video information. Please check the URL or enter context manually.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Transcription Context (optional)</label>
+                            <textarea name="description" id="youtube-context" class="form-input" rows="3" 
+                                      placeholder="Provide context for Whisper transcription (e.g., technical terms, speaker names, topic domain)"></textarea>
+                            <small style="color: #666; font-size: 0.85rem; margin-top: 5px; display: block;">
+                                This context will be used as system prompt for Whisper to improve transcription accuracy of specific terms and names
+                            </small>
+                        </div>
+                        
+                        <!-- Privacy Selection -->
+                        <div class="form-group" style="background: #f8f9ff; padding: 15px; border-radius: 6px; border: 1px solid #e3e6f0;">
+                            <label class="form-label" style="color: #5a5c69; font-weight: 600;">
+                                🔒 Privacy Setting
+                            </label>
+                            <div style="margin-top: 10px;">
+                                <label style="display: flex; align-items: center; margin-bottom: 8px; cursor: pointer;">
+                                    <input type="radio" name="privacy_level" value="public" 
+                                           style="margin-right: 10px;" checked>
+                                    <span>🌐 <strong>Public</strong> - Will be published to GitHub Pages website</span>
+                                </label>
+                                <label style="display: flex; align-items: center; cursor: pointer;">
+                                    <input type="radio" name="privacy_level" value="private" 
+                                           style="margin-right: 10px;">
+                                    <span>🔒 <strong>Private</strong> - Keep local only, accessible via Tailscale</span>
+                                </label>
+                            </div>
+                            <small style="color: #6c757d; font-style: italic;">
+                                Private content (political, sensitive topics, etc.) is saved locally only and accessible via Tailscale network
+                            </small>
+                        </div>
+                        
+                        <button type="submit" class="btn">🚀 Process YouTube Video</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Tab switching functionality
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+        
+        // Drag and Drop functionality for audio upload
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('audio-drop-zone');
+            const fileInput = document.getElementById('audio-file-input');
+            
+            if (!dropZone || !fileInput) return;
+            
+            // Click to open file dialog
+            dropZone.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            // Prevent default drag behaviors
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            // Highlight drop zone when item is dragged over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+            
+            // Handle dropped files
+            dropZone.addEventListener('drop', handleDrop, false);
+            
+            // File input change
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    updateDropZoneText(e.target.files[0].name);
+                }
+            });
+        }
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        function highlight(e) {
+            document.getElementById('audio-drop-zone').classList.add('dragover');
+        }
+        
+        function unhighlight(e) {
+            document.getElementById('audio-drop-zone').classList.remove('dragover');
+        }
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            
+            if (files.length > 0) {
+                const fileInput = document.getElementById('audio-file-input');
+                fileInput.files = files;
+                updateDropZoneText(files[0].name);
+            }
+        }
+        
+        function updateDropZoneText(filename) {
+            const dropZone = document.getElementById('audio-drop-zone');
+            const content = dropZone.querySelector('.drop-zone-content');
+            
+            content.innerHTML = `
+                <span class="drop-icon">✅</span>
+                <div class="drop-text">File Selected</div>
+                <div class="drop-hint">${filename}</div>
+            `;
+        }
+        
+        // Subcategory selection handling
+        function setupSubcategorySelection() {
+            const contentTypeSelect = document.querySelector('select[name="content_type"]');
+            const subcategoryContainer = document.getElementById('subcategory-container');
+            const subcategorySelect = document.getElementById('subcategory-select');
+            const subcategoryLabel = document.getElementById('subcategory-label');
+            const customInput = document.getElementById('custom-subcategory-input');
+            
+            if (!contentTypeSelect || !subcategoryContainer) return;
+            
+            // Content types with subcategories (from config)
+            const contentTypeData = {{ content_types | tojson }};
+            
+            contentTypeSelect.addEventListener('change', (e) => {
+                const selectedType = e.target.value;
+                const typeConfig = contentTypeData[selectedType];
+                
+                if (typeConfig && typeConfig.subcategories && typeConfig.subcategories.length > 0) {
+                    // Show subcategory section
+                    subcategoryContainer.style.display = 'block';
+                    subcategoryLabel.textContent = selectedType === 'lecture' ? 'Course Selection' : 'Subcategory';
+                    
+                    // Clear and populate subcategory options
+                    subcategorySelect.innerHTML = '<option value="">Select a ' + 
+                        (selectedType === 'lecture' ? 'course' : 'subcategory') + '...</option>';
+                    
+                    typeConfig.subcategories.forEach(sub => {
+                        const option = document.createElement('option');
+                        option.value = sub;
+                        option.textContent = sub;
+                        subcategorySelect.appendChild(option);
+                    });
+                    
+                    // Add "Other" option
+                    const otherOption = document.createElement('option');
+                    otherOption.value = 'other';
+                    otherOption.textContent = 'Other (specify below)';
+                    subcategorySelect.appendChild(otherOption);
+                    
+                } else {
+                    // Hide subcategory section
+                    subcategoryContainer.style.display = 'none';
+                    customInput.style.display = 'none';
+                    customInput.required = false;
+                    customInput.value = '';
+                }
+            });
+            
+            // Handle subcategory selection
+            subcategorySelect.addEventListener('change', (e) => {
+                if (e.target.value === 'other') {
+                    customInput.style.display = 'block';
+                    customInput.required = true;
+                } else {
+                    customInput.style.display = 'none';
+                    customInput.required = false;
+                    customInput.value = '';
+                }
+            });
+        }
+        
+        // Model selection functionality
+        function setupModelSelection() {
+            const languageSelect = document.getElementById('languageSelect');
+            const modelSelect = document.getElementById('modelSelect');
+            const modelInfo = document.getElementById('modelInfoContent');
+            
+            // Models configuration - will be loaded from API
+            let modelsConfig = {
+                english: [],
+                multilingual: []
+            };
+            
+            // Load models configuration from API
+            async function loadModelsConfig() {
+                try {
+                    const response = await fetch('/api/models/smart-config');
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        console.error('Failed to load models config:', data.error);
+                        return;
+                    }
+                    
+                    // 新API格式：按语言模式和推荐状态处理
+                    modelsConfig = {
+                        // 英文模式：显示英文推荐模型和通用模型
+                        english: data.all ? data.all.filter(m => 
+                            m.language_mode === 'english' || m.language_mode === 'general'
+                        ) : [],
+                        // 多语言模式：显示多语言推荐模型和通用模型
+                        multilingual: data.all ? data.all.filter(m => 
+                            m.language_mode === 'multilingual' || m.language_mode === 'general'
+                        ) : [],
+                        contentTypes: {
+                            lecture: data.lecture || [],
+                            meeting: data.meeting || [],
+                            others: data.others || []
+                        },
+                        all: data.all || []
+                    };
+                    
+                    // 为每个语言模式的模型根据推荐状态设置星星和排序
+                    modelsConfig.english = modelsConfig.english.map(model => {
+                        const updatedModel = {...model};
+                        // 只有英文推荐的模型才显示星星
+                        updatedModel.recommended = model.is_english_recommended === true;
+                        return updatedModel;
+                    }).sort((a, b) => {
+                        // 推荐模型排在前面
+                        if (a.recommended && !b.recommended) return -1;
+                        if (!a.recommended && b.recommended) return 1;
+                        return 0;
+                    });
+                    
+                    modelsConfig.multilingual = modelsConfig.multilingual.map(model => {
+                        const updatedModel = {...model};
+                        // 只有多语言推荐的模型才显示星星
+                        updatedModel.recommended = model.is_multilingual_recommended === true;
+                        return updatedModel;
+                    }).sort((a, b) => {
+                        // 推荐模型排在前面
+                        if (a.recommended && !b.recommended) return -1;
+                        if (!a.recommended && b.recommended) return 1;
+                        return 0;
+                    });
+                    
+                    console.log('Models config loaded:', modelsConfig);
+                    
+                    // Update UI after loading config
+                    updateModelOptions();
+                    
+                } catch (error) {
+                    console.error('Error loading models config:', error);
+                }
+            }
+            
+            function updateModelOptions() {
+                const language = languageSelect.value;
+                const contentType = document.querySelector('select[name="content_type"]').value;
+                
+                // Get content-type-specific models instead of global language models
+                let models = [];
+                if (modelsConfig.contentTypes && modelsConfig.contentTypes[contentType]) {
+                    const contentTypeModels = modelsConfig.contentTypes[contentType];
+                    models = contentTypeModels.filter(model => {
+                        // Show models that are either recommended for this language mode OR explicitly support it
+                        const isRecommended = language === 'english' ? model.is_english_recommended : model.is_multilingual_recommended;
+                        const hasLanguageSupport = language === 'english' ? model.english_support : model.multilingual_support;
+                        
+                        // Show if recommended OR if it has explicit language support
+                        const matchesLanguage = isRecommended || hasLanguageSupport;
+                        
+                        // Set the recommended flag based on current language mode
+                        model.recommended = language === 'english' 
+                            ? model.is_english_recommended 
+                            : model.is_multilingual_recommended;
+                        
+                        return matchesLanguage;
+                    });
+                } else {
+                    // Fallback to global models if content type models not available
+                    console.log(`🔍 Using fallback global models for language: ${language}`);
+                    models = modelsConfig[language] || [];
+                }
+                
+                // Clear existing options
+                modelSelect.innerHTML = '';
+                
+                if (models.length === 0) {
+                    // Show loading state if models not loaded yet
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'Loading models...';
+                    option.disabled = true;
+                    modelSelect.appendChild(option);
+                    return;
+                }
+                
+                // Add model options with smart display
+                let selectedModel = null;
+                models.forEach((model, index) => {
+                    const option = document.createElement('option');
+                    option.value = model.value;
+                    
+                    // Build option text with status indicators
+                    let optionText = model.display_name || model.name;
+                    
+                    // Add recommended star emoji for recommended models (at the end)
+                    if (model.recommended) {
+                        optionText = optionText + ' ⭐';
+                    }
+                    
+                    // Special handling for install_required placeholder
+                    if (model.status === 'install_required') {
+                        optionText = '📦 ' + optionText;
+                    }
+                    
+                    option.textContent = optionText;
+                    
+                    // Smart selection logic: prioritize recommended models (all models shown are downloaded)
+                    if (!selectedModel) {
+                        if (model.recommended) {
+                            // Priority: recommended models
+                            selectedModel = option;
+                        } else if (index === 0) {
+                            // Fallback: first model if no recommended found yet
+                            selectedModel = option;
+                        }
+                    } else if (model.recommended && !selectedModel.textContent.includes('⭐')) {
+                        // Replace if current selection is not recommended but this one is
+                        selectedModel = option;
+                    }
+                    
+                    modelSelect.appendChild(option);
+                });
+                
+                // Apply the selection
+                if (selectedModel) {
+                    selectedModel.selected = true;
+                }
+                
+                updateModelInfo();
+            }
+            
+            function updateModelInfo() {
+                const language = languageSelect.value;
+                const modelValue = modelSelect.value;
+                const models = modelsConfig[language] || modelsConfig.english;
+                const selectedModel = models.find(m => m.value === modelValue);
+                
+                if (selectedModel) {
+                    // 构建模型详细信息显示
+                    const configInfo = selectedModel.config_info || {};
+                    const encoderLayers = configInfo.encoder_layers || 0;
+                    const decoderLayers = configInfo.decoder_layers || 0;
+                    const dModel = configInfo.d_model || 0;
+                    
+                    // 获取真实文件大小
+                    const modelSize = selectedModel.model_size || 'Unknown';
+                    
+                    modelInfo.innerHTML = `
+                        <div style="margin-bottom: 15px;">
+                            <div style="margin-bottom: 8px;">
+                                <strong style="color: #667eea; font-size: 1.1em;">${selectedModel.display_name || selectedModel.name}</strong>
+                            </div>
+                            <div style="display: flex; gap: 20px; font-size: 0.9em; color: #495057; margin-bottom: 10px;">
+                                <div><strong>📦 Size:</strong> ${modelSize}</div>
+                                ${selectedModel.provider ? `<div><strong>🔗 Provider:</strong> ${selectedModel.provider}</div>` : ''}
+                            </div>
+                            ${(encoderLayers || decoderLayers || dModel) ? `
+                            <div style="font-size: 0.85rem; color: #666; margin-top: 8px;">
+                                <div><strong>📊 Model Architecture:</strong></div>
+                                <div style="margin-left: 15px; margin-top: 4px;">
+                                    ${encoderLayers ? `• Encoder: ${encoderLayers} layers<br>` : ''}
+                                    ${decoderLayers ? `• Decoder: ${decoderLayers} layers<br>` : ''}
+                                    ${dModel ? `• Hidden size: ${dModel}` : ''}
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div style="margin-top: 8px; padding: 6px 10px; border-radius: 4px; font-size: 0.8rem; background: #f8f9fa; border: 1px solid #dee2e6;">
+                            📊 <strong>Performance Benchmarks:</strong> 
+                            <a href="https://huggingface.co/spaces/argmaxinc/whisperkit-benchmarks" target="_blank" style="color: #667eea; text-decoration: none;">
+                                View WhisperKit Benchmarks →
+                            </a>
+                        </div>
+                        <div id="modelStatus" style="margin-top: 8px; padding: 6px 10px; border-radius: 4px; font-size: 0.8rem;">
+                            <!-- Model availability status will be shown here -->
+                        </div>
+                    `;
+                    
+                    // Check model availability (will be implemented)
+                    checkModelAvailability(selectedModel.value);
+                }
+            }
+            
+            function checkModelAvailability(modelValue) {
+                const statusDiv = document.getElementById('modelStatus');
+                if (!statusDiv) return;
+                
+                // Special handling for install_required placeholder
+                if (modelValue === 'install_required') {
+                    statusDiv.innerHTML = `
+                        <div style="color: #856404;">📦 No models installed for this language mode</div>
+                        <div style="font-size: 0.85rem; margin-top: 5px; font-family: monospace; background: #f8f9fa; padding: 8px; border-radius: 4px;">
+                            Install models using:<br>
+                            <code>whisperkit-cli download --model large-v3 --model-prefix distil</code> (English)<br>
+                            <code>whisperkit-cli download --model large-v3 --model-prefix openai</code> (Multilingual)
+                        </div>
+                    `;
+                    statusDiv.style.background = '#fff3cd';
+                    statusDiv.style.color = '#856404';
+                    return;
+                }
+                
+                // For all other models, they should be downloaded and ready - hide status
+                statusDiv.innerHTML = '';
+                statusDiv.style.background = 'transparent';
+                statusDiv.style.color = 'inherit';
+            }
+            
+            // Set up event listeners
+            languageSelect.addEventListener('change', updateModelOptions);
+            modelSelect.addEventListener('change', updateModelInfo);
+            
+            // Add content type change listener to update models
+            const contentTypeSelect = document.querySelector('select[name="content_type"]');
+            if (contentTypeSelect) {
+                contentTypeSelect.addEventListener('change', updateModelOptions);
+            }
+            
+            // Initialize by loading models config first
+            loadModelsConfig();
+        }
+        
+        // Setup form submission with AJAX
+        function setupFormSubmission() {
+            const form = document.getElementById('audio-form');
+            const messageDiv = document.getElementById('audio-upload-message');
+            
+            if (!form || !messageDiv) return;
+            
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                // Show loading message
+                showUploadMessage('Uploading file...', 'info');
+                
+                const formData = new FormData(form);
+                
+                try {
+                    const response = await fetch('/upload/audio', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        // Check if response is a redirect (status page)
+                        if (response.redirected || response.url.includes('/status/')) {
+                            showUploadMessage('✅ Audio file uploaded successfully!', 'success');
+                            // Redirect to status page after showing success message
+                            setTimeout(() => {
+                                window.location.href = response.url;
+                            }, 1000);
+                        } else {
+                            const data = await response.json();
+                            showUploadMessage(data.message || 'Upload successful!', 'success');
+                        }
+                    } else {
+                        const errorData = await response.json();
+                        showUploadMessage(errorData.error || 'Upload failed', 'error');
+                    }
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    showUploadMessage('Upload failed: ' + error.message, 'error');
+                }
+            });
+        }
+        
+        // Show upload message in the dedicated area
+        function showUploadMessage(message, type) {
+            const messageDiv = document.getElementById('audio-upload-message');
+            if (!messageDiv) return;
+            
+            messageDiv.textContent = message;
+            messageDiv.className = 'upload-message ' + type;
+            messageDiv.style.display = 'block';
+            
+            // Auto-hide success messages after 3 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        // YouTube建议功能
+        function setupYouTubeSuggestions() {
+            const getMetadataBtn = document.getElementById('get-metadata-btn');
+            const youtubeUrlInput = document.getElementById('youtube-url-input');
+            const contextSuggestions = document.getElementById('context-suggestions');
+            const youtubeContextTextarea = document.getElementById('youtube-context');
+            
+            if (!getMetadataBtn || !youtubeUrlInput || !contextSuggestions || !youtubeContextTextarea) {
+                return; // 如果元素不存在则跳过初始化
+            }
+            
+            let currentMetadata = null;
+            
+            // 获取视频信息按钮点击事件
+            getMetadataBtn.addEventListener('click', async () => {
+                const url = youtubeUrlInput.value.trim();
+                if (!url) {
+                    alert('Please enter a YouTube URL first');
+                    return;
+                }
+                
+                await fetchVideoMetadata(url);
+            });
+            
+            // 获取视频元数据
+            async function fetchVideoMetadata(url) {
+                const loadingDiv = document.getElementById('metadata-loading');
+                const errorDiv = document.getElementById('metadata-error');
+                const suggestions = document.querySelectorAll('.suggestion-item');
+                
+                // 显示加载状态
+                contextSuggestions.style.display = 'block';
+                loadingDiv.style.display = 'block';
+                errorDiv.style.display = 'none';
+                suggestions.forEach(item => item.style.display = 'none');
+                
+                try {
+                    const response = await fetch(`/api/youtube/metadata?url=${encodeURIComponent(url)}`);
+                    const data = await response.json();
+                    
+                    if (response.ok && data.title) {
+                        currentMetadata = data;
+                        displaySuggestions(data);
+                        loadingDiv.style.display = 'none';
+                    } else {
+                        throw new Error(data.error || 'Failed to fetch video metadata');
+                    }
+                } catch (error) {
+                    console.error('Error fetching video metadata:', error);
+                    loadingDiv.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = `❌ ${error.message}`;
+                }
+            }
+            
+            // 显示建议选项
+            function displaySuggestions(metadata) {
+                const titleSuggestion = document.getElementById('suggestion-title');
+                const descriptionSuggestion = document.getElementById('suggestion-description');
+                const combinedSuggestion = document.getElementById('suggestion-combined');
+                
+                const titleText = document.getElementById('video-title-text');
+                const descriptionText = document.getElementById('video-description-text');
+                
+                // 显示标题建议
+                if (metadata.title && metadata.title.trim()) {
+                    titleText.textContent = metadata.title;
+                    titleSuggestion.style.display = 'block';
+                    
+                    // 添加点击事件
+                    const titleContent = titleSuggestion.querySelector('.suggestion-content');
+                    titleContent.onclick = () => {
+                        fillContext(metadata.title);
+                        highlightSelected(titleContent);
+                    };
+                }
+                
+                // 显示描述建议
+                if (metadata.description && metadata.description.trim()) {
+                    descriptionText.textContent = metadata.description;
+                    descriptionSuggestion.style.display = 'block';
+                    
+                    // 添加点击事件
+                    const descriptionContent = descriptionSuggestion.querySelector('.suggestion-content');
+                    descriptionContent.onclick = () => {
+                        fillContext(metadata.description);
+                        highlightSelected(descriptionContent);
+                    };
+                }
+                
+                // 显示组合建议（推荐）
+                if (metadata.title || metadata.description) {
+                    combinedSuggestion.style.display = 'block';
+                    
+                    // 添加点击事件
+                    const combinedContent = combinedSuggestion.querySelector('.suggestion-content');
+                    combinedContent.onclick = () => {
+                        const combinedText = [
+                            metadata.title ? `Title: ${metadata.title}` : '',
+                            metadata.description ? `Description: ${metadata.description}` : ''
+                        ].filter(Boolean).join('\n\n');
+                        
+                        fillContext(combinedText);
+                        highlightSelected(combinedContent);
+                    };
+                }
+            }
+            
+            // 填入Context文本框
+            function fillContext(text) {
+                const currentValue = youtubeContextTextarea.value.trim();
+                if (currentValue) {
+                    // 如果已有内容，询问是否替换
+                    if (confirm('Replace existing context with the suggestion?')) {
+                        youtubeContextTextarea.value = text;
+                    }
+                } else {
+                    youtubeContextTextarea.value = text;
+                }
+                
+                // 滚动到Context文本框
+                youtubeContextTextarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                youtubeContextTextarea.focus();
+            }
+            
+            // 高亮选中的建议
+            function highlightSelected(selectedElement) {
+                // 移除其他建议的高亮
+                document.querySelectorAll('.suggestion-content').forEach(elem => {
+                    elem.style.background = 'white';
+                    elem.style.borderColor = '#dee2e6';
+                });
+                
+                // 高亮当前选中的建议
+                selectedElement.style.background = '#e8f5e8';
+                selectedElement.style.borderColor = '#28a745';
+                
+                // 3秒后恢复正常样式
+                setTimeout(() => {
+                    selectedElement.style.background = 'white';
+                    selectedElement.style.borderColor = '#dee2e6';
+                }, 3000);
+            }
+        }
+        
+        // Initialize all functionality on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            setupDragAndDrop();
+            setupSubcategorySelection();
+            setupModelSelection();
+            setupFormSubmission();
+            setupYouTubeSuggestions();
+        });
+    </script>
+</body>
+</html>

@@ -3,6 +3,25 @@
 {% block content %}
 <div class="index">
     <div class="card">
+        {% if is_private %}
+        <h2>🔒 私人内容</h2>
+        <p>私人内容区域 - 仅通过Tailscale网络访问</p>
+        
+        <div style="margin-top: 20px;">
+            <span style="background-color: var(--warning-color); color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.9em;">
+                📊 共收录 {{ results | length }} 个私人文件
+            </span>
+            {% if audio_count or youtube_count %}
+            <span style="background-color: var(--primary-color); color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.9em; margin-left: 8px;">
+                🎓 {{ audio_count }} 音频 | 🎥 {{ youtube_count }} 视频
+            </span>
+            {% endif %}
+        </div>
+        
+        <div style="margin-top: 15px;">
+            <a href="/" style="color: var(--primary-color); text-decoration: none; font-size: 0.9em;">← 返回主页</a>
+        </div>
+        {% else %}
         <h2>🎵 音频处理结果</h2>
         <p>智能音频处理与内容分析平台</p>
         
@@ -11,6 +30,7 @@
                 📊 共收录 {{ results | length }} 个处理结果
             </span>
         </div>
+        {% endif %}
     </div>
     
     {% if results and results | length > 0 %}
