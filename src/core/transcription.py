@@ -27,13 +27,16 @@ class TranscriptionService:
         self.logger = logging.getLogger('project_bach.transcription')
         self.whisperkit_client = WhisperKitClient(whisperkit_config)
         
-    def transcribe_audio(self, audio_path: Path, prompt: str = None, language_preference: str = 'english') -> str:
+    def transcribe_audio(self, audio_path: Path, prompt: str = None, language_preference: str = 'english', 
+                        custom_model: str = None, custom_model_prefix: str = None) -> str:
         """转录音频文件
         
         Args:
             audio_path: 音频文件路径
             prompt: Whisper系统提示词，用于提高特定术语识别准确性
             language_preference: 语言偏好 ('english' 或 'multilingual')
+            custom_model: 自定义模型名称 (如'tiny', 'medium', 'large-v3')
+            custom_model_prefix: 自定义模型前缀 (如'openai', 'distil')
             
         Returns:
             转录文本
@@ -41,11 +44,25 @@ class TranscriptionService:
         Raises:
             Exception: 转录失败
         """
-        # 根据语言偏好选择模型配置
-        language_config = self.config.get('language_configs', {}).get(language_preference, {})
-        model = self.config.get('model', 'large-v3')
-        model_prefix = language_config.get('model_prefix', 'distil')
-        language = language_config.get('language_code', 'en')
+        # 优先使用自定义模型参数，否则使用配置文件
+        if custom_model and custom_model_prefix:
+            model = custom_model
+            model_prefix = custom_model_prefix
+            # 根据模型前缀确定语言设置
+            if custom_model_prefix == 'distil' and language_preference == 'english':
+                language = 'en'
+            elif custom_model_prefix == 'openai' and language_preference == 'multilingual':
+                # WhisperKit不支持'auto'，多语言模式使用空字符串让其自动检测
+                language = None  # 让WhisperKit自动检测
+            else:
+                # 根据语言偏好选择语言代码
+                language = 'en' if language_preference == 'english' else None
+        else:
+            # 使用配置文件的默认设置
+            language_config = self.config.get('language_configs', {}).get(language_preference, {})
+            model = self.config.get('model', 'large-v3')
+            model_prefix = language_config.get('model_prefix', 'distil')
+            language = language_config.get('language_code', 'en')
         
         # 获取音频文件信息
         file_size_mb = audio_path.stat().st_size / (1024 * 1024)
@@ -75,8 +92,15 @@ class TranscriptionService:
                 self.logger.warning("   4. 设置足够的处理超时时间")
         
         try:
-            # 使用WhisperKit CLI进行真实转录
-            return self.whisperkit_client.transcribe(audio_path, audio_duration, prompt, language_preference)
+            # 使用WhisperKit CLI进行真实转录，传递计算出的实际参数
+            return self.whisperkit_client.transcribe(
+                audio_path=audio_path, 
+                audio_duration=audio_duration, 
+                prompt=prompt, 
+                model=model, 
+                model_prefix=model_prefix, 
+                language=language
+            )
         except Exception as e:
             self.logger.warning(f"WhisperKit转录失败，使用备用方案: {str(e)}")
             return self._fallback_transcription(audio_path)
@@ -169,15 +193,38 @@ class WhisperKitClient:
         """
         self.config = config
         self.logger = logging.getLogger('project_bach.whisperkit')
+    
+    def _ensure_model_available(self, base_model_path: str, model_path: str, model: str, model_prefix: str):
+        """确保模型可用，如果不存在则自动下载"""
+        import os
+        from pathlib import Path
         
-    def transcribe(self, audio_path: Path, audio_duration: float = None, prompt: str = None, language_preference: str = 'english') -> str:
+        # 确保模型目录存在
+        model_dir = Path(base_model_path)
+        model_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 检查期望的模型是否存在 (model_path 已经是完整的模型路径)
+        expected_model_name = f"{model_prefix}-{model}" if model_prefix else model
+        expected_model_dir = Path(model_path)
+        
+        if expected_model_dir.exists():
+            self.logger.debug(f"模型已存在: {expected_model_dir}")
+            return
+        
+        # 模型不存在，需要下载
+        self.logger.info(f"🔄 模型文件夹 {expected_model_dir.name} 不存在，WhisperKit将自动下载")
+        self.logger.info("⏳ 首次转录时会自动下载模型，可能需要几分钟...")
+        
+    def transcribe(self, audio_path: Path, audio_duration: float = None, prompt: str = None, model: str = None, model_prefix: str = None, language: str = None) -> str:
         """使用WhisperKit CLI进行音频转录
         
         Args:
             audio_path: 音频文件路径
             audio_duration: 音频时长（分钟），用于计算合适的超时时间
             prompt: Whisper系统提示词，用于提高特定术语识别准确性
-            language_preference: 语言偏好 ('english' 或 'multilingual')
+            model: WhisperKit模型名称（如'large-v3', 'tiny'等）
+            model_prefix: 模型前缀（如'openai', 'distil'）
+            language: 语言代码（如'en', 'zh'，None表示自动检测）
             
         Returns:
             转录文本
@@ -185,11 +232,35 @@ class WhisperKitClient:
         Raises:
             Exception: 转录失败
         """
-        # 根据语言偏好获取模型配置
-        language_config = self.config.get('language_configs', {}).get(language_preference, {})
-        model = self.config.get('model', 'large-v3')
-        model_prefix = language_config.get('model_prefix', 'distil')
-        language = language_config.get('language_code', 'en')
+        # 使用传入的参数，如果没有传入则使用默认值
+        if model is None:
+            model = self.config.get('model', 'large-v3')
+        if model_prefix is None:
+            model_prefix = 'openai'  # 默认使用OpenAI模型
+        # language 参数直接使用传入值，None表示让WhisperKit自动检测
+        
+        # 获取模型路径并确保模型存在
+        base_model_path = self.config.get('model_path', './models')
+        model_container_path = f"{base_model_path}/whisperkit-coreml"
+        
+        # 根据实际文件夹命名约定构建模型路径
+        # 实际模型文件夹命名规律：
+        # - distil-whisper_distil-large-v3
+        # - openai_whisper-large-v3-v20240930
+        # - openai_whisper-large-v3  
+        # - openai_whisper-medium
+        if model_prefix == 'distil' and model == 'large-v3':
+            # 特殊情况：distil模型使用不同的命名约定
+            model_folder_name = "distil-whisper_distil-large-v3"
+        elif model_prefix == 'openai':
+            # OpenAI模型使用标准命名约定
+            model_folder_name = f"openai_whisper-{model}"
+        else:
+            # 默认命名约定（向后兼容）
+            model_folder_name = f"{model_prefix}_whisper-{model}"
+        
+        model_path = f"{model_container_path}/{model_folder_name}"
+        self._ensure_model_available(base_model_path, model_path, model, model_prefix)
         
         # 硬编码合理的超时参数
         base_timeout = 120  # 2分钟基础超时
@@ -215,6 +286,7 @@ class WhisperKitClient:
         chunking = 'vad'                     # 语音活动检测
         workers = 2                          # 长音频优化并发数
         
+        
         # 构建WhisperKit命令
         cmd = [
             "whisperkit-cli",
@@ -229,6 +301,14 @@ class WhisperKitClient:
             "--concurrent-worker-count", str(workers)
         ]
         
+        # 只有模型存在时才指定model-path，否则让WhisperKit自动下载
+        if Path(model_path).exists():
+            cmd.extend(["--model-path", model_path])
+            self.logger.debug(f"Using local model: {model_path}")
+        else:
+            cmd.extend(["--download-model-path", base_model_path])
+            self.logger.info(f"Model not found, will auto-download to: {base_model_path}")
+        
         # 添加语言参数
         if language:
             cmd.extend(["--language", language])
@@ -241,16 +321,17 @@ class WhisperKitClient:
         if use_cache:
             cmd.append("--use-prefill-cache")
         
-        self.logger.debug(f"WhisperKit命令: {' '.join(cmd)}")
-        self.logger.info(f"🚀 WhisperKit转录配置:")
-        self.logger.info(f"   模型: {model_prefix}-{model}, 语言: {language}")
-        self.logger.info(f"   计算单元: 音频={audio_compute}, 文本={text_compute}")
-        self.logger.info(f"   优化选项: 缓存={'✅' if use_cache else '❌'}, 分块={chunking}, 并发={workers}")
-        self.logger.info(f"   超时限制: {timeout//60}分{timeout%60}秒")
+        self.logger.debug(f"WhisperKit command: {' '.join(cmd)}")
+        self.logger.info("🚀 WhisperKit transcription config:")
+        self.logger.info(f"   Model: {model_prefix}-{model}, Language: {language or 'auto'}")
+        self.logger.info(f"   Compute units: audio={audio_compute}, text={text_compute}")
+        self.logger.info(f"   Optimization: cache={'✅' if use_cache else '❌'}, chunking={chunking}, workers={workers}")
+        self.logger.info(f"   Timeout limit: {timeout//60}m{timeout%60}s")
         
         # 启动进度监控
         start_time = time.time()
-        progress_thread = threading.Thread(target=self._monitor_progress, args=(start_time, timeout, audio_path.name))
+        stop_event = threading.Event()
+        progress_thread = threading.Thread(target=self._monitor_progress, args=(start_time, timeout, audio_path.name, stop_event))
         progress_thread.daemon = True
         progress_thread.start()
         
@@ -263,18 +344,21 @@ class WhisperKitClient:
                 timeout=timeout
             )
         except subprocess.TimeoutExpired:
+            stop_event.set()  # 停止进度监控
             elapsed = time.time() - start_time
-            raise Exception(f"WhisperKit转录超时 (已运行{elapsed//60:.0f}分{elapsed%60:.0f}秒，超时限制{timeout}秒)")
+            raise Exception(f"WhisperKit transcription timeout (ran {elapsed//60:.0f}m{elapsed%60:.0f}s, timeout limit {timeout}s)")
         
         elapsed_time = time.time() - start_time
         
         if result.returncode != 0:
+            stop_event.set()  # 停止进度监控
             raise Exception(f"WhisperKit执行失败: {result.stderr}")
         
         # 提取转录文本
         transcript = result.stdout.strip()
         
         if not transcript or len(transcript.strip()) < 5:
+            stop_event.set()  # 停止进度监控
             raise Exception("转录结果为空或过短")
         
         # 计算转录性能指标
@@ -285,25 +369,33 @@ class WhisperKitClient:
         
         # 记录转录结果和性能
         preview = transcript[:80].replace('\n', ' ') + "..." if len(transcript) > 80 else transcript
-        self.logger.info(f"✅ WhisperKit转录完成!")
-        self.logger.info(f"📊 性能指标: 用时={elapsed_time:.1f}秒, 速度={words_per_second:.1f}词/秒, {chars_per_second:.1f}字符/秒")
-        self.logger.info(f"📄 结果统计: {words_count}词, {chars_count}字符, 内容预览: {preview}")
+        # 停止进度监控线程
+        stop_event.set()
+        
+        self.logger.info("✅ WhisperKit transcription completed!")
+        self.logger.info(f"📊 Performance metrics: time={elapsed_time:.1f}s, speed={words_per_second:.1f}words/s, {chars_per_second:.1f}chars/s")
+        self.logger.info(f"📄 Result stats: {words_count} words, {chars_count} characters, preview: {preview}")
         
         return transcript
     
-    def _monitor_progress(self, start_time: float, timeout: int, filename: str):
+    def _monitor_progress(self, start_time: float, timeout: int, filename: str, stop_event: threading.Event):
         """监控转录进度并定期输出状态
         
         Args:
             start_time: 开始时间戳
             timeout: 总超时时间
             filename: 文件名
+            stop_event: 停止事件信号
         """
         # 硬编码合理的进度报告间隔
         intervals = [30, 60, 120, 300, 600]  # 30秒, 1分钟, 2分钟, 5分钟, 10分钟
         
         for interval in intervals:
-            time.sleep(interval)
+            # 使用wait()而非sleep()，这样可以立即响应stop_event
+            if stop_event.wait(timeout=interval):
+                # 收到停止信号，退出监控
+                break
+                
             elapsed = time.time() - start_time
             
             if elapsed >= timeout:
@@ -312,16 +404,16 @@ class WhisperKitClient:
             remaining = timeout - elapsed
             progress_percent = (elapsed / timeout) * 100
             
-            # 显示实时处理状态
-            self.logger.info(f"🔄 转录进行中: {filename}")
-            self.logger.info(f"⏱️  已运行: {self._format_time(elapsed)} | 超时进度: {progress_percent:.1f}%")
+            # Display real-time processing status
+            self.logger.info(f"🔄 Transcription in progress: {filename}")
+            self.logger.info(f"⏱️  Elapsed time: {self._format_time(elapsed)} | Timeout progress: {progress_percent:.1f}%")
             
-            # 如果接近超时，提供建议
-            if remaining < 120:  # 最后2分钟
-                self.logger.warning(f"⚠️  转录即将超时，建议考虑：")
-                self.logger.warning(f"   1. 使用更小的WhisperKit模型（如tiny/base）")
-                self.logger.warning(f"   2. 分段处理长音频文件")
-                self.logger.warning(f"   3. 增加处理超时时间配置")
+            # Provide suggestions if nearing timeout
+            if remaining < 120:  # Last 2 minutes
+                self.logger.warning("⚠️  Transcription nearing timeout, consider:")
+                self.logger.warning("   1. Use smaller WhisperKit model (e.g. tiny/base)")
+                self.logger.warning("   2. Process long audio files in segments")
+                self.logger.warning("   3. Increase processing timeout configuration")
     
     def _format_time(self, seconds: float) -> str:
         """格式化时间显示

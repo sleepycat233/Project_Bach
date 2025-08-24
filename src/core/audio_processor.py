@@ -18,6 +18,7 @@ from ..storage.result_storage import ResultStorage
 from ..monitoring.file_monitor import FileMonitor
 from ..publishing.publishing_workflow import PublishingWorkflow
 from ..utils.config import ConfigManager
+from .processing_service import ProcessingService, ProcessingStage, get_processing_service
 
 
 class AudioProcessor:
@@ -39,6 +40,9 @@ class AudioProcessor:
         self.transcript_storage: Optional[TranscriptStorage] = None
         self.result_storage: Optional[ResultStorage] = None
         self.publishing_workflow: Optional[PublishingWorkflow] = None
+        
+        # 处理状态服务
+        self.processing_service: ProcessingService = get_processing_service()
         
         # 文件监控器（可选）
         self.file_monitor: Optional[FileMonitor] = None
@@ -98,7 +102,7 @@ class AudioProcessor:
         self.publishing_workflow = workflow
         self.logger.debug("发布工作流已设置")
     
-    def process_audio_file(self, audio_path: str, privacy_level: str = 'public', metadata: Dict[str, Any] = None) -> bool:
+    def process_audio_file(self, audio_path: str, privacy_level: str = 'public', metadata: Dict[str, Any] = None, processing_id: str = None) -> bool:
         """处理单个音频文件的完整流程
         
         Args:
@@ -125,10 +129,19 @@ class AudioProcessor:
             
             # 步骤1: 音频转录（使用description作为Whisper prompt）
             self.logger.info("步骤1: 开始音频转录")
+            if processing_id:
+                self.processing_service.update_status(processing_id, ProcessingStage.TRANSCRIBING, 20, "Transcribing audio...")
+            
+            # 提取模型选择参数
+            custom_model = metadata.get('whisper_model') if metadata else None
+            custom_model_prefix = metadata.get('model_prefix') if metadata else None
+            
             transcript = self.transcription_service.transcribe_audio(
                 audio_path, 
                 prompt=prompt, 
-                language_preference=audio_language
+                language_preference=audio_language,
+                custom_model=custom_model,
+                custom_model_prefix=custom_model_prefix
             )
             if not transcript:
                 raise Exception("转录失败或结果为空")
@@ -138,6 +151,8 @@ class AudioProcessor:
             
             # 步骤2: 人名匿名化
             self.logger.info("步骤2: 开始人名匿名化")
+            if processing_id:
+                self.processing_service.update_status(processing_id, ProcessingStage.ANONYMIZING, 50, "Anonymizing personal names...")
             anonymized_text, mapping = self.anonymization_service.anonymize_names(transcript)
             self.transcript_storage.save_anonymized_transcript(audio_path.stem, anonymized_text, privacy_level)
             
@@ -147,6 +162,8 @@ class AudioProcessor:
             
             # 步骤3: AI内容生成
             self.logger.info("步骤3: 开始AI内容生成")
+            if processing_id:
+                self.processing_service.update_status(processing_id, ProcessingStage.AI_GENERATING, 70, "Generating AI content...")
             summary = self.ai_generation_service.generate_summary(anonymized_text)
             mindmap = self.ai_generation_service.generate_mindmap(anonymized_text)
             
@@ -170,18 +187,33 @@ class AudioProcessor:
             # 步骤5: 自动部署到GitHub Pages (仅公开内容)
             if privacy_level == 'public' and self.publishing_workflow and self._should_auto_deploy():
                 self.logger.info("步骤5: 开始自动部署到GitHub Pages")
+                if processing_id:
+                    self.processing_service.update_status(processing_id, ProcessingStage.PUBLISHING, 90, "Deploying to GitHub Pages...")
                 try:
                     deploy_result = self.publishing_workflow.deploy_to_github_pages()
                     if deploy_result.get('success'):
                         self.logger.info("✅ 自动部署成功!")
                         if 'website_url' in deploy_result:
                             self.logger.info(f"🔗 网站地址: {deploy_result['website_url']}")
+                            if processing_id:
+                                self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, f"Deployment successful! Website: {deploy_result['website_url']}")
                     else:
                         self.logger.warning(f"⚠️  自动部署失败: {deploy_result.get('error', '未知错误')}")
+                        if processing_id:
+                            self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, f"Deployment failed but processing complete: {deploy_result.get('error', 'Unknown error')}")
                 except Exception as e:
                     self.logger.error(f"❌ 自动部署异常: {e}")
+                    if processing_id:
+                        self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, f"Deployment error but processing complete: {str(e)}")
             elif privacy_level == 'private':
                 self.logger.info("私人内容，跳过GitHub Pages部署")
+                if processing_id:
+                    self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, "Processing complete (private content, not deployed)")
+            else:
+                # 公开内容但没有启用部署或没有配置部署工作流
+                self.logger.info("处理完成，但未配置自动部署")
+                if processing_id:
+                    self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, "Processing complete (auto deployment not configured)")
             
             elapsed = time.time() - start_time
             self.logger.info(f"处理完成: {audio_path.name} (耗时: {elapsed:.2f}秒, 隐私级别: {privacy_level})")
@@ -189,6 +221,8 @@ class AudioProcessor:
             
         except Exception as e:
             self.logger.error(f"处理失败: {audio_path.name} - {str(e)}")
+            if processing_id:
+                self.processing_service.update_status(processing_id, ProcessingStage.FAILED, 0, f"Processing failed: {str(e)}")
             return False
     
     def _should_auto_deploy(self) -> bool:

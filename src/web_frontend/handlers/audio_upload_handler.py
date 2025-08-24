@@ -161,11 +161,12 @@ class AudioUploadHandler:
                 import threading
                 def background_process():
                     try:
-                        # 调用AudioProcessor的process_audio_file方法，传递完整metadata
+                        # 调用AudioProcessor的process_audio_file方法，传递完整metadata和processing_id
                         success = audio_processor.process_audio_file(
                             str(target_file),
                             privacy_level=privacy_level,
-                            metadata=metadata
+                            metadata=metadata,
+                            processing_id=tracker.processing_id
                         )
                         
                         if success:

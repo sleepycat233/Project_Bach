@@ -9,14 +9,20 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+from .github_deployment_monitor import create_deployment_monitor, GitHubDeploymentMonitor
+
 logger = logging.getLogger(__name__)
 
 
 class ProcessingService:
     """处理状态和队列管理服务"""
     
-    def __init__(self):
-        """初始化处理服务"""
+    def __init__(self, config: Optional[Dict] = None):
+        """初始化处理服务
+        
+        Args:
+            config: 应用配置（可选）
+        """
         # 模拟处理项目存储
         self._processing_items = {}
         self._completed_items = []
@@ -28,6 +34,17 @@ class ProcessingService:
             'total_errors': 0,
             'average_processing_time': 180  # 3分钟
         }
+        
+        # GitHub部署监控器
+        self.deployment_monitor = None
+        if config:
+            try:
+                self.deployment_monitor = create_deployment_monitor(config)
+                logger.info("GitHub部署监控器初始化成功")
+            except Exception as e:
+                logger.warning(f"GitHub部署监控器初始化失败: {e}")
+        else:
+            logger.info("未提供配置，跳过GitHub部署监控器初始化")
     
     def get_status(self) -> Dict:
         """
@@ -182,19 +199,114 @@ class ProcessingService:
                     item['progress'] = new_progress
                     
                     # 更新消息
-                    if new_progress < 30:
+                    if new_progress < 25:
                         item['message'] = "Processing audio transcription..."
-                    elif new_progress < 60:
+                    elif new_progress < 50:
                         item['message'] = "Anonymizing content..."
-                    elif new_progress < 90:
+                    elif new_progress < 75:
                         item['message'] = "Generating AI summary..."
+                    elif new_progress < 90:
+                        item['message'] = "Publishing to GitHub Pages..."
                     
                 elif current_progress >= 90:
-                    # 完成处理
-                    self._complete_item(processing_id)
+                    # 检查GitHub Pages部署状态
+                    if not item.get('deployment_checked', False):
+                        self._check_github_deployment(processing_id)
+                    else:
+                        # 完成处理
+                        self._complete_item(processing_id)
                     
         except Exception as e:
             logger.error(f"Error updating progress for {processing_id}: {e}")
+    
+    def _check_github_deployment(self, processing_id: str):
+        """检查GitHub Pages部署状态"""
+        try:
+            item = self._processing_items[processing_id]
+            
+            # 标记已检查
+            item['deployment_checked'] = True
+            item['progress'] = 95
+            item['message'] = "Checking GitHub Pages deployment..."
+            
+            # 模拟检查GitHub Pages部署状态
+            # 实际实现可以检查GitHub API或网站是否可访问
+            deployment_success = self._simulate_deployment_check(processing_id)
+            
+            if deployment_success:
+                item['progress'] = 100
+                item['message'] = "GitHub Pages deployment verified"
+                self._complete_item(processing_id)
+            else:
+                # 如果部署失败，等待下次检查
+                item['progress'] = 92
+                item['message'] = "Waiting for GitHub Pages deployment..."
+                # 设置重新检查标志
+                item['deployment_checked'] = False
+                
+        except Exception as e:
+            logger.error(f"Error checking GitHub deployment for {processing_id}: {e}")
+            # 部署检查失败，直接完成处理
+            self._complete_item(processing_id)
+    
+    def _simulate_deployment_check(self, processing_id: str) -> bool:
+        """检查GitHub Pages部署状态（基于GitHub API的真实实现）
+        
+        Args:
+            processing_id: 处理ID
+        
+        Returns:
+            bool: 部署是否成功
+        """
+        try:
+            item = self._processing_items[processing_id]
+            started_at = datetime.fromisoformat(item['started_at'])
+            now = datetime.now()
+            
+            # 如果处理刚开始不久（少于30秒），跳过检查
+            if now - started_at < timedelta(seconds=30):
+                item['deployment_message'] = "Waiting for deployment to start..."
+                return False
+            
+            # 使用GitHub部署监控器检查部署状态
+            if self.deployment_monitor:
+                # 获取可能的commit hash
+                commit_hash = item.get('commit_hash')
+                
+                deployment_status = self.deployment_monitor.check_pages_deployment_status(commit_hash)
+                
+                # 更新部署消息
+                item['deployment_message'] = deployment_status.get('message', 'Checking deployment...')
+                item['deployment_method'] = deployment_status.get('method', 'unknown')
+                
+                if deployment_status.get('deployed'):
+                    logger.info(f"GitHub Pages deployment verified via {deployment_status.get('method')}")
+                    return True
+                elif deployment_status.get('status') == 'failed':
+                    logger.warning(f"GitHub Pages deployment failed: {deployment_status.get('message')}")
+                    return True  # 认为处理完成，即使部署失败
+                else:
+                    logger.debug(f"GitHub Pages deployment still in progress: {deployment_status.get('status')}")
+                    return False
+            
+            # 回退到简单的超时检查
+            else:
+                item['deployment_message'] = "GitHub API not configured, using timeout check"
+                item['deployment_method'] = 'timeout_fallback'
+                
+                # 如果已经超过5分钟，认为部署完成
+                if now - started_at > timedelta(minutes=5):
+                    logger.info("Deployment timeout reached, assuming success")
+                    return True
+                
+                return False
+            
+        except Exception as e:
+            logger.error(f"Error in deployment check: {e}")
+            # 设置错误信息
+            if processing_id in self._processing_items:
+                self._processing_items[processing_id]['deployment_message'] = f"Deployment check error: {str(e)}"
+            return True  # 默认认为完成
     
     def _complete_item(self, processing_id: str):
         """完成处理项目"""

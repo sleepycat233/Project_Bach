@@ -339,5 +339,247 @@ class TestTranscriptionValidator(unittest.TestCase):
             self.assertEqual(result, case['expected'])
 
 
+class TestWhisperKitModelPathMappings(unittest.TestCase):
+    """测试WhisperKit模型路径映射修复"""
+    
+    def setUp(self):
+        """每个测试前的准备工作"""
+        self.config = {
+            'model_path': './models',
+            'model': 'large-v3',
+            'language': 'en'
+        }
+    
+    @patch('pathlib.Path.exists')
+    @patch('logging.getLogger')
+    def test_distil_model_path_mapping(self, mock_logger, mock_path_exists):
+        """测试distil模型的特殊路径映射"""
+        mock_path_exists.return_value = True
+        
+        client = WhisperKitClient(self.config)
+        
+        # 测试distil模型的路径构建
+        with patch.object(client, '_ensure_model_available') as mock_ensure:
+            with patch('subprocess.run') as mock_subprocess:
+                mock_result = MagicMock()
+                mock_result.returncode = 0
+                mock_result.stdout = "Test transcription"
+                mock_subprocess.return_value = mock_result
+                
+                # 测试distil模型前缀
+                client.transcribe(
+                    Path('/test/audio.mp3'), 
+                    model='large-v3', 
+                    model_prefix='distil'
+                )
+                
+                # 验证使用了正确的distil模型文件夹名
+                expected_path = "./models/whisperkit-coreml/distil-whisper_distil-large-v3"
+                mock_ensure.assert_called_once()
+                actual_path = mock_ensure.call_args[0][1]
+                self.assertEqual(actual_path, expected_path)
+    
+    @patch('pathlib.Path.exists')
+    @patch('logging.getLogger')
+    def test_openai_model_path_mapping(self, mock_logger, mock_path_exists):
+        """测试OpenAI模型的标准路径映射"""
+        mock_path_exists.return_value = True
+        
+        client = WhisperKitClient(self.config)
+        
+        with patch.object(client, '_ensure_model_available') as mock_ensure:
+            with patch('subprocess.run') as mock_subprocess:
+                mock_result = MagicMock()
+                mock_result.returncode = 0
+                mock_result.stdout = "Test transcription"
+                mock_subprocess.return_value = mock_result
+                
+                # 测试OpenAI模型前缀
+                client.transcribe(
+                    Path('/test/audio.mp3'), 
+                    model='large-v3', 
+                    model_prefix='openai'
+                )
+                
+                # 验证使用了正确的OpenAI模型文件夹名
+                expected_path = "./models/whisperkit-coreml/openai_whisper-large-v3"
+                mock_ensure.assert_called_once()
+                actual_path = mock_ensure.call_args[0][1]
+                self.assertEqual(actual_path, expected_path)
+
+
+class TestProgressMonitoringThread(unittest.TestCase):
+    """测试进度监控线程修复"""
+    
+    def setUp(self):
+        """每个测试前的准备工作"""
+        self.config = {
+            'model_path': './models',
+            'model': 'large-v3',
+            'language': 'en'
+        }
+    
+    @patch('threading.Thread')
+    @patch('threading.Event')
+    @patch('pathlib.Path.exists')
+    @patch('logging.getLogger')
+    def test_progress_monitoring_stop_event(self, mock_logger, mock_path_exists, mock_event_class, mock_thread_class):
+        """测试进度监控使用stop_event正确停止"""
+        mock_path_exists.return_value = True
+        mock_stop_event = MagicMock()
+        mock_event_class.return_value = mock_stop_event
+        mock_thread = MagicMock()
+        mock_thread_class.return_value = mock_thread
+        
+        client = WhisperKitClient(self.config)
+        
+        with patch('subprocess.run') as mock_subprocess:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = "Test transcription"
+            mock_subprocess.return_value = mock_result
+            
+            client.transcribe(Path('/test/audio.mp3'))
+            
+            # 验证创建了stop_event
+            mock_event_class.assert_called_once()
+            
+            # 验证启动了进度监控线程，并传入了stop_event
+            mock_thread_class.assert_called_once()
+            thread_args = mock_thread_class.call_args[1]['args']
+            self.assertIn(mock_stop_event, thread_args)
+            
+            # 验证在成功完成时设置了stop_event
+            mock_stop_event.set.assert_called()
+    
+    @patch('threading.Thread')
+    @patch('threading.Event')
+    @patch('pathlib.Path.exists')
+    @patch('logging.getLogger')
+    def test_progress_monitoring_stop_on_error(self, mock_logger, mock_path_exists, mock_event_class, mock_thread_class):
+        """测试进度监控在错误时也会停止"""
+        mock_path_exists.return_value = True
+        mock_stop_event = MagicMock()
+        mock_event_class.return_value = mock_stop_event
+        mock_thread = MagicMock()
+        mock_thread_class.return_value = mock_thread
+        
+        client = WhisperKitClient(self.config)
+        
+        with patch('subprocess.run') as mock_subprocess:
+            # 模拟subprocess失败
+            mock_result = MagicMock()
+            mock_result.returncode = 1
+            mock_result.stderr = "Test error"
+            mock_subprocess.return_value = mock_result
+            
+            with self.assertRaises(Exception):
+                client.transcribe(Path('/test/audio.mp3'))
+            
+            # 验证即使在错误情况下也设置了stop_event
+            mock_stop_event.set.assert_called()
+
+
+class TestEnglishLogMessages(unittest.TestCase):
+    """测试英文日志消息修复"""
+    
+    @patch('pathlib.Path.exists')
+    @patch('logging.getLogger')
+    def test_english_log_messages(self, mock_logger_func, mock_path_exists):
+        """测试所有日志消息都使用英文"""
+        mock_path_exists.return_value = True
+        mock_logger = MagicMock()
+        mock_logger_func.return_value = mock_logger
+        
+        client = WhisperKitClient({
+            'model_path': './models',
+            'model': 'large-v3',
+            'language': 'en'
+        })
+        
+        with patch('subprocess.run') as mock_subprocess:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = "Test transcription"
+            mock_subprocess.return_value = mock_result
+            
+            client.transcribe(Path('/test/audio.mp3'), model='large-v3', model_prefix='distil')
+            
+            # 检查日志调用中是否使用了英文
+            log_calls = [str(call) for call in mock_logger.info.call_args_list]
+            
+            # 验证关键日志消息使用英文
+            english_keywords = [
+                'WhisperKit transcription config',
+                'Model:',
+                'Compute units:',
+                'Optimization:',
+                'Timeout limit:',
+                'transcription completed',
+                'Performance metrics:',
+                'Result stats:'
+            ]
+            
+            log_text = ' '.join(log_calls)
+            for keyword in english_keywords:
+                self.assertIn(keyword, log_text, 
+                             f"English keyword '{keyword}' not found in logs")
+            
+            # 验证没有中文关键词
+            chinese_keywords = [
+                '转录配置',
+                '模型',
+                '计算单元',
+                '优化选项',
+                '超时限制',
+                '转录完成',
+                '性能指标',
+                '结果统计'
+            ]
+            
+            for keyword in chinese_keywords:
+                self.assertNotIn(keyword, log_text, 
+                               f"Chinese keyword '{keyword}' found in logs")
+
+
+class TestCustomPromptSupport(unittest.TestCase):
+    """测试自定义提示词支持"""
+    
+    @patch('pathlib.Path.exists')
+    @patch('logging.getLogger')
+    def test_custom_prompt_usage(self, mock_logger, mock_path_exists):
+        """测试自定义提示词被正确传递给WhisperKit"""
+        mock_path_exists.return_value = True
+        
+        client = WhisperKitClient({
+            'model_path': './models',
+            'model': 'large-v3',
+            'language': 'en'
+        })
+        
+        with patch('subprocess.run') as mock_subprocess:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = "Test transcription"
+            mock_subprocess.return_value = mock_result
+            
+            custom_prompt = "Physics lecture by Richard Feynman about diffusion"
+            client.transcribe(
+                Path('/test/audio.mp3'), 
+                prompt=custom_prompt,
+                model='large-v3', 
+                model_prefix='distil'
+            )
+            
+            # 验证命令行包含了自定义提示词
+            mock_subprocess.assert_called_once()
+            cmd_args = mock_subprocess.call_args[0][0]
+            
+            # 检查命令中是否包含--prompt参数
+            self.assertIn('--prompt', cmd_args)
+            prompt_index = cmd_args.index('--prompt')
+            self.assertEqual(cmd_args[prompt_index + 1], custom_prompt)
+
+
 if __name__ == '__main__':
     unittest.main()
