@@ -28,7 +28,7 @@ class TestPhase6Integration:
         
         # 创建完整的目录结构
         directories = [
-            'uploads',
+            'data/uploads',
             'output',
             'temp',
             'data/logs',
@@ -53,7 +53,7 @@ class TestPhase6Integration:
     @pytest.fixture
     def sample_audio_file(self, temp_workspace):
         """创建示例音频文件"""
-        audio_path = Path(temp_workspace) / "uploads" / "physics_lecture.mp3"
+        audio_path = Path(temp_workspace) / "data/uploads" / "physics_lecture.mp3"
         
         # 创建模拟MP3文件
         mp3_header = b'\xff\xfb\x90\x00'

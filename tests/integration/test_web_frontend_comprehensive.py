@@ -56,7 +56,7 @@ class TestWebFrontendComprehensive:
         
         # 创建其他必要目录
         directories = [
-            'uploads',
+            'data/uploads',
             'output', 
             'temp',
             'data/logs',
@@ -127,7 +127,7 @@ FLASK_SECRET_KEY=test-secret-key
             'TESTING': True,
             'SECRET_KEY': 'test-secret-key',
             'MAX_CONTENT_LENGTH': 500 * 1024 * 1024,
-            'UPLOAD_FOLDER': str(Path(temp_workspace) / 'uploads'),
+            'UPLOAD_FOLDER': str(Path(temp_workspace) / 'data/uploads'),
             'WTF_CSRF_ENABLED': False
         }
         

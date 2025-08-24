@@ -33,7 +33,7 @@ class TestAudioUploadHandler(unittest.TestCase):
     def setUp(self):
         """每个测试前的准备工作"""
         self.test_dir = tempfile.mkdtemp()
-        self.uploads_dir = os.path.join(self.test_dir, 'uploads')
+        self.uploads_dir = os.path.join(self.test_dir, 'data/uploads')
         os.makedirs(self.uploads_dir, exist_ok=True)
         
         # 创建模拟配置管理器
@@ -474,7 +474,7 @@ class TestFileOrganizationIntegration(unittest.TestCase):
     def test_uploads_equals_watch_folder_consistency(self):
         """测试uploads目录与watch_folder一致性"""
         # 这个测试验证我们的设计决策：uploads目录就是watch_folder
-        uploads_path = Path('./uploads')
+        uploads_path = Path('./data/uploads')
         
         # 在真实环境中，这两个路径应该指向同一个目录
         uploads_resolved = uploads_path.resolve()

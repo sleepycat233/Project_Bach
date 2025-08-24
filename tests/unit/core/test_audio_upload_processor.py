@@ -92,7 +92,7 @@ class TestAudioUploadProcessor:
         """创建音频上传处理器实例"""
         # 使用临时目录作为上传和监控目录
         processor = AudioUploadProcessor(config_manager)
-        processor.upload_dir = Path(temp_dir) / "uploads"
+        processor.upload_dir = Path(temp_dir) / "data/uploads"
         processor.watch_dir = Path(temp_dir) / "watch"
         processor.upload_dir.mkdir(exist_ok=True)
         processor.watch_dir.mkdir(exist_ok=True)

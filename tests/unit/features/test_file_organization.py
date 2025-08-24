@@ -44,13 +44,13 @@ class TestFileOrganizationConfig(unittest.TestCase):
                 'file': './test.log'
             },
             'paths': {
-                'watch_folder': './uploads',  # 新的统一目录
+                'watch_folder': './data/uploads',  # 新的统一目录
                 'data_folder': './data',
                 'output_folder': './data/output'
             },
             'web_frontend': {
                 'upload': {
-                    'upload_folder': './uploads',  # 与watch_folder一致
+                    'upload_folder': './data/uploads',  # 与watch_folder一致
                     'organize_by_category': True,
                     'create_subcategory_folders': True,
                     'max_file_size': 104857600,
@@ -101,8 +101,8 @@ class TestFileOrganizationConfig(unittest.TestCase):
         watch_folder = paths_config.get('watch_folder')
         upload_folder = upload_config.get('upload_folder')
         
-        self.assertEqual(watch_folder, './uploads')
-        self.assertEqual(upload_folder, './uploads')
+        self.assertEqual(watch_folder, './data/uploads')
+        self.assertEqual(upload_folder, './data/uploads')
         self.assertEqual(watch_folder, upload_folder)
     
     @patch('utils.env_manager.setup_project_environment')
@@ -152,7 +152,7 @@ class TestFileMonitorIntegration(unittest.TestCase):
     def setUp(self):
         """测试设置"""
         self.test_dir = tempfile.mkdtemp()
-        self.uploads_dir = os.path.join(self.test_dir, 'uploads')
+        self.uploads_dir = os.path.join(self.test_dir, 'data/uploads')
         os.makedirs(self.uploads_dir, exist_ok=True)
         
         # 切换到测试目录
@@ -172,7 +172,7 @@ class TestFileMonitorIntegration(unittest.TestCase):
         
         # 创建FileMonitor，监控uploads目录
         monitor = FileMonitor(
-            watch_folder='./uploads',
+            watch_folder='./data/uploads',
             file_processor_callback=mock_processor
         )
         
@@ -191,7 +191,7 @@ class TestFileMonitorIntegration(unittest.TestCase):
         # 创建文件监控器
         mock_processor = Mock()
         monitor = FileMonitor(
-            watch_folder='./uploads', 
+            watch_folder='./data/uploads', 
             file_processor_callback=mock_processor
         )
         

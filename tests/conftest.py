@@ -51,7 +51,7 @@ def test_config():
             }
         },
         'web_interface': {
-            'upload_folder': './uploads',
+            'upload_folder': './data/uploads',
             'max_file_size': 100 * 1024 * 1024,  # 100MB
             'allowed_extensions': ['.mp3', '.wav', '.m4a', '.mp4'],
             'tailscale_network': '100.64.0.0/10',
@@ -76,7 +76,7 @@ def temp_workspace():
     
     # 创建基本目录结构
     directories = [
-        'uploads',
+        'data/uploads',
         'output',
         'templates',
         'static',
@@ -118,7 +118,7 @@ def _get_nested_value(data, keys):
 @pytest.fixture
 def sample_audio_file(temp_workspace):
     """示例音频文件"""
-    audio_path = Path(temp_workspace) / "uploads" / "test_lecture.mp3"
+    audio_path = Path(temp_workspace) / "data/uploads" / "test_lecture.mp3"
     
     # 创建模拟音频文件内容
     fake_mp3_header = b'\xff\xfb\x90\x00'  # MP3文件头

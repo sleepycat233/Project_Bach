@@ -215,12 +215,12 @@ class TestConfigManager(unittest.TestCase):
         # 更新配置使watch_folder和upload_folder一致
         self.valid_config['web_frontend'] = {
             'upload': {
-                'upload_folder': './uploads',
+                'upload_folder': './data/uploads',
                 'organize_by_category': True,
                 'create_subcategory_folders': True
             }
         }
-        self.valid_config['paths']['watch_folder'] = './uploads'
+        self.valid_config['paths']['watch_folder'] = './data/uploads'
         
         # 更新测试配置文件
         with open(self.config_path, 'w', encoding='utf-8') as f:
@@ -236,8 +236,8 @@ class TestConfigManager(unittest.TestCase):
         watch_folder = paths_config.get('watch_folder')
         upload_folder = upload_config.get('upload_folder')
         
-        self.assertEqual(watch_folder, './uploads')
-        self.assertEqual(upload_folder, './uploads')
+        self.assertEqual(watch_folder, './data/uploads')
+        self.assertEqual(upload_folder, './data/uploads')
         self.assertEqual(watch_folder, upload_folder)
 
 
