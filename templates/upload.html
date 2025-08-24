@@ -192,6 +192,11 @@
             transition: border-color 0.3s ease;
         }
         
+        /* YouTube URL输入框特殊样式（为加载指示器留出空间） */
+        .youtube-input-container .form-input {
+            padding-right: 80px; /* 为加载指示器和取消按钮留出空间 */
+        }
+        
         .form-input:focus {
             outline: none;
             border-color: #667eea;
@@ -321,6 +326,172 @@
             background: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
+        }
+        
+        /* YouTube加载指示器样式 */
+        .youtube-input-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .youtube-loading-indicator {
+            position: absolute;
+            right: 52px; /* 为取消按钮留出空间 */
+            top: 50%;
+            transform: translateY(-50%);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+        
+        .youtube-loading-indicator.hidden {
+            display: none !important;
+        }
+        
+        .youtube-loading-indicator.loading {
+            display: flex;
+        }
+        
+        .youtube-loading-indicator.success {
+            display: flex;
+        }
+        
+        .youtube-loading-indicator.error {
+            display: flex;
+        }
+        
+        /* 旋转动画 */
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e3e6f0;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 成功图标 */
+        .success-icon {
+            font-size: 24px;
+            color: #28a745;
+            animation: checkmark-appear 0.3s ease-in-out;
+        }
+        
+        @keyframes checkmark-appear {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        /* 错误图标 */
+        .error-icon {
+            font-size: 24px;
+            color: #dc3545;
+            animation: error-shake 0.5s ease-in-out;
+        }
+        
+        @keyframes error-shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+        
+        /* 取消按钮 */
+        .youtube-cancel-button {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            z-index: 11;
+        }
+        
+        .youtube-cancel-button:hover {
+            background: #c82333;
+            transform: translateY(-50%) scale(1.1);
+        }
+        
+        .youtube-cancel-button.visible {
+            display: flex;
+        }
+        
+        /* 响应式设计 - 手机端适配 */
+        @media (max-width: 480px) {
+            .youtube-loading-indicator {
+                width: 28px;
+                height: 28px;
+                right: 48px;
+            }
+            
+            .spinner {
+                width: 20px;
+                height: 20px;
+                border-width: 2px;
+            }
+            
+            .success-icon, .error-icon {
+                font-size: 20px;
+            }
+            
+            .youtube-cancel-button {
+                width: 32px; /* 更大的触摸目标 */
+                height: 32px;
+                right: 12px;
+                font-size: 14px;
+            }
+        }
+        
+        /* 高对比度和可访问性 */
+        @media (prefers-contrast: high) {
+            .spinner {
+                border-top-color: #000;
+            }
+            
+            .success-icon {
+                color: #006400;
+            }
+            
+            .error-icon {
+                color: #8b0000;
+            }
+        }
+        
+        /* 减少动画（用户偏好） */
+        @media (prefers-reduced-motion: reduce) {
+            .spinner {
+                animation: none;
+                border: 3px solid #667eea;
+            }
+            
+            .success-icon, .error-icon {
+                animation: none;
+            }
+            
+            .youtube-loading-indicator, .youtube-cancel-button {
+                transition: none;
+            }
         }
     </style>
 </head>
@@ -477,12 +648,22 @@
                     <form action="/upload/youtube" method="POST">
                         <div class="form-group">
                             <label class="form-label">YouTube URL</label>
-                            <input type="url" name="youtube_url" id="youtube-url-input" class="form-input" 
-                                   placeholder="https://www.youtube.com/watch?v=..." required>
-                            <button type="button" id="get-metadata-btn" class="btn-secondary" 
-                                    style="margin-top: 8px; padding: 6px 12px; font-size: 0.85rem;">
-                                📋 Get Video Info
-                            </button>
+                            <div class="youtube-input-container">
+                                <input type="url" name="youtube_url" id="youtube-url-input" class="form-input" 
+                                       placeholder="https://www.youtube.com/watch?v=..." required>
+                                
+                                <!-- 加载指示器 -->
+                                <div id="youtube-loading-indicator" class="youtube-loading-indicator hidden" 
+                                     role="status" aria-live="polite" aria-label="Ready">
+                                    <div class="spinner-container"></div>
+                                </div>
+                                
+                                <!-- 取消按钮 -->
+                                <button type="button" id="youtube-cancel-button" class="youtube-cancel-button"
+                                        aria-label="Cancel loading YouTube metadata" title="Cancel loading">
+                                    ✕
+                                </button>
+                            </div>
                         </div>
                         
                         <!-- Context Suggestions -->
@@ -511,11 +692,6 @@
                                         <span style="color: #28a745;">Click to add both title and description as context</span>
                                         <small style="float: right; color: #6c757d;">Recommended</small>
                                     </div>
-                                </div>
-                                
-                                <!-- Subtitle Status Display -->
-                                <div id="subtitle-status" class="subtitle-status-info" style="display: none; margin-top: 15px; padding: 12px; border-radius: 6px; border-left: 4px solid;">
-                                    <div id="subtitle-status-content"></div>
                                 </div>
                                 
                                 <div id="metadata-loading" style="text-align: center; color: #6c757d; display: none;">
@@ -1036,32 +1212,188 @@
             }
         }
         
+        // YouTube加载指示器管理器
+        class YouTubeLoadingIndicator {
+            constructor() {
+                this.indicator = document.getElementById('youtube-loading-indicator');
+                this.cancelButton = document.getElementById('youtube-cancel-button');
+                this.spinnerContainer = null;
+                this.currentState = 'hidden';
+                this.currentRequest = null;
+                this.setupEventListeners();
+            }
+            
+            setupEventListeners() {
+                if (this.cancelButton) {
+                    this.cancelButton.addEventListener('click', () => {
+                        this.cancel();
+                    });
+                }
+            }
+            
+            showLoading() {
+                if (!this.indicator) return;
+                
+                this.currentState = 'loading';
+                this.indicator.className = 'youtube-loading-indicator loading';
+                this.indicator.setAttribute('aria-label', 'Loading YouTube metadata, please wait');
+                this.indicator.setAttribute('aria-live', 'polite');
+                
+                // 创建旋转指示器
+                this.spinnerContainer = document.createElement('div');
+                this.spinnerContainer.className = 'spinner';
+                this.indicator.innerHTML = '';
+                this.indicator.appendChild(this.spinnerContainer);
+                
+                // 显示取消按钮
+                if (this.cancelButton) {
+                    this.cancelButton.classList.add('visible');
+                }
+                
+                console.log('Loading indicator shown');
+            }
+            
+            showSuccess() {
+                if (!this.indicator) return;
+                
+                this.currentState = 'success';
+                this.indicator.className = 'youtube-loading-indicator success';
+                this.indicator.setAttribute('aria-label', 'YouTube metadata loaded successfully');
+                this.indicator.setAttribute('aria-live', 'polite');
+                
+                // 创建成功图标
+                this.indicator.innerHTML = '<div class="success-icon">✓</div>';
+                
+                // 隐藏取消按钮
+                if (this.cancelButton) {
+                    this.cancelButton.classList.remove('visible');
+                }
+                
+                // 3秒后自动隐藏成功状态
+                setTimeout(() => {
+                    this.hide();
+                }, 3000);
+                
+                console.log('Success indicator shown');
+            }
+            
+            showError(message = 'Error loading metadata') {
+                if (!this.indicator) return;
+                
+                this.currentState = 'error';
+                this.indicator.className = 'youtube-loading-indicator error';
+                this.indicator.setAttribute('aria-label', `Error loading YouTube metadata: ${message}`);
+                this.indicator.setAttribute('aria-live', 'assertive');
+                this.indicator.setAttribute('role', 'alert');
+                
+                // 创建错误图标
+                this.indicator.innerHTML = '<div class="error-icon">✕</div>';
+                
+                // 隐藏取消按钮
+                if (this.cancelButton) {
+                    this.cancelButton.classList.remove('visible');
+                }
+                
+                // 5秒后自动隐藏错误状态
+                setTimeout(() => {
+                    this.hide();
+                }, 5000);
+                
+                console.log('Error indicator shown:', message);
+            }
+            
+            hide() {
+                if (!this.indicator) return;
+                
+                this.currentState = 'hidden';
+                this.indicator.className = 'youtube-loading-indicator hidden';
+                this.indicator.setAttribute('aria-label', 'Ready');
+                this.indicator.removeAttribute('role');
+                this.indicator.innerHTML = '';
+                
+                // 隐藏取消按钮
+                if (this.cancelButton) {
+                    this.cancelButton.classList.remove('visible');
+                }
+                
+                console.log('Loading indicator hidden');
+            }
+            
+            cancel() {
+                if (this.currentState === 'loading' && this.currentRequest) {
+                    console.log('Cancelling YouTube metadata request');
+                    
+                    // 如果有fetch请求的AbortController，可以在这里abort
+                    if (this.currentRequest.abort) {
+                        this.currentRequest.abort();
+                    }
+                    
+                    this.currentRequest = null;
+                    this.hide();
+                    
+                    // 触发取消事件
+                    const cancelEvent = new CustomEvent('youtube-metadata-cancelled', {
+                        detail: { message: 'User cancelled the request' }
+                    });
+                    document.dispatchEvent(cancelEvent);
+                    
+                    return true;
+                }
+                return false;
+            }
+            
+            setCurrentRequest(request) {
+                this.currentRequest = request;
+            }
+            
+            getCurrentState() {
+                return this.currentState;
+            }
+            
+            isLoading() {
+                return this.currentState === 'loading';
+            }
+        }
+        
+        // 全局加载指示器实例
+        let youtubeLoadingIndicator = null;
+        
         // YouTube建议功能
         function setupYouTubeSuggestions() {
-            const getMetadataBtn = document.getElementById('get-metadata-btn');
             const youtubeUrlInput = document.getElementById('youtube-url-input');
             const contextSuggestions = document.getElementById('context-suggestions');
             const youtubeContextTextarea = document.getElementById('youtube-context');
             
-            if (!getMetadataBtn || !youtubeUrlInput || !contextSuggestions || !youtubeContextTextarea) {
-                return; // 如果元素不存在则跳过初始化
+            if (!youtubeUrlInput || !contextSuggestions) {
+                console.warn('Missing required elements for YouTube suggestions');
+                return; // 如果关键元素不存在则跳过初始化
+            }
+            
+            // youtubeContextTextarea 可能不存在，但不应该阻止自动检测功能
+            if (!youtubeContextTextarea) {
+                console.warn('youtube-context textarea not found, but continuing with auto-detection');
             }
             
             let currentMetadata = null;
             
-            // 获取视频信息按钮点击事件
-            getMetadataBtn.addEventListener('click', async () => {
-                const url = youtubeUrlInput.value.trim();
-                if (!url) {
-                    alert('Please enter a YouTube URL first');
-                    return;
+            // YouTube URL验证函数（全局作用域）- 必须在使用之前定义
+            window.isValidYouTubeUrl = function(url) {
+                try {
+                    const patterns = [
+                        /^https?:\/\/(www\.)?youtube\.com\/watch\?v=[\w-]+/,
+                        /^https?:\/\/youtu\.be\/[\w-]+/,
+                        /^https?:\/\/(m\.)?youtube\.com\/watch\?v=[\w-]+/
+                    ];
+                    return patterns.some(pattern => pattern.test(url));
+                } catch {
+                    return false;
                 }
-                
-                await fetchVideoMetadata(url);
-            });
+            };
             
-            // 获取视频元数据
-            async function fetchVideoMetadata(url) {
+            // 注意：自动检测功能已在DOMContentLoaded事件中实现
+            
+            // 获取视频元数据（全局函数，供自动检测调用）
+            window.fetchVideoMetadata = async function fetchVideoMetadata(url) {
                 const loadingDiv = document.getElementById('metadata-loading');
                 const errorDiv = document.getElementById('metadata-error');
                 const suggestions = document.querySelectorAll('.suggestion-item');
@@ -1072,14 +1404,38 @@
                 errorDiv.style.display = 'none';
                 suggestions.forEach(item => item.style.display = 'none');
                 
+                // 显示加载指示器
+                if (youtubeLoadingIndicator) {
+                    youtubeLoadingIndicator.showLoading();
+                }
+                
+                let abortController = new AbortController();
+                let requestInfo = {
+                    abort: () => abortController.abort(),
+                    url: url,
+                    startTime: Date.now()
+                };
+                
+                // 设置当前请求信息（用于取消功能）
+                if (youtubeLoadingIndicator) {
+                    youtubeLoadingIndicator.setCurrentRequest(requestInfo);
+                }
+                
                 try {
-                    const response = await fetch(`/api/youtube/metadata?url=${encodeURIComponent(url)}`);
+                    const response = await fetch(`/api/youtube/metadata?url=${encodeURIComponent(url)}`, {
+                        signal: abortController.signal
+                    });
                     const data = await response.json();
                     
                     if (response.ok && data.title) {
                         currentMetadata = data;
                         displaySuggestions(data);
                         loadingDiv.style.display = 'none';
+                        
+                        // 显示成功指示器
+                        if (youtubeLoadingIndicator) {
+                            youtubeLoadingIndicator.showSuccess();
+                        }
                     } else {
                         throw new Error(data.error || 'Failed to fetch video metadata');
                     }
@@ -1087,7 +1443,22 @@
                     console.error('Error fetching video metadata:', error);
                     loadingDiv.style.display = 'none';
                     errorDiv.style.display = 'block';
-                    errorDiv.textContent = `❌ ${error.message}`;
+                    
+                    if (error.name === 'AbortError') {
+                        errorDiv.textContent = '❌ Request cancelled by user';
+                    } else {
+                        errorDiv.textContent = `❌ ${error.message}`;
+                    }
+                    
+                    // 显示错误指示器（除非是用户取消）
+                    if (youtubeLoadingIndicator && error.name !== 'AbortError') {
+                        youtubeLoadingIndicator.showError(error.message);
+                    }
+                } finally {
+                    // 清除请求引用
+                    if (youtubeLoadingIndicator) {
+                        youtubeLoadingIndicator.setCurrentRequest(null);
+                    }
                 }
             }
             
@@ -1142,58 +1513,6 @@
                         highlightSelected(combinedContent);
                     };
                 }
-                
-                // 显示字幕检测状态
-                displaySubtitleStatus(metadata.subtitle_info);
-            }
-            
-            // 显示字幕检测状态
-            function displaySubtitleStatus(subtitleInfo) {
-                const subtitleStatus = document.getElementById('subtitle-status');
-                const subtitleContent = document.getElementById('subtitle-status-content');
-                
-                if (!subtitleInfo) {
-                    subtitleStatus.style.display = 'none';
-                    return;
-                }
-                
-                const { available, subtitles = {}, auto_captions = {}, total_languages = 0 } = subtitleInfo;
-                
-                subtitleStatus.style.display = 'block';
-                
-                const subtitlesList = Object.keys(subtitles);
-                const autoCaptionsList = Object.keys(auto_captions);
-                
-                if (subtitlesList.length > 0) {
-                    // 有手动字幕 - 最佳情况
-                    subtitleStatus.style.borderLeftColor = '#28a745'; // 绿色
-                    subtitleStatus.style.backgroundColor = '#d4edda';
-                    subtitleStatus.style.color = '#155724';
-                    
-                    let statusHTML = `<strong>📺 Subtitle Detection: ✅ Manual subtitles available</strong><br>`;
-                    statusHTML += `🎯 Available languages: ${subtitlesList.join(', ')}<br>`;
-                    statusHTML += `<em>💡 Will use high-quality manual subtitles, no audio transcription needed - faster and more accurate.</em>`;
-                    
-                    subtitleContent.innerHTML = statusHTML;
-                } else if (autoCaptionsList.length > 0) {
-                    // 仅有自动字幕 - 次优选择
-                    subtitleStatus.style.borderLeftColor = '#ffc107'; // 橙色
-                    subtitleStatus.style.backgroundColor = '#fff3cd';
-                    subtitleStatus.style.color = '#856404';
-                    
-                    let statusHTML = `<strong>📺 Subtitle Detection: ⚠️ Only auto-captions available</strong><br>`;
-                    statusHTML += `🤖 Auto-caption quality may be lower than manual transcription<br>`;
-                    statusHTML += `<em>💡 Recommend choosing audio transcription for better quality, or accept auto-captions for faster processing.</em>`;
-                    
-                    subtitleContent.innerHTML = statusHTML;
-                } else {
-                    // 无字幕可用
-                    subtitleStatus.style.borderLeftColor = '#ffc107'; // 黄色
-                    subtitleStatus.style.backgroundColor = '#fff3cd';
-                    subtitleStatus.style.color = '#856404';
-                    
-                    subtitleContent.innerHTML = `<strong>📺 Subtitle Detection: ⚠️ No subtitles available</strong><br><em>💡 Will use Whisper for audio transcription, processing may take longer.</em>`;
-                }
             }
             
             // 填入Context文本框
@@ -1240,6 +1559,83 @@
             setupModelSelection();
             setupFormSubmission();
             setupYouTubeSuggestions();
+            
+            // 初始化YouTube加载指示器
+            youtubeLoadingIndicator = new YouTubeLoadingIndicator();
+            console.log('YouTube loading indicator initialized');
+            
+            // 增强的YouTube自动检测功能（集成加载指示器）
+            const youtubeInput = document.getElementById('youtube-url-input');
+            
+            if (youtubeInput) {
+                let autoTimer = null;
+                
+                // 监听取消事件
+                document.addEventListener('youtube-metadata-cancelled', (event) => {
+                    console.log('YouTube metadata request cancelled:', event.detail.message);
+                    // 清除自动检测定时器（如果有的话）
+                    if (autoTimer) {
+                        clearTimeout(autoTimer);
+                        autoTimer = null;
+                    }
+                });
+                
+                youtubeInput.addEventListener('input', function() {
+                    const url = this.value.trim();
+                    console.log('YouTube URL input changed:', url);
+                    
+                    // 清除之前的定时器
+                    if (autoTimer) {
+                        clearTimeout(autoTimer);
+                        autoTimer = null;
+                    }
+                    
+                    // 如果当前正在加载，隐藏指示器
+                    if (youtubeLoadingIndicator && youtubeLoadingIndicator.isLoading()) {
+                        youtubeLoadingIndicator.hide();
+                    }
+                    
+                    // 简单YouTube URL检查（更严格的验证）
+                    const isValidYouTube = (url.includes('youtube.com/watch?v=') || url.includes('youtu.be/')) && url.length > 20;
+                    
+                    if (isValidYouTube) {
+                        console.log('Valid YouTube URL detected, auto-triggering in 800ms');
+                        
+                        // 设置800ms延迟自动触发
+                        autoTimer = setTimeout(() => {
+                            console.log('Auto-triggering YouTube metadata fetch');
+                            
+                            // 直接调用元数据获取函数
+                            if (window.fetchVideoMetadata && typeof window.fetchVideoMetadata === 'function') {
+                                window.fetchVideoMetadata(url);
+                            }
+                            
+                            autoTimer = null;
+                        }, 800);
+                        
+                    } else if (url.length === 0) {
+                        // URL为空时隐藏指示器
+                        if (youtubeLoadingIndicator) {
+                            youtubeLoadingIndicator.hide();
+                        }
+                    }
+                });
+                
+                
+                console.log('Enhanced YouTube auto-detection with loading indicator initialized successfully');
+            } else {
+                console.warn('YouTube auto-detection failed: missing elements');
+            }
+            
+            // 全局暴露fetchVideoMetadata函数以便自动检测调用
+            if (typeof window.fetchVideoMetadata === 'undefined') {
+                // 从setupYouTubeSuggestions中暴露fetchVideoMetadata
+                const youtubeUrlInput = document.getElementById('youtube-url-input');
+                if (youtubeUrlInput) {
+                    // 触发setupYouTubeSuggestions中的fetchVideoMetadata函数创建
+                    console.log('Setting up global fetchVideoMetadata function');
+                }
+            }
         });
     </script>
 </body>
