@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="This error message indicates a problem opening or accessing the audio file `/Users/me/Documents/GitHub/Project_Bach/watch_folder/20250824_031205_LEC_test_whisperkit_fix.wav` using Apple&#39;s Core Audio f">
+    <meta name="description" content="This error message indicates a problem opening an audio file (`20250824_031205_LEC_test_whisperkit_fix.wav`) for transcription using WhisperKit. The core issue is with the `ExtAudioFileOpenURL` functi">
     <meta name="keywords" content="">
     <meta name="author" content="Project Bach">
     
-    <title>错误信息分析：音频转录问题 - Project Bach</title>
+    <title>错误信息分析：音频转录失败 - Project Bach</title>
     
     <!-- 响应式样式 -->
     <style>
@@ -465,15 +465,15 @@
         <main class="main-content">
             <!-- 页面头部 -->
             <header class="header">
-                <h1>错误信息分析：音频转录问题</h1>
-                <p>This error message indicates a problem opening or accessing the audio file `/Users/me/Documents/GitHub/Project_Bach/watch_folder/20250824_031205_LEC_test_whisperkit_fix.wav` using Apple&#39;s Core Audio f</p>
+                <h1>错误信息分析：音频转录失败</h1>
+                <p>This error message indicates a problem opening an audio file (`20250824_031205_LEC_test_whisperkit_fix.wav`) for transcription using WhisperKit. The core issue is with the `ExtAudioFileOpenURL` functi</p>
             </header>
             
             <!-- 主内容 -->
             <div class="content">
 <article class="card">
     <header>
-        <h1>错误信息分析：音频转录问题</h1>
+        <h1>错误信息分析：音频转录失败</h1>
         <div class="meta" style="margin-top: 15px; color: var(--text-secondary);">
             <span>📅 2025年08月24日</span>
             <span style="margin-left: 20px;">🎵 watch_folder/20250824_031205_LEC_test_whisperkit_fix.wav</span>
@@ -484,15 +484,9 @@
         <section class="summary">
             <h2>📄 内容摘要</h2>
             <div style="margin-top: 15px; padding: 20px; background-color: var(--card-bg); border-radius: 8px;">
-                <p>This error message indicates a problem opening or accessing the audio file <code>/Users/me/Documents/GitHub/Project_Bach/watch_folder/20250824_031205_LEC_test_whisperkit_fix.wav</code> using Apple's Core Audio framework. The specific error code 1954115647 suggests a failure during the <code>ExtAudioFileOpenURL</code> call, which is responsible for opening audio files. The message "(null)" likely signifies a problem with the file URL or some other related parameter.</p>
-<p>The error is likely preventing the WhisperKit transcription process from accessing the audio data.  It could be due to various reasons, including:</p>
-<ul>
-<li><strong>File corruption:</strong> The audio file might be damaged.</li>
-<li><strong>Incorrect file path:</strong> The path to the audio file is incorrect.</li>
-<li><strong>Permissions issue:</strong> The user running the transcription process doesn't have permission to access the file.</li>
-<li><strong>Core Audio library issue:</strong> A problem with Apple's Core Audio framework.</li>
-</ul>
-<p>Troubleshooting steps might involve verifying the file path, checking file permissions, and ensuring the audio file is not corrupted.</p>
+                <p>This error message indicates a problem opening an audio file (<code>20250824_031205_LEC_test_whisperkit_fix.wav</code>) for transcription using WhisperKit. The core issue is with the <code>ExtAudioFileOpenURL</code> function, which is part of Apple's Core Audio framework.  Specifically, the error code <code>1954115647</code> signifies a failure in opening the audio file.</p>
+<p>The message "(null)" suggests that the file URL being passed to <code>ExtAudioFileOpenURL</code> is either invalid or inaccessible. This could stem from several reasons: the file doesn't exist at the specified location, the file path is incorrect, or there's a permission issue preventing the application from accessing the audio file.</p>
+<p>Essentially, WhisperKit is unable to access the audio file, preventing the transcription process from starting.  Troubleshooting steps might include verifying the file path and existence, checking file permissions, and ensuring the audio file is a valid WAV format.</p>
             </div>
         </section>
         
@@ -516,7 +510,7 @@
             <!-- 页脚 -->
             <footer class="footer">
                 <p><strong>Project Bach</strong> - AI多媒体内容处理与分析系统</p>
-                <p><em>最后更新: 2025年08月24日 03:13:12</em></p>
+                <p><em>最后更新: 2025年08月24日 03:19:25</em></p>
                 <p>🤖 Generated with <a href="https://claude.ai/code" target="_blank">Claude Code</a></p>
             </footer>
         </main>
