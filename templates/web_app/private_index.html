@@ -15,7 +15,7 @@
     <div class="content-header">
         <h3>📋 Recent Content</h3>
         <div class="header-actions">
-            <a href="{{ url_for('upload_page') }}" class="btn btn-primary btn-sm">
+            <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">
                 📤 Upload New
             </a>
             <button onclick="window.location.reload()" class="btn btn-secondary btn-sm">
@@ -87,7 +87,7 @@
         <div class="empty-icon">📝</div>
         <h3>No Content Yet</h3>
         <p>Upload your first piece of content to get started!</p>
-        <a href="{{ url_for('upload_page') }}" class="btn btn-primary">
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
             📤 Upload Content
         </a>
     </div>
@@ -103,7 +103,7 @@
                 <div class="category-count">{{ content_counts.lecture or 0 }} items</div>
                 <p>Academic content and course materials</p>
             </div>
-            <a href="{{ url_for('lectures') }}" class="category-link">View All →</a>
+            <a href="{{ url_for('private_content') }}#categories" class="category-link">View All →</a>
         </div>
         
         <div class="category-card card" data-category="youtube">
@@ -113,7 +113,7 @@
                 <div class="category-count">{{ content_counts.youtube or 0 }} items</div>
                 <p>YouTube and multimedia content</p>
             </div>
-            <a href="{{ url_for('videos') }}" class="category-link">View All →</a>
+            <a href="{{ url_for('private_content') }}#categories" class="category-link">View All →</a>
         </div>
         
         <div class="category-card card" data-category="rss">
@@ -123,7 +123,7 @@
                 <div class="category-count">{{ content_counts.rss or 0 }} items</div>
                 <p>RSS feeds and written content</p>
             </div>
-            <a href="{{ url_for('articles') }}" class="category-link">View All →</a>
+            <a href="{{ url_for('private_content') }}#categories" class="category-link">View All →</a>
         </div>
         
         <div class="category-card card" data-category="podcast">
@@ -133,7 +133,7 @@
                 <div class="category-count">{{ content_counts.podcast or 0 }} items</div>
                 <p>Audio content and interviews</p>
             </div>
-            <a href="{{ url_for('podcasts') }}" class="category-link">View All →</a>
+            <a href="{{ url_for('private_content') }}#categories" class="category-link">View All →</a>
         </div>
     </div>
 </section>
@@ -196,10 +196,10 @@
     <div class="quick-actions card">
         <h3>⚡ Quick Actions</h3>
         <div class="action-buttons">
-            <a href="{{ url_for('upload_page') }}" class="btn btn-primary btn-block">
+            <a href="{{ url_for('index') }}" class="btn btn-primary btn-block">
                 📤 Upload New Content
             </a>
-            <a href="{{ url_for('status_page') }}" class="btn btn-secondary btn-block">
+            <a href="/api/status/processing" class="btn btn-secondary btn-block">
                 📊 Check Status
             </a>
             <a href="{{ url_for('index') }}" class="btn btn-secondary btn-block">

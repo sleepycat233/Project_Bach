@@ -4,8 +4,188 @@
 {% block app_title %}Processing Status{% endblock %}
 {% block app_subtitle %}Monitor your content processing progress{% endblock %}
 
+{% block additional_css %}
+{{ super() }}
+<style>
+/* Status page specific styles - preserving the good UX from old design */
+.status-page {
+    max-width: 900px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    padding: 40px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.header h1 {
+    color: #333;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+
+.processing-id {
+    font-family: 'Monaco', 'Courier New', monospace;
+    background: #f5f5f5;
+    padding: 8px 12px;
+    border-radius: 4px;
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 30px;
+}
+
+.status-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 30px;
+    margin-bottom: 30px;
+}
+
+.status-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.status-icon {
+    font-size: 2rem;
+    margin-right: 15px;
+}
+
+.status-info h2 {
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.status-message {
+    color: #666;
+    font-size: 1.1rem;
+}
+
+.progress-container {
+    margin: 20px 0;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.3s ease;
+    border-radius: 10px;
+}
+
+.progress-text {
+    text-align: center;
+    font-weight: 500;
+    color: #333;
+}
+
+.status-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.detail-item {
+    text-align: center;
+    padding: 15px;
+    background: #f8f9ff;
+    border-radius: 6px;
+}
+
+.detail-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.detail-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-secondary {
+    background: #f8f9fa;
+    color: #666;
+    border: 1px solid #ddd;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+}
+
+.status-uploaded .status-icon { color: #6c757d; }
+.status-transcribing .status-icon { color: #17a2b8; }
+.status-anonymizing .status-icon { color: #fd7e14; }
+.status-ai_generating .status-icon { color: #6f42c1; }
+.status-publishing .status-icon { color: #007bff; }
+.status-completed .status-icon { color: #28a745; }
+.status-failed .status-icon { color: #dc3545; }
+
+.auto-refresh {
+    text-align: center;
+    margin-top: 20px;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .status-page {
+        padding: 20px;
+        margin: 10px;
+    }
+    
+    .header h1 {
+        font-size: 2rem;
+    }
+    
+    .actions {
+        flex-direction: column;
+    }
+}
+</style>
+{% endblock %}
+
 {% block app_content %}
-<main id="status-container" class="status-page">
+<main class="status-page">
     <header class="header">
         <h1>Processing Status</h1>
         <div class="processing-id">ID: {{ processing_id }}</div>
@@ -196,4 +376,9 @@ setTimeout(function() {
 
 {% endif %}
 </script>
+{% endblock %}
+
+{% block additional_js %}
+<!-- Status page specific JS - don't load web-app.js to avoid StatusTracker conflict -->
+<script type="module" src="{{ url_for('static', filename='js/shared.js') }}"></script>
 {% endblock %}

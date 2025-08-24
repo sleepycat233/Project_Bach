@@ -286,13 +286,13 @@ class YouTubeHandler:
                 import subprocess
                 import json
                 
-                # 获取配置中的超时设置 - 优化为5秒以内但留足余量
-                timeout = 6  # 默认6秒，允许网络波动
+                # 获取配置中的超时设置 - 增加超时时间以处理网络延迟
+                timeout = 15  # 默认15秒，处理网络波动和复杂视频
                 if self.config_manager:
                     try:
                         youtube_config = self.config_manager.get_nested_config('youtube')
                         if youtube_config and 'metadata' in youtube_config:
-                            timeout = min(youtube_config['metadata'].get('quick_metadata_timeout', 6), 8)  # 最大8秒
+                            timeout = youtube_config['metadata'].get('quick_metadata_timeout', 15)
                     except:
                         pass
                 

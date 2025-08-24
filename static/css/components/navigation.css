@@ -108,7 +108,7 @@
 .nav-links a:hover .nav-badge,
 .nav-links a.active .nav-count,
 .nav-links a.active .nav-badge {
-    background-color: rgba(255, 255, 255, 0.3);
+    background-color: var(--bg-badge-active);
 }
 
 /* ===== 顶部导航栏 ===== */

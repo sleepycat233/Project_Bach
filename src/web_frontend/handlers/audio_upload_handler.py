@@ -96,8 +96,8 @@ class AudioUploadHandler:
             try:
                 tracker.update_stage(ProcessingStage.UPLOADED, 5, f"Uploading file: {filename}")
                 
-                # 直接保存到uploads目录的正确子目录，文件监控系统会自动处理
-                uploads_folder = Path("./uploads")
+                # 直接保存到data/uploads目录的正确子目录，文件监控系统会自动处理
+                uploads_folder = Path("./data/uploads")
                 uploads_folder.mkdir(parents=True, exist_ok=True)
                 
                 # 文件组织逻辑：根据content_type和subcategory创建目录结构

@@ -29,15 +29,17 @@ logger = logging.getLogger(__name__)
 def create_app(config=None):
     """创建Flask应用工厂函数"""
     import os
-    # 设置模板文件夹为项目根目录的templates
-    template_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'templates')
-    app = Flask(__name__, template_folder=template_dir)
+    # 设置模板文件夹和静态文件夹为项目根目录
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    template_dir = os.path.join(project_root, 'templates')
+    static_dir = os.path.join(project_root, 'static')
+    app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
     
     # 默认配置
     app.config.update({
         'SECRET_KEY': os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production'),
         'MAX_CONTENT_LENGTH': 500 * 1024 * 1024,  # 500MB
-        'UPLOAD_FOLDER': '/tmp/project_bach_uploads',
+        'UPLOAD_FOLDER': '/tmp/project_bach_data_uploads',
         'ALLOWED_EXTENSIONS': {'.mp3', '.wav', '.m4a', '.mp4', '.flac', '.aac', '.ogg'},
         'TAILSCALE_NETWORK': '100.64.0.0/10',
         'RATE_LIMIT_PER_MINUTE': 60,
@@ -124,7 +126,7 @@ def create_app(config=None):
         # 获取完整配置用于模板
         config_dict = config_manager.get_full_config() if config_manager else {}
         
-        return render_template('upload.html', 
+        return render_template('web_app/upload.html', 
                                content_types=content_types,
                                config=config_dict)
     
@@ -245,11 +247,11 @@ def create_app(config=None):
         status = service.get_status(processing_id)
         
         if status is None:
-            return render_template('error.html',
+            return render_template('web_app/error.html',
                                  error_code=404,
                                  error_message=f"Processing session not found: {processing_id}"), 404
         
-        return render_template('status.html', 
+        return render_template('web_app/status.html', 
                              processing_id=processing_id,
                              status=status)
     
@@ -283,11 +285,19 @@ def create_app(config=None):
     @app.route('/api/categories')
     def api_categories():
         """内容分类API"""
-        categories = {
-            'lecture': {'icon': '🎓', 'name': 'Academic Lecture'},
-            'youtube': {'icon': '📺', 'name': 'YouTube Video'}
-        }
-        return jsonify(categories)
+        try:
+            from ..utils.config import ConfigManager
+            config_manager = ConfigManager()
+            content_types = config_manager.get_nested_config('content_classification', 'content_types') or {}
+            return jsonify(content_types)
+        except Exception as e:
+            logger.error(f"Categories API error: {e}")
+            # 最基本的回退，确保网站能继续工作
+            basic_categories = {
+                'lecture': {'icon': '🎓', 'display_name': 'Academic Lecture'},
+                'others': {'icon': '📄', 'display_name': 'Others'}
+            }
+            return jsonify(basic_categories)
     
     @app.route('/api/results/recent')
     def api_recent_results():
@@ -466,18 +476,54 @@ def create_app(config=None):
             metadata = handler.get_video_metadata(url)
             
             if metadata:
+                # 转换字幕信息为前端期望的格式
+                subtitle_info = metadata.get('subtitle_info', {})
+                subtitles_list = []
+                
+                # 处理手动字幕
+                if subtitle_info.get('subtitles'):
+                    for lang_code, subtitle_data in subtitle_info['subtitles'].items():
+                        # subtitle_data可能是列表（不同格式），我们只需要语言信息
+                        language_name = lang_code
+                        if isinstance(subtitle_data, list) and subtitle_data:
+                            # 尝试从第一个格式中获取名称
+                            first_format = subtitle_data[0]
+                            if isinstance(first_format, dict):
+                                language_name = first_format.get('name', lang_code)
+                        elif isinstance(subtitle_data, dict):
+                            language_name = subtitle_data.get('name', lang_code)
+                            
+                        subtitles_list.append({
+                            'language_code': lang_code,
+                            'language': language_name,
+                            'auto_generated': False
+                        })
+                
+                # 处理自动生成字幕
+                if subtitle_info.get('auto_captions'):
+                    for lang_code, caption_data in subtitle_info['auto_captions'].items():
+                        # caption_data可能是列表，处理方式同上
+                        language_name = lang_code
+                        if isinstance(caption_data, list) and caption_data:
+                            first_format = caption_data[0]
+                            if isinstance(first_format, dict):
+                                language_name = first_format.get('name', lang_code)
+                        elif isinstance(caption_data, dict):
+                            language_name = caption_data.get('name', lang_code)
+                            
+                        subtitles_list.append({
+                            'language_code': lang_code,
+                            'language': language_name,
+                            'auto_generated': True
+                        })
+                
                 return jsonify({
                     'title': metadata.get('title', ''),
                     'description': metadata.get('description', ''),
                     'duration': metadata.get('duration', ''),
                     'uploader': metadata.get('uploader', ''),
                     'tags': metadata.get('tags', []),
-                    'subtitle_info': metadata.get('subtitle_info', {
-                        'available': False,
-                        'subtitles': {},
-                        'auto_captions': {},
-                        'total_languages': 0
-                    })
+                    'subtitles': subtitles_list  # 前端期望的字段名
                 })
             else:
                 return jsonify({'error': 'Failed to fetch video metadata'}), 400
@@ -1118,13 +1164,24 @@ def create_app(config=None):
                     })
                 
                 # 使用现有的index模板，但传入私有内容数据
-                return render_template('index.html', 
+                return render_template('web_app/private_index.html', 
                                      title="🔒 Private Content",
                                      site_title="Project Bach",
                                      description="私人内容区域 - 仅通过Tailscale网络访问",
                                      results=results,
-                                     audio_count=audio_count,
-                                     youtube_count=youtube_count,
+                                     recent_content=results,  # 为模板提供recent_content
+                                     content_counts={
+                                         'lecture': audio_count,
+                                         'youtube': youtube_count,
+                                         'rss': 0,
+                                         'podcast': 0
+                                     },
+                                     stats={
+                                         'total_processed': audio_count + youtube_count,
+                                         'this_month': audio_count + youtube_count,
+                                         'total_hours': '0h',
+                                         'success_rate': '100%'
+                                     },
                                      is_private=True)  # 添加标志以便模板识别
             
             # 安全检查：防止目录穿越攻击
@@ -1139,7 +1196,7 @@ def create_app(config=None):
             
             # 检查文件是否存在
             if not safe_path.exists():
-                return render_template('error.html', 
+                return render_template('web_app/error.html', 
                                      error_code=404,
                                      error_message=f"Private content not found: {filepath}"), 404
             
@@ -1193,20 +1250,20 @@ def create_app(config=None):
                 
         except Exception as e:
             logger.error(f"Private content access error: {e}")
-            return render_template('error.html',
+            return render_template('web_app/error.html',
                                  error_code=500,
                                  error_message="Failed to access private content"), 500
     
     # 错误处理
     @app.errorhandler(404)
     def not_found_error(error):
-        return render_template('error.html', 
+        return render_template('web_app/error.html', 
                              error_code=404,
                              error_message="Page not found"), 404
     
     @app.errorhandler(500)
     def internal_error(error):
-        return render_template('error.html',
+        return render_template('web_app/error.html',
                              error_code=500,
                              error_message="Internal server error"), 500
     

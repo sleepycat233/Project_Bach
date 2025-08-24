@@ -38,6 +38,12 @@ export class YouTubeHandler {
             return;
         }
 
+        // 页面初始化时清空URL输入框和context文本框
+        this.urlInput.value = '';
+        if (this.contextTextarea) {
+            this.contextTextarea.value = '';
+        }
+        
         this.setupEventListeners();
         this.initializeLoadingIndicator();
     }
@@ -167,6 +173,9 @@ export class YouTubeHandler {
     displaySuggestions(metadata) {
         if (!this.contextSuggestions) return;
 
+        // 显示字幕检测结果
+        this.displaySubtitleInfo(metadata);
+
         const titleSuggestion = this.contextSuggestions.querySelector('#suggestion-title');
         const descriptionSuggestion = this.contextSuggestions.querySelector('#suggestion-description');
         const combinedSuggestion = this.contextSuggestions.querySelector('#suggestion-combined');
@@ -221,6 +230,62 @@ export class YouTubeHandler {
                     this.highlightSelected(combinedContent);
                 };
             }
+        }
+    }
+
+    displaySubtitleInfo(metadata) {
+        const subtitleInfo = document.getElementById('subtitle-info');
+        if (!subtitleInfo) return;
+
+        // 显示字幕信息容器
+        subtitleInfo.style.display = 'block';
+        
+        const subtitleDetails = document.getElementById('subtitle-details');
+        if (!subtitleDetails) return;
+
+        // 检查是否有字幕信息
+        if (metadata.subtitles && metadata.subtitles.length > 0) {
+            // 有字幕的情况
+            const manualSubtitles = metadata.subtitles.filter(sub => !sub.auto_generated);
+            
+            if (manualSubtitles.length > 0) {
+                // 有人工字幕
+                const languages = manualSubtitles.map(sub => sub.language || sub.language_code).join(', ');
+                subtitleDetails.innerHTML = `
+                    <div class="subtitle-found">
+                        <span class="subtitle-icon">✅</span>
+                        <div class="subtitle-text">
+                            <strong>Manual Subtitles Found</strong>
+                            <br><small>Languages: ${languages}</small>
+                            <br><small>✨ No transcription needed - will use subtitle text directly</small>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // 只有自动生成字幕
+                const languages = metadata.subtitles.map(sub => sub.language || sub.language_code).join(', ');
+                subtitleDetails.innerHTML = `
+                    <div class="subtitle-auto">
+                        <span class="subtitle-icon">⚠️</span>
+                        <div class="subtitle-text">
+                            <strong>Auto-Generated Subtitles Only</strong>
+                            <br><small>Languages: ${languages}</small>
+                            <br><small>⏳ Recommend using audio transcription for better quality</small>
+                        </div>
+                    </div>
+                `;
+            }
+        } else {
+            // 没有字幕
+            subtitleDetails.innerHTML = `
+                <div class="subtitle-none">
+                    <span class="subtitle-icon">❌</span>
+                    <div class="subtitle-text">
+                        <strong>No Subtitles Found</strong>
+                        <br><small>🎙️ Will use audio transcription</small>
+                    </div>
+                </div>
+            `;
         }
     }
 
