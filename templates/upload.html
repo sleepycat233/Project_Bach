@@ -513,6 +513,11 @@
                                     </div>
                                 </div>
                                 
+                                <!-- Subtitle Status Display -->
+                                <div id="subtitle-status" class="subtitle-status-info" style="display: none; margin-top: 15px; padding: 12px; border-radius: 6px; border-left: 4px solid;">
+                                    <div id="subtitle-status-content"></div>
+                                </div>
+                                
                                 <div id="metadata-loading" style="text-align: center; color: #6c757d; display: none;">
                                     🔄 Loading video information...
                                 </div>
@@ -1136,6 +1141,58 @@
                         fillContext(combinedText);
                         highlightSelected(combinedContent);
                     };
+                }
+                
+                // 显示字幕检测状态
+                displaySubtitleStatus(metadata.subtitle_info);
+            }
+            
+            // 显示字幕检测状态
+            function displaySubtitleStatus(subtitleInfo) {
+                const subtitleStatus = document.getElementById('subtitle-status');
+                const subtitleContent = document.getElementById('subtitle-status-content');
+                
+                if (!subtitleInfo) {
+                    subtitleStatus.style.display = 'none';
+                    return;
+                }
+                
+                const { available, subtitles = {}, auto_captions = {}, total_languages = 0 } = subtitleInfo;
+                
+                subtitleStatus.style.display = 'block';
+                
+                const subtitlesList = Object.keys(subtitles);
+                const autoCaptionsList = Object.keys(auto_captions);
+                
+                if (subtitlesList.length > 0) {
+                    // 有手动字幕 - 最佳情况
+                    subtitleStatus.style.borderLeftColor = '#28a745'; // 绿色
+                    subtitleStatus.style.backgroundColor = '#d4edda';
+                    subtitleStatus.style.color = '#155724';
+                    
+                    let statusHTML = `<strong>📺 Subtitle Detection: ✅ Manual subtitles available</strong><br>`;
+                    statusHTML += `🎯 Available languages: ${subtitlesList.join(', ')}<br>`;
+                    statusHTML += `<em>💡 Will use high-quality manual subtitles, no audio transcription needed - faster and more accurate.</em>`;
+                    
+                    subtitleContent.innerHTML = statusHTML;
+                } else if (autoCaptionsList.length > 0) {
+                    // 仅有自动字幕 - 次优选择
+                    subtitleStatus.style.borderLeftColor = '#ffc107'; // 橙色
+                    subtitleStatus.style.backgroundColor = '#fff3cd';
+                    subtitleStatus.style.color = '#856404';
+                    
+                    let statusHTML = `<strong>📺 Subtitle Detection: ⚠️ Only auto-captions available</strong><br>`;
+                    statusHTML += `🤖 Auto-caption quality may be lower than manual transcription<br>`;
+                    statusHTML += `<em>💡 Recommend choosing audio transcription for better quality, or accept auto-captions for faster processing.</em>`;
+                    
+                    subtitleContent.innerHTML = statusHTML;
+                } else {
+                    // 无字幕可用
+                    subtitleStatus.style.borderLeftColor = '#ffc107'; // 黄色
+                    subtitleStatus.style.backgroundColor = '#fff3cd';
+                    subtitleStatus.style.color = '#856404';
+                    
+                    subtitleContent.innerHTML = `<strong>📺 Subtitle Detection: ⚠️ No subtitles available</strong><br><em>💡 Will use Whisper for audio transcription, processing may take longer.</em>`;
                 }
             }
             

@@ -476,7 +476,13 @@ def create_app(config=None):
                     'description': metadata.get('description', ''),
                     'duration': metadata.get('duration', ''),
                     'uploader': metadata.get('uploader', ''),
-                    'tags': metadata.get('tags', [])
+                    'tags': metadata.get('tags', []),
+                    'subtitle_info': metadata.get('subtitle_info', {
+                        'available': False,
+                        'subtitles': {},
+                        'auto_captions': {},
+                        'total_languages': 0
+                    })
                 })
             else:
                 return jsonify({'error': 'Failed to fetch video metadata'}), 400

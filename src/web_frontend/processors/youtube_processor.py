@@ -74,19 +74,19 @@ class YouTubeProcessor:
         # 字幕配置
         subtitle_config = self.youtube_config.get('subtitles', {
             'enabled': True,
-            'strategy': 'native_first',  # 'native_first', 'whisper_only', 'subtitles_only'
+            'strategy': 'manual_only',  # 'manual_only', 'native_first', 'whisper_only', 'subtitles_only'
             'preferred_languages': ['zh-Hans', 'zh-CN', 'zh-Hant', 'zh-TW', 'en'],
             'fallback_to_whisper': True,
             'prefer_native_over_translated': True,  # 优先原语言而非翻译
-            'auto_translate': False,  # 默认关闭自动翻译
+            'allow_auto_captions': False,  # 默认禁用自动字幕
             'subtitle_formats': ['vtt', 'srt']
         })
         self.subtitles_enabled = subtitle_config.get('enabled', True)
-        self.subtitle_strategy = subtitle_config.get('strategy', 'native_first')
+        self.subtitle_strategy = subtitle_config.get('strategy', 'manual_only')
         self.preferred_languages = subtitle_config.get('preferred_languages', ['zh-Hans', 'zh-CN', 'zh-Hant', 'zh-TW', 'en'])
         self.fallback_to_whisper = subtitle_config.get('fallback_to_whisper', True)
         self.prefer_native_over_translated = subtitle_config.get('prefer_native_over_translated', True)
-        self.auto_translate = subtitle_config.get('auto_translate', False)
+        self.allow_auto_captions = subtitle_config.get('allow_auto_captions', False)
         self.subtitle_formats = subtitle_config.get('subtitle_formats', ['vtt', 'srt'])
         
         # YouTube URL模式
@@ -654,10 +654,13 @@ class YouTubeProcessor:
         if self.subtitle_strategy == 'whisper_only':
             self.logger.info("配置为仅使用Whisper，跳过字幕")
             return None
+        elif self.subtitle_strategy == 'manual_only':
+            self.logger.info("配置为仅使用手动字幕，禁用自动字幕")
+            # 只考虑手动字幕，忽略自动字幕
         elif self.subtitle_strategy == 'subtitles_only':
             self.logger.info("配置为仅使用字幕，不回退到Whisper")
             # 继续执行字幕选择逻辑
-        # 默认 'native_first' 策略
+        # 默认 'manual_only' 策略
         
         # 1. 检测视频原始语言
         detected_language = self._detect_video_language(video_info) if video_info else None
@@ -674,11 +677,12 @@ class YouTubeProcessor:
                     self.logger.info(f"✓ 选择原语言手动字幕: {lang} (最佳选择)")
                     return lang
             
-            # 第二优先级：原语言自动字幕
-            for lang in native_language_variants:
-                if lang in auto_captions:
-                    self.logger.info(f"✓ 选择原语言自动字幕: {lang} (较好选择)")
-                    return lang
+            # 第二优先级：原语言自动字幕（仅在允许时）
+            if self.allow_auto_captions or self.subtitle_strategy not in ['manual_only']:
+                for lang in native_language_variants:
+                    if lang in auto_captions:
+                        self.logger.info(f"✓ 选择原语言自动字幕: {lang} (较好选择)")
+                        return lang
             
             self.logger.info(f"原语言({detected_language})字幕不可用，回退到其他策略")
         
@@ -691,35 +695,41 @@ class YouTubeProcessor:
                 self.logger.info(f"选择配置首选手动字幕语言: {lang}")
                 return lang
         
-        # 自动字幕次之
-        for lang in self.preferred_languages:
-            if lang in auto_captions:
-                self.logger.info(f"选择配置首选自动字幕语言: {lang}")
-                return lang
+        # 自动字幕次之（仅在允许时）
+        if self.allow_auto_captions or self.subtitle_strategy not in ['manual_only']:
+            for lang in self.preferred_languages:
+                if lang in auto_captions:
+                    self.logger.info(f"选择配置首选自动字幕语言: {lang}")
+                    return lang
         
-        # 3. 通用备选语言（如果允许自动翻译）
-        if self.auto_translate:
+        # 3. 通用备选语言（如果允许自动翻译且manual_only策略允许自动字幕）
+        if self.auto_translate and (self.allow_auto_captions or self.subtitle_strategy not in ['manual_only']):
             self.logger.info("尝试自动翻译字幕")
             fallback_langs = ['zh', 'en', 'zh-CN', 'zh-TW', 'en-US', 'en-GB']
             
+            # 首先尝试手动字幕
             for lang in fallback_langs:
                 if lang in subtitles:
                     self.logger.info(f"选择备选手动字幕语言: {lang} (自动翻译)")
                     return lang
-                    
-            for lang in fallback_langs:
-                if lang in auto_captions:
-                    self.logger.info(f"选择备选自动字幕语言: {lang} (自动翻译)")
-                    return lang
+            
+            # 然后尝试自动字幕（仅在允许时）        
+            if self.allow_auto_captions or self.subtitle_strategy not in ['manual_only']:
+                for lang in fallback_langs:
+                    if lang in auto_captions:
+                        self.logger.info(f"选择备选自动字幕语言: {lang} (自动翻译)")
+                        return lang
         
         # 4. 最后选择任意可用的语言（如果允许）
         if self.auto_translate:
+            # 优先手动字幕
             if subtitles:
                 first_lang = list(subtitles.keys())[0]
                 self.logger.info(f"选择首个手动字幕语言: {first_lang} (最后备选)")
                 return first_lang
-                
-            if auto_captions:
+            
+            # 自动字幕（仅在允许时）    
+            if (self.allow_auto_captions or self.subtitle_strategy not in ['manual_only']) and auto_captions:
                 first_lang = list(auto_captions.keys())[0]
                 self.logger.info(f"选择首个自动字幕语言: {first_lang} (最后备选)")
                 return first_lang

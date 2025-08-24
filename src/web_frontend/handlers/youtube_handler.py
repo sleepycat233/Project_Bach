@@ -236,6 +236,100 @@ class YouTubeHandler:
             logger.error(f"Error getting video info: {e}")
             return None
     
+    def get_video_metadata(self, url):
+        """
+        获取YouTube视频元数据（标题、描述等）用于转录context
+        
+        Args:
+            url: YouTube URL
+            
+        Returns:
+            dict: 视频元数据，包含title, description, duration, uploader, tags
+        """
+        try:
+            video_id = self.extract_video_id(url)
+            if not video_id:
+                return None
+            
+            if self.youtube_processor:
+                # 使用真实的YouTube处理器获取详细元数据
+                metadata = self.youtube_processor.get_video_metadata(url)
+                if metadata:
+                    # 添加字幕检测信息
+                    try:
+                        subtitle_info = self.youtube_processor.get_available_subtitles(url)
+                        metadata['subtitle_info'] = subtitle_info
+                    except Exception as e:
+                        logger.warning(f"获取字幕信息失败: {e}")
+                        metadata['subtitle_info'] = {
+                            'available': False,
+                            'subtitles': {},
+                            'auto_captions': {},
+                            'total_languages': 0
+                        }
+                    return metadata
+            
+            # 如果无法获取真实数据，尝试使用yt-dlp直接获取
+            try:
+                import subprocess
+                import json
+                
+                # 使用yt-dlp获取视频元数据
+                cmd = [
+                    'yt-dlp', '--dump-json', '--no-download', 
+                    '--quiet', url
+                ]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                
+                if result.returncode == 0:
+                    video_info = json.loads(result.stdout)
+                    
+                    metadata = {
+                        'title': video_info.get('title', ''),
+                        'description': video_info.get('description', '')[:1000] if video_info.get('description') else '',  # 限制描述长度
+                        'duration': video_info.get('duration', ''),
+                        'uploader': video_info.get('uploader', ''),
+                        'tags': video_info.get('tags', [])[:10] if video_info.get('tags') else []  # 限制标签数量
+                    }
+                    
+                    # 使用yt-dlp直接检测字幕
+                    try:
+                        subtitle_info = self._get_subtitles_via_ytdlp(url)
+                        metadata['subtitle_info'] = subtitle_info
+                    except Exception as e:
+                        logger.warning(f"yt-dlp字幕检测失败: {e}")
+                        metadata['subtitle_info'] = {
+                            'available': False,
+                            'subtitles': {},
+                            'auto_captions': {},
+                            'total_languages': 0
+                        }
+                    
+                    return metadata
+                
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, ImportError, json.JSONDecodeError) as e:
+                logger.warning(f"yt-dlp fallback failed: {e}")
+            
+            # 如果都失败，返回模拟数据
+            return {
+                'title': f'YouTube Video {video_id}',
+                'description': 'Description not available',
+                'duration': '',
+                'uploader': '',
+                'tags': [],
+                'subtitle_info': {
+                    'available': False,
+                    'subtitles': {},
+                    'auto_captions': {},
+                    'total_languages': 0
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting video metadata: {e}")
+            return None
+    
     def estimate_processing_time(self, duration_seconds):
         """
         根据视频时长估算处理时间
@@ -257,3 +351,78 @@ class YouTubeHandler:
         
         total_time = base_time + download_time + transcription_time
         return max(int(total_time), 120)  # 最少2分钟
+    
+    def _get_subtitles_via_ytdlp(self, url):
+        """使用yt-dlp直接获取字幕信息
+        
+        Args:
+            url: YouTube URL
+            
+        Returns:
+            包含字幕信息的字典
+        """
+        try:
+            import subprocess
+            cmd = [
+                'yt-dlp',
+                '--list-subs',
+                '--no-warnings',
+                '--no-playlist',
+                url
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False
+            )
+            
+            if result.returncode != 0:
+                logger.warning(f"获取字幕信息失败: {result.stderr}")
+                return {
+                    'available': False,
+                    'subtitles': {},
+                    'auto_captions': {},
+                    'total_languages': 0
+                }
+            
+            # 解析输出获取字幕信息
+            lines = result.stdout.split('\n')
+            subtitles = {}
+            auto_captions = {}
+            current_section = None
+            
+            for line in lines:
+                line = line.strip()
+                if 'Available subtitles' in line:
+                    current_section = 'subtitles'
+                elif 'Available automatic captions' in line:
+                    current_section = 'auto_captions'
+                elif line and current_section and not line.startswith('Language'):
+                    # 解析字幕语言行
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        lang = parts[0]
+                        formats = parts[1:]
+                        if current_section == 'subtitles':
+                            subtitles[lang] = formats
+                        else:
+                            auto_captions[lang] = formats
+            
+            has_subtitles = bool(subtitles or auto_captions)
+            
+            return {
+                'available': has_subtitles,
+                'subtitles': subtitles,
+                'auto_captions': auto_captions,
+                'total_languages': len(subtitles) + len(auto_captions)
+            }
+            
+        except subprocess.TimeoutExpired:
+            logger.error(f"获取字幕信息超时: {url}")
+            return {'available': False, 'subtitles': {}, 'auto_captions': {}, 'total_languages': 0}
+        except Exception as e:
+            logger.error(f"获取字幕信息异常: {e}")
+            return {'available': False, 'subtitles': {}, 'auto_captions': {}, 'total_languages': 0}
