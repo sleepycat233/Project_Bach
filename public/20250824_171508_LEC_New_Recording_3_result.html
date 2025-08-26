@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>20250824_171508_LEC_New_Recording_3 - 处理结果</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            border-bottom: 2px solid #eee;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .meta-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #2c3e50;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .mindmap {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+        }
+        .footer {
+            text-align: center;
+            font-style: italic;
+            color: #666;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>20250824_171508_LEC_New_Recording_3 - 处理结果</h1>
+    </div>
+    
+    <div class="meta-info">
+        <strong>处理时间:</strong> 2025-08-24T17:15:22.473334<br>
+        <strong>原始文件:</strong> uploads/20250824_171508_LEC_New_Recording_3.m4a
+    </div>
+    
+    
+    
+    <div class="section">
+        <h2>内容摘要</h2>
+        <p>This appears to be a very fragmented and unclear statement, likely a transcription error or incomplete thought.  It seems to be referencing a completed site project, possibly related to some kind of "bar" or "work." The speaker is expressing gratitude for something, although the context remains ambiguous. 
+
+Essentially, the core message seems to be: **"This project is finished. Thank you."** 
+
+Without more context, it's difficult to provide a more detailed summary. The repetition and lack of clear sentence structure make it challenging to understand the full scope or significance of the "site project."</p>
+    </div>
+    
+    <div class="section">
+        <h2>思维导图</h2>
+        <div class="mindmap">
+            <h2>项目总结</h2>
+<br>
+<h3>核心内容</h3>
+<br>
+<li>完成</li>
+<li>网站项目</li>
+<li>感谢</li>
+<br>
+<h3>细节</h3>
+<br>
+<li>描述：This is a one of this is a done. This is a done.</li>
+<li>描述：It's a site project bar.</li>
+<li>描述：The work is for...</li>
+<li>描述：nice. Thank you</li>
+<p>---</p>
+<br>
+<p>**注意:**  由于原始文本非常简短且缺乏结构，我尽可能地提取了核心信息并将其组织成思维导图的结构。  实际思维导图会更清晰，但考虑到文本的局限性，此版本力求呈现关键点。</p>
+        </div>
+    </div>
+    
+    
+    <div class="section">
+        <h2>📝 转录文本 (匿名化)</h2>
+        <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 15px;">
+            <div id="transcript-preview" style="max-height: 150px; overflow-y: auto; margin-bottom: 15px; font-family: monospace; line-height: 1.4; color: #495057;">
+                This is a one of this is a done. This is a done. It's a site project bar. Uh, the work. Uh, is for. So, nice. Thank you
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button id="copy-transcript-btn" onclick="copyTranscript()" 
+                        style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    📋 复制完整转录文本
+                </button>
+                <button id="toggle-transcript-btn" onclick="toggleTranscript()" 
+                        style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    👁️ 显示完整文本
+                </button>
+                <span id="copy-status" style="color: #28a745; font-weight: bold; display: none;">✅ 已复制!</span>
+            </div>
+        </div>
+        
+        <!-- 隐藏的完整transcript用于复制 -->
+        <textarea id="full-transcript" style="position: absolute; left: -9999px; opacity: 0;" readonly>This is a one of this is a done. This is a done. It's a site project bar. Uh, the work. Uh, is for. So, nice. Thank you</textarea>
+        
+        <script>
+        let isFullTextVisible = false;
+        const originalText = `This is a one of this is a done. This is a done. It's a site project bar. Uh, the work. Uh, is for. So, nice. Thank you`;
+        const fullText = `This is a one of this is a done. This is a done. It's a site project bar. Uh, the work. Uh, is for. So, nice. Thank you`;
+        
+        function copyTranscript() {
+            const textarea = document.getElementById('full-transcript');
+            textarea.select();
+            textarea.setSelectionRange(0, 99999);
+            document.execCommand('copy');
+            
+            const status = document.getElementById('copy-status');
+            const btn = document.getElementById('copy-transcript-btn');
+            
+            status.style.display = 'inline';
+            btn.innerHTML = '✅ 已复制!';
+            btn.style.background = '#28a745';
+            
+            setTimeout(() => {
+                status.style.display = 'none';
+                btn.innerHTML = '📋 复制完整转录文本';
+                btn.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+            }, 2000);
+        }
+        
+        function toggleTranscript() {
+            const preview = document.getElementById('transcript-preview');
+            const btn = document.getElementById('toggle-transcript-btn');
+            
+            if (!isFullTextVisible) {
+                preview.innerHTML = fullText;
+                preview.style.maxHeight = '400px';
+                btn.innerHTML = '👁️ 隐藏完整文本';
+                isFullTextVisible = true;
+            } else {
+                preview.innerHTML = originalText;
+                preview.style.maxHeight = '150px';
+                btn.innerHTML = '👁️ 显示完整文本';
+                isFullTextVisible = false;
+            }
+        }
+        </script>
+    </div>
+        
+    
+    <div class="section">
+        <h2>处理信息</h2>
+        <p><strong>匿名化映射:</strong> 无</p>
+    </div>
+    
+    <div class="footer">
+        由 Project Bach 自动生成
+    </div>
+</body>
+</html>

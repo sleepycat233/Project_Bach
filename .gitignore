@@ -101,6 +101,8 @@ anonymized_*
 processed_*
 result_*
 *_result.*
+# But allow result HTML files in public/ for GitHub Pages
+!public/*_result.html
 
 # WhisperKit models - large files, should not be in git
 models/

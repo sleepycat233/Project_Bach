@@ -1,0 +1,43 @@
+name: Deploy Website to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # 监控完整网站文件夹
+      - 'public/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch 🛎️
+        uses: actions/checkout@v4
+
+      - name: Verify website files 📋
+        run: |
+          if [ -d "public" ]; then
+            echo "✅ Public directory found"
+            echo "📁 Website structure:"
+            ls -la public/
+            if [ -f "public/index.html" ]; then
+              echo "✅ Main index.html found"
+            else
+              echo "⚠️ No index.html found"
+            fi
+          else
+            echo "❌ No public directory found - website not generated yet"
+            exit 1
+          fi
+          
+      - name: Deploy to GitHub Pages 🚀
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          commit_message: "🌐 部署完整网站：HTML + CSS + JS"
