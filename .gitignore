@@ -1,0 +1,106 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+data/logs/
+data/transcripts/
+*.log
+temp/
+tmp/
+
+# API keys and secrets - NEVER commit these!
+.env
+.env.local
+.env.production
+secrets.yaml
+config.local.yaml
+config.production.yaml
+**/config.yaml
+!config.template.yaml
+
+# Test outputs
+test_output/
+coverage.xml
+.coverage
+.pytest_cache/
+
+# Audio files (usually large)
+*.mp3
+*.mp4
+*.wav
+*.m4a
+*.flac
+*.aac
+*.ogg
+
+# But keep sample audio files
+!samples/*.mp3
+!samples/*.wav
+!samples/*.m4a
+
+# User data and processing outputs - NEVER commit these!
+watch_folder/
+output/
+results/
+transcriptions/
+logs/
+audio/
+*.md
+!README.md
+!doc/*.md
+!docs/*.md
+
+# Processing artifacts
+anonymized_*
+processed_*
+result_*
+*_result.*
+
+# WhisperKit models - large files, should not be in git
+models/

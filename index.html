@@ -3,353 +3,208 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="共收录1个音频处理结果">
-    <meta name="keywords" content="音频处理, AI分析, 结果索引">
+    <meta name="description" content="Project Bach - AI-powered content processing and analysis">
+    <meta name="keywords" content="音频处理, AI分析, 结果索引, Project Bach">
     <meta name="author" content="Project Bach">
     
-    <title>Project Bach</title>
+    <title>Project Bach - Content Analysis Hub</title>
     
-    <!-- 响应式样式 -->
-    <style>
-        /* CSS变量定义 */
-        :root {
-            --primary-color: #007AFF;
-            --secondary-color: #5856D6;
-            --success-color: #34C759;
-            --warning-color: #FF9500;
-            --error-color: #FF3B30;
-            --bg-color: #FFFFFF;
-            --text-color: #1D1D1F;
-            --text-secondary: #8E8E93;
-            --border-color: #D1D1D6;
-            --card-bg: #F2F2F7;
-        }
-        
-        /* 暗色模式支持 */
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-color: #000000;
-                --text-color: #FFFFFF;
-                --text-secondary: #8E8E93;
-                --border-color: #38383A;
-                --card-bg: #1C1C1E;
-            }
-        }
-        
-        /* 基础样式 */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        /* 响应式布局 */
-        @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-        }
-        
-        /* 头部样式 */
-        .header {
-            border-bottom: 2px solid var(--primary-color);
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .header h1 {
-            font-size: 2.5em;
-            font-weight: 700;
-            color: var(--primary-color);
-            margin-bottom: 10px;
-        }
-        
-        .header p {
-            color: var(--text-secondary);
-            font-size: 1.1em;
-        }
-        
-        /* 导航样式 */
-        .nav {
-            margin-top: 20px;
-        }
-        
-        .nav a {
-            color: var(--primary-color);
-            text-decoration: none;
-            margin-right: 20px;
-            padding: 8px 16px;
-            border-radius: 8px;
-            transition: background-color 0.2s;
-        }
-        
-        .nav a:hover {
-            background-color: var(--card-bg);
-        }
-        
-        /* 主内容样式 */
-        .content {
-            margin-top: 30px;
-        }
-        
-        /* 卡片样式 */
-        .card {
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 1px solid var(--border-color);
-        }
-        
-        /* 表格样式 */
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        
-        .table th,
-        .table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .table th {
-            font-weight: 600;
-            background-color: var(--card-bg);
-        }
-        
-        .table-striped tr:nth-child(even) {
-            background-color: var(--card-bg);
-        }
-        
-        /* 代码样式 */
-        .code-block {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 16px;
-            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-            font-size: 0.9em;
-            overflow-x: auto;
-        }
-        
-        /* 引用样式 */
-        .quote {
-            border-left: 4px solid var(--primary-color);
-            padding: 16px 20px;
-            margin: 20px 0;
-            background-color: var(--card-bg);
-            font-style: italic;
-        }
-        
-        /* 按钮样式 */
-        .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.2s;
-            border: none;
-            cursor: pointer;
-        }
-        
-        .btn-primary {
-            background-color: var(--primary-color);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            opacity: 0.8;
-        }
-        
-        /* 页脚样式 */
-        .footer {
-            margin-top: 60px;
-            padding-top: 30px;
-            border-top: 1px solid var(--border-color);
-            text-align: center;
-            color: var(--text-secondary);
-        }
-        
-        .footer a {
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-        
-        /* 工具提示 */
-        .tooltip {
-            position: relative;
-            cursor: help;
-        }
-        
-        /* 响应式图片 */
-        img {
-            max-width: 100%;
-            height: auto;
-        }
-        
-        /* 滚动条样式 */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: var(--card-bg);
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--text-secondary);
-        }
-    </style>
-    
+    <!-- 动态获取CSS资源 - 从main分支 -->
+    <link rel="stylesheet" href="https://raw.githubusercontent.com/sleepycat233/Project_Bach/main/static/css/shared.css">
+    <link rel="stylesheet" href="https://raw.githubusercontent.com/sleepycat233/Project_Bach/main/static/css/github-pages.css">
+    <link rel="stylesheet" href="https://raw.githubusercontent.com/sleepycat233/Project_Bach/main/static/css/components/navigation.css">
+    <link rel="stylesheet" href="https://raw.githubusercontent.com/sleepycat233/Project_Bach/main/static/css/components/cards.css">
 </head>
-<body>
-    <div class="container">
-        <!-- 页面头部 -->
-        <header class="header">
-            <h1>Project Bach</h1>
-            <p>AI音频处理结果发布</p>
-            
-            <nav class="nav">
-                <a href="index.html">🏠 首页</a>
-                <a href="archive.html">📋 归档</a>
-                <a href="stats.html">📊 统计</a>
-                <a href="about.html">ℹ️ 关于</a>
+<body class="github-pages">
+    <div class="github-container">
+        <button class="mobile-menu-toggle" aria-label="Toggle navigation">☰</button>
+        
+        <aside class="sidebar" role="navigation">
+            <nav class="sidebar-nav" role="navigation">
+                <div class="nav-header">
+                    <h2 class="nav-title">Project Bach</h2>
+                    <p class="nav-subtitle">Content Analysis</p>
+                </div>
+                
+                <section class="nav-section">
+                    <h3 class="nav-section-title">Content Types</h3>
+                    <ul class="nav-links">
+                        <li>
+                            <a href="index.html" class="active">
+                                <span class="nav-icon content-lecture">🎓</span>
+                                Lectures
+                                <span class="nav-count">1</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="videos.html">
+                                <span class="nav-icon content-youtube">📺</span>
+                                Videos
+                                <span class="nav-count">0</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="articles.html">
+                                <span class="nav-icon content-rss">📰</span>
+                                Articles
+                                <span class="nav-count">0</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="podcasts.html">
+                                <span class="nav-icon content-podcast">🎙️</span>
+                                Podcasts
+                                <span class="nav-count">0</span>
+                            </a>
+                        </li>
+                    </ul>
+                </section>
+                
+                <section class="nav-section">
+                    <h3 class="nav-section-title">Tools</h3>
+                    <ul class="nav-links">
+                        <li>
+                            <a href="#upload">
+                                <span class="nav-icon">📤</span>
+                                Upload Content
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#status">
+                                <span class="nav-icon">📊</span>
+                                Processing Status
+                            </a>
+                        </li>
+                    </ul>
+                </section>
+                
+                <section class="nav-section">
+                    <h3 class="nav-section-title">Quick Stats</h3>
+                    <div class="stats-overview card">
+                        <h4>📈 Overview</h4>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-value">1</div>
+                                <div class="stat-label">Processed</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">1</div>
+                                <div class="stat-label">This Month</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </nav>
-        </header>
+        </aside>
         
-        <!-- 主内容区域 -->
-        <main class="content">
-<div class="index">
-    <div class="card">
-        <h2>🎵 音频处理结果</h2>
-        <p>智能音频处理与内容分析平台</p>
-        
-        <div style="margin-top: 20px;">
-            <span style="background-color: var(--success-color); color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.9em;">
-                📊 共收录 1 个处理结果
-            </span>
-        </div>
-    </div>
-    
-    <div class="results-section">
-        <h2 style="margin-top: 30px;">📋 最新结果</h2>
-        
-        <article class="card result-item" style="margin-top: 20px;">
-            <h3>
-                <a href="20250824_171508_LEC_New_Recording_3_result.html" style="color: var(--primary-color); text-decoration: none;">
-                    20250824_171508_LEC_New_Recording_3 - 处理结果
-                </a>
-            </h3>
-            <div class="meta" style="color: var(--text-secondary); font-size: 0.9em; margin-top: 8px;">
-                <span>📅 2025年08月24日</span>
-            </div>
-            <p style="margin-top: 12px; color: var(--text-secondary);">
-                This appears to be a very fragmented and unclear statement, likely a transcription error or incomple...
-            </p>
-            <div style="margin-top: 15px;">
-                <a href="20250824_171508_LEC_New_Recording_3_result.html" class="btn btn-primary" style="font-size: 0.9em; padding: 6px 16px;">
-                    查看详情 →
-                </a>
-            </div>
-        </article>
-        
-    </div>
-    
-    <!-- 统计概览 -->
-    <div class="stats-overview card" style="margin-top: 30px;">
-        <h2>📊 统计概览</h2>
-        <table class="table table-striped" style="margin-top: 15px;">
-            <tbody>
-                <tr>
-                    <td>总处理数</td>
-                    <td><strong>1</strong></td>
-                </tr>
-                <tr>
-                    <td>本月新增</td>
-                    <td><strong>1</strong></td>
-                </tr>
-                <tr>
-                    <td>本周新增</td>
-                    <td><strong>1</strong></td>
-                </tr>
-                <tr>
-                    <td>最后更新</td>
-                    <td>2025-08-24 17:15:23</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    
-    
-    <!-- 快速导航 -->
-    <div class="quick-nav card" style="margin-top: 30px;">
-        <h2>🔍 快速导航</h2>
-        <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-            <a href="archive.html" style="text-decoration: none;">
-                <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center; transition: transform 0.2s;">
-                    <div style="font-size: 2em;">📋</div>
-                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">完整归档</div>
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">查看所有结果</div>
+        <main class="main-content">
+            <header class="header">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <h1>Welcome to Project Bach</h1>
+                        <p>Your AI-powered content analysis hub</p>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: var(--spacing-xs); align-items: flex-end;">
+                        <button id="darkModeToggle" class="dark-mode-toggle-btn" title="Toggle dark mode">🌙</button>
+                    </div>
                 </div>
-            </a>
-            <a href="stats.html" style="text-decoration: none;">
-                <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em;">📈</div>
-                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">数据统计</div>
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">处理结果分析</div>
-                </div>
-            </a>
-            <a href="search.html" style="text-decoration: none;">
-                <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em;">🔎</div>
-                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">搜索功能</div>
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">快速查找内容</div>
-                </div>
-            </a>
-            <a href="about.html" style="text-decoration: none;">
-                <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em;">ℹ️</div>
-                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">关于项目</div>
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Project Bach</div>
-                </div>
-            </a>
-        </div>
-    </div>
-</div>
+            </header>
+            
+            <section class="content">
+                <!-- Quick Access Navigation -->
+                <section class="quick-nav card">
+                    <h2>🚀 Quick Access</h2>
+                    <div class="quick-nav-grid">
+                        <a href="lectures.html" class="quick-nav-item">
+                            <span class="icon">🎓</span>
+                            <div class="title">Lectures</div>
+                            <div class="description">Academic content and course materials</div>
+                            <span class="nav-count">1</span>
+                        </a>
+                        
+                        <a href="videos.html" class="quick-nav-item">
+                            <span class="icon">📺</span>
+                            <div class="title">Videos</div>
+                            <div class="description">YouTube and video content analysis</div>
+                            <span class="nav-count">0</span>
+                        </a>
+                        
+                        <a href="articles.html" class="quick-nav-item">
+                            <span class="icon">📰</span>
+                            <div class="title">Articles</div>
+                            <div class="description">RSS feeds and written content</div>
+                            <span class="nav-count">0</span>
+                        </a>
+                        
+                        <a href="podcasts.html" class="quick-nav-item">
+                            <span class="icon">🎙️</span>
+                            <div class="title">Podcasts</div>
+                            <div class="description">Audio content and interviews</div>
+                            <span class="nav-count">0</span>
+                        </a>
+                    </div>
+                </section>
+
+                <!-- Recent Content -->
+                <section class="recent-content">
+                    <h2>📋 Recent Analysis</h2>
+                    <div class="result-list">
+                        <article class="result-item card">
+                            <header class="result-header">
+                                <div class="result-title">
+                                    <h3>
+                                        <a href="20250824_171508_LEC_New_Recording_3_result.html">New Recording 3</a>
+                                    </h3>
+                                </div>
+                                <span class="result-type">lecture</span>
+                            </header>
+                            
+                            <div class="result-meta">
+                                <span class="meta-item">
+                                    <span class="meta-icon">📅</span>
+                                    2025-08-24 17:15
+                                </span>
+                            </div>
+                            
+                            <div class="result-summary">
+                                This appears to be a very fragmented and unclear statement, likely a transcription error or incomplete thought. It seems to be referencing a complete...
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- Statistics Overview -->
+                <section class="stats-overview card">
+                    <h2>📊 Processing Statistics</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">1</div>
+                            <div class="stat-label">Total Processed</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">1</div>
+                            <div class="stat-label">This Month</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">0m</div>
+                            <div class="stat-label">Avg Processing Time</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">2</div>
+                            <div class="stat-label">Languages Supported</div>
+                        </div>
+                    </div>
+                </section>
+            </section>
+            
+            <footer class="footer">
+                <p>&copy; 2025 Project Bach. Generated with Claude Code.</p>
+            </footer>
         </main>
-        
-        <!-- 页脚 -->
-        <footer class="footer">
-            <p><strong>Project Bach</strong> - AI音频处理与内容分析</p>
-            <p><em>最后更新: 2025年08月24日 17:15:23</em></p>
-            <p>
-                <a href="https://github.com/project-bach" target="_blank">🔗 GitHub</a> |
-                <a href="mailto:contact@project-bach.com">📧 联系我们</a>
-            </p>
-        </footer>
     </div>
-    
+
+    <!-- 动态获取JavaScript资源 - 从main分支 -->
+    <script type="module" src="https://raw.githubusercontent.com/sleepycat233/Project_Bach/main/static/js/github-pages.js"></script>
+    <script type="module" src="https://raw.githubusercontent.com/sleepycat233/Project_Bach/main/static/js/shared.js"></script>
 </body>
 </html>
