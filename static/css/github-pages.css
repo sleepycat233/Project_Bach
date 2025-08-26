@@ -168,6 +168,56 @@
     box-shadow: var(--shadow-md);
 }
 
+/* 隐私标识样式 */
+.privacy-badge {
+    font-size: var(--font-size-xs);
+    padding: 2px var(--spacing-xs);
+    border-radius: var(--border-radius-sm);
+    font-weight: 500;
+    margin-left: var(--spacing-sm);
+}
+
+.privacy-badge.private {
+    background-color: rgba(255, 149, 0, 0.1);
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning);
+}
+
+.privacy-badge.public {
+    background-color: rgba(52, 199, 89, 0.1);
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
+}
+
+/* 导航链接按钮样式 */
+.nav-link {
+    display: flex;
+    align-items: center;
+    color: var(--text-primary);
+    text-decoration: none;
+    padding: var(--spacing-md) var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    transition: var(--transition-fast);
+    font-weight: 500;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    width: 100%;
+    text-align: left;
+}
+
+.nav-link:hover {
+    background-color: var(--color-primary);
+    color: white;
+    transform: translateX(5px);
+}
+
+.nav-link.active {
+    background-color: var(--color-primary);
+    color: white;
+}
+
 .result-item h3 a {
     color: var(--color-primary);
     text-decoration: none;
@@ -223,6 +273,11 @@
     transition: var(--transition-fast);
     text-decoration: none;
     color: var(--text-primary);
+    position: relative;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    display: block;
 }
 
 .quick-nav-item:hover {
@@ -230,6 +285,16 @@
     box-shadow: var(--shadow-md);
     text-decoration: none;
     color: var(--text-primary);
+}
+
+.quick-nav-item.active {
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.quick-nav-item.active .title,
+.quick-nav-item.active .description {
+    color: white;
 }
 
 .quick-nav-item .icon {
@@ -247,6 +312,27 @@
 .quick-nav-item .description {
     color: var(--text-secondary);
     font-size: var(--font-size-sm);
+}
+
+/* ===== 标签内容样式 ===== */
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
 }
 
 /* ===== 移动端适配 ===== */

@@ -1082,107 +1082,154 @@ def create_app(config=None):
                 private_root.mkdir(parents=True, exist_ok=True)
             
             if filepath is None:
-                # 动态生成私人内容列表
-                content_files = []
-                audio_count = 0
-                youtube_count = 0
-                
-                # 扫描私人目录中的HTML文件
-                for html_file in private_root.glob('*.html'):
-                    # 跳过index.html
-                    if html_file.name == 'index.html':
-                        continue
+                # 获取公有和私有内容
+                def scan_directory_for_content(directory_path, is_private=False):
+                    """扫描目录获取内容文件信息"""
+                    content_files = []
+                    if not directory_path.exists():
+                        return content_files, 0, 0
                     
-                    # 解析文件名获取信息
-                    filename = html_file.name
+                    lecture_count = 0
+                    youtube_count = 0
                     
-                    # 解析日期 (格式: 20250824_034746_...)
-                    date_match = re.match(r'(\d{8})_(\d{6})_', filename)
-                    if date_match:
-                        date_str = date_match.group(1)
-                        time_str = date_match.group(2)
-                        try:
-                            parsed_date = datetime.strptime(f"{date_str}_{time_str}", "%Y%m%d_%H%M%S")
-                            formatted_date = parsed_date.strftime("%Y-%m-%d %H:%M")
-                        except:
+                    for html_file in directory_path.glob('*.html'):
+                        # 跳过index.html
+                        if html_file.name == 'index.html':
+                            continue
+                        
+                        # 解析文件名获取信息
+                        filename = html_file.name
+                        
+                        # 解析日期 (格式: 20250824_034746_...)
+                        date_match = re.match(r'(\d{8})_(\d{6})_', filename)
+                        if date_match:
+                            date_str = date_match.group(1)
+                            time_str = date_match.group(2)
+                            try:
+                                parsed_date = datetime.strptime(f"{date_str}_{time_str}", "%Y%m%d_%H%M%S")
+                                formatted_date = parsed_date.strftime("%Y-%m-%d %H:%M")
+                            except:
+                                formatted_date = "Unknown"
+                        else:
                             formatted_date = "Unknown"
-                    else:
-                        formatted_date = "Unknown"
-                    
-                    # 生成显示标题
-                    if 'youtube' in filename:
-                        title = filename.replace('youtube_', '').replace('_result.html', '').replace('_', ' ')
-                        youtube_count += 1
-                    elif 'LEC' in filename:
-                        # 提取讲座标题
-                        title_match = re.search(r'LEC_(.+?)_result\.html', filename)
-                        if title_match:
-                            title = title_match.group(1).replace('_', ' ')
+                        
+                        # 生成显示标题和确定内容类型
+                        content_type = 'others'
+                        if 'youtube' in filename:
+                            title = filename.replace('youtube_', '').replace('_result.html', '').replace('_', ' ')
+                            content_type = 'youtube'
+                            youtube_count += 1
+                        elif 'LEC' in filename:
+                            # 提取讲座标题
+                            title_match = re.search(r'LEC_(.+?)_result\.html', filename)
+                            if title_match:
+                                title = title_match.group(1).replace('_', ' ')
+                            else:
+                                title = filename.replace('_result.html', '').replace('_', ' ')
+                            content_type = 'lecture'
+                            lecture_count += 1
                         else:
                             title = filename.replace('_result.html', '').replace('_', ' ')
-                        audio_count += 1
-                    else:
-                        title = filename.replace('_result.html', '').replace('_', ' ')
-                        audio_count += 1
+                            lecture_count += 1
+                            content_type = 'lecture'  # 默认为lecture类型
+                        
+                        # 尝试从HTML文件中提取摘要
+                        summary = "Content summary"
+                        try:
+                            content = html_file.read_text(encoding='utf-8')
+                            # 查找第一个段落内容
+                            summary_match = re.search(r'<p[^>]*>(.*?)</p>', content, re.DOTALL)
+                            if summary_match:
+                                summary_text = re.sub(r'<[^>]+>', '', summary_match.group(1))
+                                summary = summary_text.strip()[:150] + "..." if len(summary_text) > 150 else summary_text.strip()
+                        except:
+                            pass
+                        
+                        content_files.append({
+                            'filename': filename,
+                            'title': title,
+                            'date': formatted_date,
+                            'size': html_file.stat().st_size,
+                            'content_type': content_type,
+                            'summary': summary,
+                            'is_private': is_private
+                        })
                     
-                    content_files.append({
-                        'filename': filename,
-                        'title': title,
-                        'date': formatted_date,
-                        'size': html_file.stat().st_size
-                    })
+                    return content_files, lecture_count, youtube_count
+                
+                # 扫描私有内容
+                private_files, private_lecture_count, private_youtube_count = scan_directory_for_content(private_root, is_private=True)
+                
+                # 扫描公有内容（output/public目录）
+                public_root = Path(output_folder) / 'public'
+                public_files, public_lecture_count, public_youtube_count = scan_directory_for_content(public_root, is_private=False)
+                
+                # 合并所有内容
+                all_content_files = private_files + public_files
                 
                 # 按日期倒序排列 (最新的在前)
-                content_files.sort(key=lambda x: x['date'], reverse=True)
+                all_content_files.sort(key=lambda x: x['date'], reverse=True)
                 
-                # 转换为与公开模板兼容的格式
-                results = []
-                for file_info in content_files:
-                    # 尝试从HTML文件中提取摘要
-                    html_path = private_root / file_info['filename']
-                    summary = "私人内容摘要"  # 默认摘要
+                # 统计计数
+                total_lecture_count = private_lecture_count + public_lecture_count
+                total_youtube_count = private_youtube_count + public_youtube_count
+                
+                # 转换为模板期望的格式
+                all_content = []
+                for file_info in all_content_files:
+                    # 确定URL
+                    if file_info['is_private']:
+                        url = f"/private/{file_info['filename']}"
+                    else:
+                        # 公有内容的GitHub Pages链接（如果可用）
+                        github_url = f"https://sleepycat233.github.io/Project_Bach/{file_info['filename']}"
+                        url = github_url
                     
-                    try:
-                        # 简单提取HTML中的第一段内容作为摘要
-                        content = html_path.read_text(encoding='utf-8')
-                        import re
-                        # 查找第一个段落内容
-                        summary_match = re.search(r'<p[^>]*>(.*?)</p>', content, re.DOTALL)
-                        if summary_match:
-                            summary_text = re.sub(r'<[^>]+>', '', summary_match.group(1))
-                            summary = summary_text.strip()[:150] + "..." if len(summary_text) > 150 else summary_text.strip()
-                    except:
-                        pass
-                    
-                    # 转换为模板期望的格式
-                    results.append({
+                    all_content.append({
                         'title': file_info['title'],
-                        'file': f"/private/{file_info['filename']}",
+                        'url': url,
+                        'file': f"/private/{file_info['filename']}" if file_info['is_private'] else url,
                         'date': file_info['date'],
+                        'created_at': file_info['date'],
                         'file_size': file_info['size'],
-                        'summary': summary
+                        'summary': file_info['summary'],
+                        'content_type': file_info['content_type'],
+                        'is_private': file_info['is_private'],
+                        'filename': file_info['filename']
                     })
                 
-                # 使用现有的index模板，但传入私有内容数据
+                # 计算内容统计
+                content_counts = {
+                    'lecture': len([c for c in all_content if c.get('content_type') == 'lecture']),
+                    'youtube': len([c for c in all_content if c.get('content_type') == 'youtube']),
+                    'rss': len([c for c in all_content if c.get('content_type') == 'rss']),
+                    'podcast': len([c for c in all_content if c.get('content_type') == 'podcast']),
+                    'public': len([c for c in all_content if not c.get('is_private', True)]),
+                    'private': len([c for c in all_content if c.get('is_private', True)])
+                }
+                
+                total_content = len(all_content)
+                
+                # 获取GitHub Pages URL
+                github_pages_url = "https://sleepycat233.github.io/Project_Bach"  # 默认值
+                if config_manager and hasattr(config_manager, 'config'):
+                    github_pages_url = config_manager.config.get('github', {}).get('website', {}).get('pages_url', github_pages_url)
+                
+                # 使用新的私有页面模板，传入合并的内容数据
                 return render_template('web_app/private_index.html', 
-                                     title="🔒 Private Content",
+                                     title="🔒 Private Content Hub",
                                      site_title="Project Bach",
-                                     description="私人内容区域 - 仅通过Tailscale网络访问",
-                                     results=results,
-                                     recent_content=results,  # 为模板提供recent_content
-                                     content_counts={
-                                         'lecture': audio_count,
-                                         'youtube': youtube_count,
-                                         'rss': 0,
-                                         'podcast': 0
-                                     },
+                                     description="私人内容区域 - 浏览所有内容，支持公私筛选",
+                                     all_content=all_content,  # 传入合并的内容数据
+                                     content_counts=content_counts,
                                      stats={
-                                         'total_processed': audio_count + youtube_count,
-                                         'this_month': audio_count + youtube_count,
+                                         'total_processed': total_content,
+                                         'this_month': total_content,
                                          'total_hours': '0h',
                                          'success_rate': '100%'
                                      },
-                                     is_private=True)  # 添加标志以便模板识别
+                                     github_pages_url=github_pages_url,  # 传入GitHub Pages URL
+                                     is_private=True)
             
             # 安全检查：防止目录穿越攻击
             safe_path = private_root / filepath

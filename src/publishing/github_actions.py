@@ -39,6 +39,43 @@ class GitHubActionsManager:
         
         self.logger.info("GitHub Actions管理器初始化完成")
     
+    def create_static_sync_workflow(self, workflow_dir: Path) -> Dict[str, Any]:
+        """创建静态资源同步工作流
+        
+        Args:
+            workflow_dir: 工作流目录
+            
+        Returns:
+            创建结果
+        """
+        self.logger.info("创建静态资源同步工作流配置")
+        
+        try:
+            # 确保工作流目录存在
+            workflow_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 生成静态资源同步工作流配置
+            workflow_content = self._generate_static_sync_workflow()
+            
+            # 写入工作流文件
+            workflow_file = workflow_dir / 'sync-static-assets.yml'
+            workflow_file.write_text(workflow_content, encoding='utf-8')
+            
+            self.logger.info(f"静态资源同步工作流文件创建: {workflow_file}")
+            
+            return {
+                'success': True,
+                'workflow_file': str(workflow_file),
+                'message': '静态资源同步工作流创建成功'
+            }
+            
+        except Exception as e:
+            self.logger.error(f"创建静态资源同步工作流失败: {str(e)}")
+            return {
+                'success': False,
+                'message': f'创建静态资源同步工作流失败: {str(e)}'
+            }
+    
     def create_pages_workflow(self, workflow_dir: Path) -> Dict[str, Any]:
         """创建GitHub Pages工作流配置
         
@@ -122,6 +159,109 @@ class GitHubActionsManager:
                             'name': 'Deploy to GitHub Pages',
                             'id': 'deployment',
                             'uses': 'actions/deploy-pages@v4'
+                        }
+                    ]
+                }
+            }
+        }
+        
+        return yaml.dump(workflow, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    
+    def _generate_static_sync_workflow(self) -> str:
+        """生成静态资源同步工作流YAML内容"""
+        workflow = {
+            'name': 'Sync Static Assets to GitHub Pages',
+            'on': {
+                'push': {
+                    'branches': ['main'],
+                    'paths': [
+                        'static/**',
+                        'templates/**'
+                    ]
+                },
+                'workflow_dispatch': None
+            },
+            'permissions': {
+                'contents': 'write',
+                'actions': 'read'
+            },
+            'jobs': {
+                'sync-static-assets': {
+                    'runs-on': 'ubuntu-latest',
+                    'steps': [
+                        {
+                            'name': 'Checkout main branch',
+                            'uses': 'actions/checkout@v4',
+                            'with': {
+                                'ref': 'main',
+                                'fetch-depth': 0
+                            }
+                        },
+                        {
+                            'name': 'Configure Git',
+                            'run': '\n'.join([
+                                'git config --global user.name "GitHub Actions"',
+                                'git config --global user.email "actions@github.com"'
+                            ])
+                        },
+                        {
+                            'name': 'Checkout gh-pages branch',
+                            'run': 'git checkout gh-pages'
+                        },
+                        {
+                            'name': 'Create static directory if not exists',
+                            'run': 'mkdir -p static'
+                        },
+                        {
+                            'name': 'Sync static assets from main',
+                            'run': '\n'.join([
+                                'git checkout main -- static/',
+                                'echo "✅ Static assets synced from main branch"'
+                            ])
+                        },
+                        {
+                            'name': 'Check for changes',
+                            'id': 'check-changes',
+                            'run': '\n'.join([
+                                'if git diff --quiet; then',
+                                '  echo "changes=false" >> $GITHUB_OUTPUT',
+                                '  echo "No changes to commit"',
+                                'else',
+                                '  echo "changes=true" >> $GITHUB_OUTPUT',
+                                '  echo "Changes detected in static assets"',
+                                'fi'
+                            ])
+                        },
+                        {
+                            'name': 'Commit and push changes',
+                            'if': 'steps.check-changes.outputs.changes == \'true\'',
+                            'run': '\n'.join([
+                                'git add static/',
+                                'git commit -m "🔄 Auto-sync: Update static assets from main branch',
+                                '',
+                                '- Synced CSS, JS, and other static files',
+                                '- Triggered by changes in main branch',
+                                '- Auto-generated by GitHub Actions"',
+                                'git push origin gh-pages'
+                            ])
+                        },
+                        {
+                            'name': 'Summary',
+                            'run': '\n'.join([
+                                'echo "### Static Assets Sync Summary 📊" >> $GITHUB_STEP_SUMMARY',
+                                'echo "" >> $GITHUB_STEP_SUMMARY',
+                                'if [ "${{ steps.check-changes.outputs.changes }}" = "true" ]; then',
+                                '  echo "✅ Static assets were updated and synced to gh-pages branch" >> $GITHUB_STEP_SUMMARY',
+                                '  echo "🔗 [View GitHub Pages](https://sleepycat233.github.io/Project_Bach/)" >> $GITHUB_STEP_SUMMARY',
+                                'else',
+                                '  echo "ℹ️ No changes detected in static assets" >> $GITHUB_STEP_SUMMARY',
+                                'fi',
+                                'echo "" >> $GITHUB_STEP_SUMMARY',
+                                'echo "**Synced directories:**" >> $GITHUB_STEP_SUMMARY',
+                                'echo "- `static/css/` - CSS stylesheets" >> $GITHUB_STEP_SUMMARY',
+                                'echo "- `static/js/` - JavaScript files" >> $GITHUB_STEP_SUMMARY',
+                                'echo "- `static/assets/` - Images and other assets" >> $GITHUB_STEP_SUMMARY'
+                            ])
                         }
                     ]
                 }
@@ -406,6 +546,27 @@ if __name__ == '__main__':
     
     # 测试工作流配置生成
     test_workflow_dir = Path('./test_workflows')
+    
+    # 测试静态资源同步工作流
+    print("=== 测试静态资源同步工作流 ===")
+    sync_result = actions_manager.create_static_sync_workflow(test_workflow_dir)
+    
+    if sync_result['success']:
+        print(f"✅ 静态资源同步工作流创建成功: {sync_result['workflow_file']}")
+        
+        # 验证工作流配置
+        sync_workflow_file = Path(sync_result['workflow_file'])
+        if sync_workflow_file.exists():
+            sync_workflow_content = sync_workflow_file.read_text()
+            sync_validation = actions_manager.validate_workflow_config(sync_workflow_content)
+            print(f"工作流配置验证: {'有效' if sync_validation['valid'] else '无效'}")
+            
+            if sync_validation.get('warnings'):
+                print(f"警告: {sync_validation['warnings']}")
+    else:
+        print(f"❌ 静态资源同步工作流创建失败: {sync_result['message']}")
+    
+    print("\n=== 测试GitHub Pages工作流 ===")
     result = actions_manager.create_pages_workflow(test_workflow_dir)
     
     if result['success']:

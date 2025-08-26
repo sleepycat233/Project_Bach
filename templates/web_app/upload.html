@@ -205,6 +205,35 @@
                     </small>
                 </div>
                 
+                <!-- Language & Model Selection -->
+                <div class="form-group">
+                    <label class="form-label">🎯 Language & Model Selection</label>
+                    
+                    <!-- Language Selection -->
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; display: block;">Audio Language</label>
+                        <select name="audio_language" id="youtubeLanguageSelect" class="form-select" required style="margin-bottom: 10px;">
+                            <option value="english">🇺🇸 English Only</option>
+                            <option value="multilingual">🌍 Multilingual</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Model Selection -->
+                    <div>
+                        <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; display: block;">Model</label>
+                        <select name="whisper_model" id="youtubeModelSelect" class="form-select" required>
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+                    
+                    <!-- Model Info Display -->
+                    <div id="youtubeModelInfo" style="background: var(--bg-card); border: 1px solid var(--color-primary); border-radius: 6px; padding: 12px; margin-top: 10px;">
+                        <div id="youtubeModelInfoContent">
+                            <!-- Model details will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Privacy Selection -->
                 <div class="form-group" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
                     <label class="form-label" style="color: var(--text-primary); font-weight: 600;">
@@ -373,17 +402,26 @@
                     all: data.all || []
                 };
                 
-                // Update UI after loading config
-                updateModelOptions();
+                // Config loaded - UI will be updated by initializeAllModules()
                 
             } catch (error) {
                 console.error('Error loading models config:', error);
             }
         }
         
-        function updateModelOptions() {
+        // 通用函数：更新模型选项（支持不同的元素ID）
+        function updateModelOptions(languageSelectId = 'languageSelect', modelSelectId = 'modelSelect', contentTypeSelector = 'select[name="content_type"]') {
+            const languageSelect = document.getElementById(languageSelectId);
+            const modelSelect = document.getElementById(modelSelectId);
+            const contentTypeElement = document.querySelector(contentTypeSelector);
+            
+            if (!languageSelect || !modelSelect || !contentTypeElement) {
+                console.error('Required elements not found:', {languageSelectId, modelSelectId, contentTypeSelector});
+                return;
+            }
+            
             const language = languageSelect.value;
-            const contentType = document.querySelector('select[name="content_type"]').value;
+            const contentType = contentTypeElement.value;
             
             // Get content-type-specific models instead of global language models
             let models = [];
@@ -466,10 +504,20 @@
                 selectedModel.selected = true;
             }
             
-            updateModelInfo();
+            updateModelInfo(languageSelectId, modelSelectId, modelSelectId.replace('Select', 'Info'));
         }
         
-        function updateModelInfo() {
+        // 通用函数：更新模型信息显示（支持不同的元素ID）
+        function updateModelInfo(languageSelectId = 'languageSelect', modelSelectId = 'modelSelect', modelInfoId = 'modelInfo') {
+            const languageSelect = document.getElementById(languageSelectId);
+            const modelSelect = document.getElementById(modelSelectId);
+            const modelInfo = document.getElementById(modelInfoId);
+            
+            if (!languageSelect || !modelSelect || !modelInfo) {
+                console.error('Required elements not found for updateModelInfo:', {languageSelectId, modelSelectId, modelInfoId});
+                return;
+            }
+            
             const language = languageSelect.value;
             const modelValue = modelSelect.value;
             const models = modelsConfig[language] || modelsConfig.english;
@@ -505,18 +553,49 @@
             }
         }
         
-        // Set up event listeners
-        languageSelect.addEventListener('change', updateModelOptions);
-        modelSelect.addEventListener('change', updateModelInfo);
-        
-        // Add content type change listener to update models
-        const contentTypeSelect = document.querySelector('select[name="content_type"]');
-        if (contentTypeSelect) {
-            contentTypeSelect.addEventListener('change', updateModelOptions);
+        // 设置音频上传模块的事件监听器
+        function setupAudioUploadListeners() {
+            const languageSelect = document.getElementById('languageSelect');
+            const modelSelect = document.getElementById('modelSelect');
+            const contentTypeSelect = document.querySelector('select[name="content_type"]');
+            
+            if (languageSelect && modelSelect) {
+                languageSelect.addEventListener('change', () => updateModelOptions('languageSelect', 'modelSelect'));
+                modelSelect.addEventListener('change', () => updateModelInfo('languageSelect', 'modelSelect', 'modelInfo'));
+            }
+            
+            if (contentTypeSelect) {
+                contentTypeSelect.addEventListener('change', () => updateModelOptions('languageSelect', 'modelSelect'));
+            }
         }
         
-        // Initialize by loading models config first
+        // 设置YouTube模块的事件监听器
+        function setupYouTubeListeners() {
+            const youtubeLanguageSelect = document.getElementById('youtubeLanguageSelect');
+            const youtubeModelSelect = document.getElementById('youtubeModelSelect');
+            
+            if (youtubeLanguageSelect && youtubeModelSelect) {
+                youtubeLanguageSelect.addEventListener('change', () => updateModelOptions('youtubeLanguageSelect', 'youtubeModelSelect', 'select[name="content_type"]'));
+                youtubeModelSelect.addEventListener('change', () => updateModelInfo('youtubeLanguageSelect', 'youtubeModelSelect', 'youtubeModelInfo'));
+            }
+        }
+        
+        // 初始化所有模块
+        function initializeAllModules() {
+            // 设置事件监听器
+            setupAudioUploadListeners();
+            setupYouTubeListeners();
+            
+            // 初始化模型选项（为两个模块都初始化）
+            setTimeout(() => {
+                updateModelOptions('languageSelect', 'modelSelect');  // 音频上传模块
+                updateModelOptions('youtubeLanguageSelect', 'youtubeModelSelect');  // YouTube模块
+            }, 100);  // 给config加载一点时间
+        }
+        
+        // Initialize by loading models config first, then setup modules
         loadModelsConfig();
+        initializeAllModules();
     }
 
     // Setup form submission with AJAX
@@ -578,6 +657,188 @@
                 messageDiv.style.display = 'none';
             }, 3000);
         }
+    }
+
+    // YouTube Model Selection functionality
+    function setupYouTubeModelSelection() {
+        const languageSelect = document.getElementById('youtubeLanguageSelect');
+        const modelSelect = document.getElementById('youtubeModelSelect');
+        const modelInfo = document.getElementById('youtubeModelInfoContent');
+        
+        // Models configuration - will be loaded from API
+        let modelsConfig = {
+            english: [],
+            multilingual: []
+        };
+        
+        // Load models configuration from API
+        async function loadModelsConfig() {
+            try {
+                const response = await fetch('/api/models/smart-config');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Failed to load models config:', data.error);
+                    return;
+                }
+                
+                // 新API格式：按语言模式和推荐状态处理
+                modelsConfig = {
+                    // 英文模式：显示英文推荐模型和通用模型
+                    english: data.all ? data.all.filter(m => 
+                        m.language_mode === 'english' || m.language_mode === 'general'
+                    ) : [],
+                    // 多语言模式：显示多语言推荐模型和通用模型
+                    multilingual: data.all ? data.all.filter(m => 
+                        m.language_mode === 'multilingual' || m.language_mode === 'general'
+                    ) : [],
+                    contentTypes: {
+                        lecture: data.lecture || [],
+                        meeting: data.meeting || [],
+                        others: data.others || []
+                    },
+                    all: data.all || []
+                };
+                
+                // Update UI after loading config
+                updateYouTubeModelOptions();
+                
+            } catch (error) {
+                console.error('Error loading models config:', error);
+            }
+        }
+        
+        function updateYouTubeModelOptions() {
+            const language = languageSelect.value;
+            // YouTube默认为others类型
+            const contentType = 'others';
+            
+            // Get content-type-specific models instead of global language models
+            let models = [];
+            if (modelsConfig.contentTypes && modelsConfig.contentTypes[contentType]) {
+                const contentTypeModels = modelsConfig.contentTypes[contentType];
+                models = contentTypeModels.filter(model => {
+                    // Show models that are either recommended for this language mode OR explicitly support it
+                    const isRecommended = language === 'english' ? model.is_english_recommended : model.is_multilingual_recommended;
+                    const hasLanguageSupport = language === 'english' ? model.english_support : model.multilingual_support;
+                    
+                    // Show if recommended OR if it has explicit language support
+                    const matchesLanguage = isRecommended || hasLanguageSupport;
+                    
+                    // Set the recommended flag based on current language mode
+                    model.recommended = language === 'english' 
+                        ? model.is_english_recommended 
+                        : model.is_multilingual_recommended;
+                    
+                    return matchesLanguage;
+                });
+            } else {
+                // Fallback to global models if content type models not available
+                console.log(`🔍 Using fallback global models for language: ${language}`);
+                models = modelsConfig[language] || [];
+            }
+            
+            // Clear existing options
+            modelSelect.innerHTML = '';
+            
+            if (models.length === 0) {
+                // Show loading state if models not loaded yet
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'Loading models...';
+                option.disabled = true;
+                modelSelect.appendChild(option);
+                return;
+            }
+            
+            // Add model options with smart display
+            let selectedModel = null;
+            models.forEach((model, index) => {
+                const option = document.createElement('option');
+                option.value = model.value;
+                
+                // Build option text with status indicators
+                let optionText = model.display_name || model.name;
+                
+                // Add recommended star emoji for recommended models (at the end)
+                if (model.recommended) {
+                    optionText = optionText + ' ⭐';
+                }
+                
+                // Special handling for install_required placeholder
+                if (model.status === 'install_required') {
+                    optionText = '📦 ' + optionText;
+                }
+                
+                option.textContent = optionText;
+                
+                // Smart selection logic: prioritize recommended models (all models shown are downloaded)
+                if (!selectedModel) {
+                    if (model.recommended) {
+                        // Priority: recommended models
+                        selectedModel = option;
+                    } else if (index === 0) {
+                        // Fallback: first model if no recommended found yet
+                        selectedModel = option;
+                    }
+                } else if (model.recommended && !selectedModel.textContent.includes('⭐')) {
+                    // Replace if current selection is not recommended but this one is
+                    selectedModel = option;
+                }
+                
+                modelSelect.appendChild(option);
+            });
+            
+            // Apply the selection
+            if (selectedModel) {
+                selectedModel.selected = true;
+            }
+            
+            updateYouTubeModelInfo();
+        }
+        
+        function updateYouTubeModelInfo() {
+            const language = languageSelect.value;
+            const modelValue = modelSelect.value;
+            const models = modelsConfig[language] || modelsConfig.english;
+            const selectedModel = models.find(m => m.value === modelValue);
+            
+            if (selectedModel) {
+                // 构建模型详细信息显示
+                const configInfo = selectedModel.config_info || {};
+                const encoderLayers = configInfo.encoder_layers || 0;
+                const decoderLayers = configInfo.decoder_layers || 0;
+                const dModel = configInfo.d_model || 0;
+                
+                // 获取真实文件大小
+                const modelSize = selectedModel.model_size || 'Unknown';
+                
+                modelInfo.innerHTML = `
+                    <div style="margin-bottom: 15px;">
+                        <div style="margin-bottom: 8px;">
+                            <strong style="color: var(--color-primary); font-size: 1.1em;">${selectedModel.display_name || selectedModel.name}</strong>
+                        </div>
+                        <div style="display: flex; gap: 20px; font-size: 0.9em; color: var(--text-primary); margin-bottom: 10px;">
+                            <div><strong>📦 Size:</strong> ${modelSize}</div>
+                            ${selectedModel.provider ? `<div><strong>🔗 Provider:</strong> ${selectedModel.provider}</div>` : ''}
+                        </div>
+                        <div style="margin-top: 8px; padding: 6px 10px; border-radius: 4px; font-size: 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color);">
+                            📊 <strong>Performance Benchmarks:</strong> 
+                            <a href="https://huggingface.co/spaces/argmaxinc/whisperkit-benchmarks" target="_blank" style="color: var(--color-primary); text-decoration: none;">
+                                View WhisperKit Benchmarks →
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Set up event listeners
+        languageSelect.addEventListener('change', updateYouTubeModelOptions);
+        modelSelect.addEventListener('change', updateYouTubeModelInfo);
+        
+        // Initialize by loading models config first
+        loadModelsConfig();
     }
 
     // YouTube functionality - simplified implementation using existing components
@@ -735,6 +996,7 @@
         setupDragAndDrop();
         // setupSubcategorySelection handled by web-app.js
         setupModelSelection();
+        setupYouTubeModelSelection();
         setupFormSubmission();
         setupYouTubeFunctionality();
         

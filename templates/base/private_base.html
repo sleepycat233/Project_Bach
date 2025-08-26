@@ -1,0 +1,192 @@
+{% extends "base/shared_base.html" %}
+
+{% block additional_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/github-pages.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/navigation.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+{% endblock %}
+
+{% block body_class %}private-pages{% endblock %}
+
+{% block body_content %}
+<div class="github-container">
+    <button class="mobile-menu-toggle" aria-label="Toggle navigation">☰</button>
+    
+    <aside class="sidebar" role="navigation">
+        {% include 'components/private_navigation.html' %}
+    </aside>
+    
+    <main class="main-content">
+        <header class="header">
+            {% block page_header %}
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h1>{% block page_title %}Private Content Hub{% endblock %}</h1>
+                    <p>{% block page_subtitle %}Access your processed content and analysis{% endblock %}</p>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: var(--spacing-xs); align-items: flex-end;">
+                    <button id="darkModeToggle" class="dark-mode-toggle-btn" title="Toggle dark mode">🌙</button>
+                </div>
+            </div>
+            {% endblock %}
+        </header>
+        
+        <section class="content">
+            {% block main_content %}{% endblock %}
+        </section>
+        
+        <footer class="footer">
+            {% block footer %}
+            <p>&copy; 2025 Project Bach. Generated with Claude Code.</p>
+            {% endblock %}
+        </footer>
+    </main>
+</div>
+{% endblock %}
+
+{% block additional_js %}
+<script type="module" src="{{ url_for('static', filename='js/github-pages.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/shared.js') }}"></script>
+<script>
+// Content filtering functionality
+let currentFilter = 'private';
+let currentTypeFilter = 'all';
+let allContent = {{ all_content | tojson if all_content else '[]' }};
+
+function switchContentFilter(filter) {
+    currentFilter = filter;
+    
+    // Update active nav button
+    document.querySelectorAll('.content-filter').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
+    
+    // Filter and display content
+    displayFilteredContent();
+}
+
+function filterByType(type) {
+    currentTypeFilter = currentTypeFilter === type ? 'all' : type;
+    
+    // Update active nav button
+    document.querySelectorAll('.nav-type-filter').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    if (currentTypeFilter !== 'all') {
+        document.querySelector(`[data-type="${type}"]`).classList.add('active');
+    }
+    
+    // Filter and display content
+    displayFilteredContent();
+}
+
+function displayFilteredContent() {
+    const contentContainer = document.getElementById('filtered-content');
+    if (!contentContainer) return;
+    
+    let filteredContent = allContent;
+    
+    // Filter by visibility (public/private/all)
+    if (currentFilter === 'private') {
+        filteredContent = filteredContent.filter(item => item.is_private);
+    } else if (currentFilter === 'public') {
+        filteredContent = filteredContent.filter(item => !item.is_private);
+    }
+    
+    // Filter by content type
+    if (currentTypeFilter !== 'all') {
+        filteredContent = filteredContent.filter(item => item.content_type === currentTypeFilter);
+    }
+    
+    // Display filtered content
+    if (filteredContent.length === 0) {
+        contentContainer.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📝</div>
+                <h3 class="empty-title">No Content Found</h3>
+                <p class="empty-description">No content matches the current filters.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let contentHTML = '<div class="result-list">';
+    filteredContent.forEach(item => {
+        const privacyBadge = item.is_private ? 
+            '<span class="privacy-badge private">🔒 Private</span>' : 
+            '<span class="privacy-badge public">🌐 Public</span>';
+            
+        contentHTML += `
+            <article class="result-item card">
+                <header class="result-header">
+                    <div class="result-title">
+                        <h3>
+                            <a href="${item.url || '#'}" target="_blank">${item.title || item.filename}</a>
+                        </h3>
+                        ${privacyBadge}
+                    </div>
+                    <span class="result-type">${item.content_type || 'content'}</span>
+                </header>
+                
+                <div class="result-meta">
+                    <span class="meta-item">
+                        <span class="meta-icon">📅</span>
+                        ${item.created_at || item.date || 'Recently'}
+                    </span>
+                    ${item.duration ? `
+                    <span class="meta-item">
+                        <span class="meta-icon">⏱️</span>
+                        ${item.duration}
+                    </span>` : ''}
+                    ${item.language ? `
+                    <span class="meta-item">
+                        <span class="meta-icon">🌍</span>
+                        ${item.language}
+                    </span>` : ''}
+                </div>
+                
+                ${item.summary ? `
+                <div class="result-summary">
+                    ${item.summary.length > 200 ? item.summary.substring(0, 200) + '...' : item.summary}
+                </div>` : ''}
+                
+                ${item.tags && item.tags.length > 0 ? `
+                <div class="result-tags">
+                    ${item.tags.map(tag => `<a href="#" class="result-tag">${tag}</a>`).join('')}
+                </div>` : ''}
+            </article>
+        `;
+    });
+    contentHTML += '</div>';
+    
+    contentContainer.innerHTML = contentHTML;
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize dark mode toggle
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    if (darkModeToggle && window.DarkModeManager) {
+        window.DarkModeManager.bindExistingButtons();
+    }
+    
+    // Mobile menu functionality
+    const mobileToggle = document.querySelector('.mobile-menu-toggle');
+    const sidebar = document.querySelector('.sidebar');
+    
+    if (mobileToggle && sidebar) {
+        mobileToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('open');
+        });
+    }
+    
+    // Initial content display
+    displayFilteredContent();
+});
+
+// Make functions globally available
+window.switchContentFilter = switchContentFilter;
+window.filterByType = filterByType;
+</script>
+{% endblock %}
