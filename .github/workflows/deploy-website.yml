@@ -34,10 +34,10 @@ jobs:
             echo "❌ No public directory found - website not generated yet"
             exit 1
           fi
-          
+
       - name: Deploy to GitHub Pages 🚀
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
-          commit_message: "🌐 部署完整网站：HTML + CSS + JS"
+          commit_message: "🌐 Deploying：HTML + CSS + JS"
