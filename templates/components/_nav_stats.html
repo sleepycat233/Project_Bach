@@ -1,0 +1,37 @@
+{# 可复用的统计组件 - 紧凑版 #}
+<div class="nav-section">
+    <h3 class="nav-section-title">📊 Stats</h3>
+    <div class="nav-stats">
+        {% if stats %}
+        <div class="stat-grid">
+            <div class="stat-item">
+                <span class="stat-value">{{ stats.total_processed or 0 }}</span>
+                <span class="stat-label">Total</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ stats.this_month or 0 }}</span>
+                <span class="stat-label">This Month</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ stats.success_rate or '100%' }}</span>
+                <span class="stat-label">Success Rate</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="stat-grid">
+            <div class="stat-item">
+                <span class="stat-value">{{ content_counts.lecture + content_counts.youtube if content_counts else 0 }}</span>
+                <span class="stat-label">Total</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ content_counts.lecture + content_counts.youtube if content_counts else 0 }}</span>
+                <span class="stat-label">This Month</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">100%</span>
+                <span class="stat-label">Success Rate</span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>

@@ -1,0 +1,106 @@
+{# 可复用的内容树组件 #}
+<section class="nav-section">
+    <h3 class="nav-section-title">{% if is_private_page %}Content Library{% else %}Content Types{% endif %}</h3>
+    <ul class="nav-tree">
+        <!-- Lectures Tree -->
+        <li class="nav-tree-item">
+            <button class="nav-tree-toggle" aria-expanded="true" data-target="lectures-submenu">
+                <span class="nav-tree-icon">📁</span>
+                <span class="nav-tree-label">Lectures</span>
+                <span class="nav-count">{{ content_counts.lecture if is_private_page else (lecture_count or 0) }}</span>
+                <span class="nav-expand-icon">▼</span>
+            </button>
+            <ul class="nav-tree-submenu" id="lectures-submenu">
+                {% if not is_private_page %}
+                <li><a href="{{ url_for('index') }}" class="nav-tree-link {% if request.endpoint == 'index' %}active{% endif %}">
+                    <span class="nav-icon content-lecture">🎓</span>All Lectures
+                </a></li>
+                {% endif %}
+                {% if organized_content and organized_content.lectures %}
+                    {% for course_name, lectures in organized_content.lectures.items() %}
+                    <li class="nav-tree-item">
+                        <button class="nav-tree-toggle" aria-expanded="false" data-target="course-{{ loop.index }}">
+                            <span class="nav-tree-icon">📖</span>
+                            <span class="nav-tree-label">{{ course_name }}</span>
+                            <span class="nav-count">{{ lectures|length }}</span>
+                            <span class="nav-expand-icon">▶</span>
+                        </button>
+                        <ul class="nav-tree-submenu collapsed" id="course-{{ loop.index }}">
+                            {% for lecture in lectures %}
+                            <li><a href="javascript:void(0);" class="nav-tree-link content-item-link" 
+                                   data-url="{{ lecture.url }}" data-title="{{ lecture.title }}" 
+                                   data-type="lecture" data-course="{{ course_name }}">
+                                <span class="nav-icon">🎓</span>{{ lecture.title }}
+                            </a></li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    {% else %}
+                    {% if is_private_page %}
+                    <li><a href="#" class="nav-tree-link">
+                        <span class="nav-icon">📝</span>No lectures yet
+                    </a></li>
+                    {% endif %}
+                    {% endfor %}
+                {% else %}
+                {% if is_private_page %}
+                <li><a href="#" class="nav-tree-link">
+                    <span class="nav-icon">📝</span>Loading lectures...
+                </a></li>
+                {% endif %}
+                {% endif %}
+            </ul>
+        </li>
+
+        <!-- Videos Tree -->
+        <li class="nav-tree-item">
+            <button class="nav-tree-toggle" aria-expanded="true" data-target="videos-submenu">
+                <span class="nav-tree-icon">📁</span>
+                <span class="nav-tree-label">Videos</span>
+                <span class="nav-count">{{ content_counts.youtube if is_private_page else (video_count or 0) }}</span>
+                <span class="nav-expand-icon">▼</span>
+            </button>
+            <ul class="nav-tree-submenu" id="videos-submenu">
+                {% if not is_private_page %}
+                <li><a href="{{ url_for('videos') }}" class="nav-tree-link {% if request.endpoint == 'videos' %}active{% endif %}">
+                    <span class="nav-icon content-youtube">📺</span>All Videos
+                </a></li>
+                {% endif %}
+                {% if organized_content and organized_content.videos %}
+                    {% for series_name, videos in organized_content.videos.items() %}
+                    <li class="nav-tree-item">
+                        <button class="nav-tree-toggle" aria-expanded="false" data-target="series-{{ loop.index }}">
+                            <span class="nav-tree-icon">🎬</span>
+                            <span class="nav-tree-label">{{ series_name }}</span>
+                            <span class="nav-count">{{ videos|length }}</span>
+                            <span class="nav-expand-icon">▶</span>
+                        </button>
+                        <ul class="nav-tree-submenu collapsed" id="series-{{ loop.index }}">
+                            {% for video in videos %}
+                            <li><a href="javascript:void(0);" class="nav-tree-link content-item-link" 
+                                   data-url="{{ video.url }}" data-title="{{ video.title }}" 
+                                   data-type="video" data-series="{{ series_name }}">
+                                <span class="nav-icon">📺</span>{{ video.title }}
+                            </a></li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    {% else %}
+                    {% if is_private_page %}
+                    <li><a href="#" class="nav-tree-link">
+                        <span class="nav-icon">📝</span>No videos yet
+                    </a></li>
+                    {% endif %}
+                    {% endfor %}
+                {% else %}
+                {% if is_private_page %}
+                <li><a href="#" class="nav-tree-link">
+                    <span class="nav-icon">📝</span>Loading videos...
+                </a></li>
+                {% endif %}
+                {% endif %}
+            </ul>
+        </li>
+
+    </ul>
+</section>
