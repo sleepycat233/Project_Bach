@@ -33,7 +33,7 @@ jobs:
             echo "⚠️ No static directory found"
           fi
 
-      - name: Verify website files 📋
+      - name: Verify website files and generate stats 📋
         run: |
           if [ -d "public" ]; then
             echo "✅ Public directory found"
@@ -49,6 +49,16 @@ jobs:
             else
               echo "⚠️ No static resources"
             fi
+            
+            # 获取所有HTML文件名
+            html_files=$(find public -name "*.html" -not -name "index.html" -type f | xargs basename -a 2>/dev/null | tr '\n' ' ' | sed 's/[[:space:]]*$//')
+            html_count=$(find public -name "*.html" -not -name "index.html" | wc -l)
+            echo "📄 HTML files ($html_count): $html_files"
+            
+            # 导出环境变量供下一步使用
+            echo "HTML_FILES=$html_files" >> $GITHUB_ENV
+            echo "HTML_COUNT=$html_count" >> $GITHUB_ENV
+            
           else
             echo "❌ No public directory found - website not generated yet"
             exit 1
@@ -59,4 +69,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
-          commit_message: "🌐 Deploying：HTML + CSS + JS"
+          commit_message: "🚀 Deploy: ${{ env.HTML_COUNT }} files - ${{ env.HTML_FILES }}"

@@ -754,6 +754,7 @@ class TemplateEngine:
         # 处理静态资源文件 url_for('static', filename='css/style.css')
         if endpoint == 'static':
             filename = kwargs.get('filename', '')
+            # 确保返回正确的静态文件路径，不要加上.html后缀
             return f'static/{filename}'
         
         # 处理页面路由
