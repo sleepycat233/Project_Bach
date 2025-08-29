@@ -1,102 +1,23 @@
+{# Private Navigation - 扩展版本包含搜索、统计和关于信息 #}
+{% set is_private_page = true %}
+
 <nav class="sidebar-nav" role="navigation">
     <div class="nav-header">
-        <h2 class="nav-title">Project Bach</h2>
+        <a href="/" class="nav-title-link">
+            <h2 class="nav-title">Project Bach</h2>
+        </a>
         <p class="nav-subtitle">Private Content Hub</p>
     </div>
     
-    <section class="nav-section">
-        <h3 class="nav-section-title">Content Visibility</h3>
-        <ul class="nav-links">
-            <li>
-                <button class="nav-link content-filter" data-filter="all" onclick="switchContentFilter('all')">
-                    <span class="nav-icon">🌐</span>
-                    All Content
-                    <span class="nav-count">{{ (content_counts.public + content_counts.private) or 0 }}</span>
-                </button>
-            </li>
-            <li>
-                <button class="nav-link content-filter active" data-filter="private" onclick="switchContentFilter('private')">
-                    <span class="nav-icon">🔒</span>
-                    Private Only
-                    <span class="nav-count">{{ content_counts.private or 0 }}</span>
-                </button>
-            </li>
-            <li>
-                <button class="nav-link content-filter" data-filter="public" onclick="switchContentFilter('public')">
-                    <span class="nav-icon">🌍</span>
-                    Public Only
-                    <span class="nav-count">{{ content_counts.public or 0 }}</span>
-                </button>
-            </li>
-        </ul>
-    </section>
+    {# 内容树结构 - 修改为动态加载内容 #}
+    {% include 'components/_nav_content_tree.html' %}
     
-    <section class="nav-section">
-        <h3 class="nav-section-title">Content Types</h3>
-        <ul class="nav-links">
-            <li>
-                <a href="#" class="nav-type-filter" data-type="lecture" onclick="filterByType('lecture')">
-                    <span class="nav-icon content-lecture">🎓</span>
-                    Lectures
-                    <span class="nav-count">{{ content_counts.lecture or 0 }}</span>
-                </a>
-            </li>
-            <li>
-                <a href="#" class="nav-type-filter" data-type="youtube" onclick="filterByType('youtube')">
-                    <span class="nav-icon content-youtube">📺</span>
-                    Videos
-                    <span class="nav-count">{{ content_counts.youtube or 0 }}</span>
-                </a>
-            </li>
-            <li>
-                <a href="#" class="nav-type-filter" data-type="rss" onclick="filterByType('rss')">
-                    <span class="nav-icon content-rss">📰</span>
-                    Articles
-                    <span class="nav-count">{{ content_counts.rss or 0 }}</span>
-                </a>
-            </li>
-            <li>
-                <a href="#" class="nav-type-filter" data-type="podcast" onclick="filterByType('podcast')">
-                    <span class="nav-icon content-podcast">🎙️</span>
-                    Podcasts
-                    <span class="nav-count">{{ content_counts.podcast or 0 }}</span>
-                </a>
-            </li>
-        </ul>
-    </section>
+    {# 工具栏 #}
+    {% include 'components/_nav_tools.html' %}
     
-    <section class="nav-section">
-        <h3 class="nav-section-title">Tools</h3>
-        <ul class="nav-links">
-            <li>
-                <a href="/">
-                    <span class="nav-icon">📤</span>
-                    Upload Content
-                </a>
-            </li>
-            <li>
-                <a href="{{ github_pages_url }}" target="_blank">
-                    <span class="nav-icon">🌐</span>
-                    GitHub Pages
-                </a>
-            </li>
-        </ul>
-    </section>
+    {# 统计信息 - 从主内容区移到左侧栏 #}
+    {% include 'components/_nav_stats.html' %}
     
-    <section class="nav-section">
-        <h3 class="nav-section-title">Quick Stats</h3>
-        <div class="stats-overview card">
-            <h4>📈 Overview</h4>
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-value">{{ stats.total_processed or 0 }}</div>
-                    <div class="stat-label">Processed</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">{{ stats.this_month or 0 }}</div>
-                    <div class="stat-label">This Month</div>
-                </div>
-            </div>
-        </div>
-    </section>
+    {# 搜索功能 - 放在navigation的最下面 #}
+    {% include 'components/_nav_search.html' %}
 </nav>

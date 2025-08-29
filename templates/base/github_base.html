@@ -4,36 +4,46 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/github-pages.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/navigation.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/toc.css') }}">
 {% endblock %}
 
 {% block body_class %}github-pages{% endblock %}
 
 {% block body_content %}
-<div class="github-container">
+<div class="gitbook-container">
     <button class="mobile-menu-toggle" aria-label="Toggle navigation">☰</button>
     
-    <aside class="sidebar" role="navigation">
+    <!-- Left Navigation Panel -->
+    <aside class="left-sidebar" role="navigation" aria-label="Main navigation">
+        {% block navigation %}
         {% include 'components/navigation.html' %}
+        {% endblock %}
     </aside>
     
-    <main class="main-content">
-        <header class="header">
+    <!-- Main Content Area -->
+    <main class="main-content" role="main">
+        <header class="content-header">
             {% block page_header %}
-            <h1>{% block page_title %}Project Bach{% endblock %}</h1>
-            <p>{% block page_subtitle %}AI-powered content processing and analysis{% endblock %}</p>
+            <h1 class="page-title">{% block page_title %}Project Bach{% endblock %}</h1>
+            <p class="page-subtitle">{% block page_subtitle %}AI-powered content processing and analysis{% endblock %}</p>
             {% endblock %}
         </header>
         
-        <section class="content">
+        <article class="content-body">
             {% block main_content %}{% endblock %}
-        </section>
+        </article>
         
-        <footer class="footer">
+        <footer class="content-footer">
             {% block footer %}
             <p>&copy; 2025 Project Bach. Generated with Claude Code.</p>
             {% endblock %}
         </footer>
     </main>
+    
+    <!-- Right Table of Contents Panel -->
+    <aside class="right-sidebar" role="complementary" aria-label="Table of contents">
+        {% include 'components/toc.html' %}
+    </aside>
 </div>
 {% endblock %}
 

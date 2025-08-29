@@ -5,65 +5,61 @@
 {% block page_subtitle %}Access your processed content and analysis{% endblock %}
 
 {% block main_content %}
-<!-- Content Display Area -->
-<div id="filtered-content">
-    <!-- Content will be loaded here by JavaScript -->
-    <div class="loading">
-        <p>Loading content...</p>
-    </div>
-</div>
-
-<!-- Search Section -->
-<section class="card" style="margin-top: var(--spacing-xl);">
-    <h2>🔍 Search Content</h2>
-    <div style="margin-bottom: var(--spacing-lg);">
-        <input type="search" id="content-search" placeholder="Search your content..." class="form-input" style="margin-bottom: var(--spacing-md);">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); margin-bottom: var(--spacing-md);">
-            <select id="search-category" class="form-select">
-                <option value="">All Categories</option>
-                <option value="lecture">Lectures</option>
-                <option value="youtube">Videos</option>
-                <option value="rss">Articles</option>
-                <option value="podcast">Podcasts</option>
-            </select>
-            
-            <select id="search-language" class="form-select">
-                <option value="">All Languages</option>
-                <option value="english">English</option>
-                <option value="multilingual">Multilingual</option>
-            </select>
+<!-- Dynamic Content Display Area -->
+<div id="main-content-area">
+    <!-- Welcome/Default content -->
+    <div id="welcome-content" class="content-section active">
+        <div class="welcome-header">
+            <h1>Welcome to Your Private Content Hub</h1>
+            <p class="welcome-subtitle">Select content from the sidebar to view detailed analysis</p>
         </div>
-        <button class="search-btn btn btn-primary">🔍 Search</button>
+        
+        <div class="quick-stats-overview">
+            <h2>📊 Content Overview</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">{{ content_counts.lecture or 0 }}</div>
+                    <div class="stat-label">Lectures</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ content_counts.youtube or 0 }}</div>
+                    <div class="stat-label">Videos</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="recent-activity">
+            <h3>Recent Processing Activity</h3>
+            {% if all_content %}
+            <div class="activity-list">
+                {% for content in all_content[:5] %}
+                <div class="activity-item">
+                    <div class="activity-icon">
+                        {% if content.content_type == 'lecture' %}🎓
+                        {% elif content.content_type == 'youtube' %}📺
+                        {% elif content.content_type == 'rss' %}📰
+                        {% else %}🎙️{% endif %}
+                    </div>
+                    <div class="activity-details">
+                        <div class="activity-title">{{ content.title }}</div>
+                        <div class="activity-meta">{{ content.date }} • {{ content.content_type|title }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-message">No content processed yet. Upload your first file to get started!</p>
+            {% endif %}
+        </div>
     </div>
     
-    <div id="search-results" class="search-results">
-        <div class="empty-state">
-            <div class="empty-icon">🔍</div>
-            <p class="empty-description">Enter search terms to find your content</p>
+    <!-- Dynamic content will be loaded here -->
+    <div id="dynamic-content" class="content-section hidden">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading content...</p>
         </div>
     </div>
-</section>
-
-<section class="stats-overview card">
-    <h2>📊 Processing Statistics</h2>
-    <div class="stats-grid">
-        <div class="stat-item">
-            <div class="stat-value">{{ stats.total_processed or 0 }}</div>
-            <div class="stat-label">Total Processed</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">{{ stats.this_month or 0 }}</div>
-            <div class="stat-label">This Month</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">{{ stats.total_hours or '0h' }}</div>
-            <div class="stat-label">Processing Hours</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">{{ stats.success_rate or '100%' }}</div>
-            <div class="stat-label">Success Rate</div>
-        </div>
-    </div>
-</section>
+</div>
 
 {% endblock %}
