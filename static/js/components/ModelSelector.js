@@ -107,7 +107,9 @@ export class ModelSelector {
             this.notifications.error(`Failed to load models: ${error.message}`);
             this.showErrorState(error.message);
         } finally {
-            loader.hide();
+            if (loader && loader.hide) {
+                loader.hide();
+            }
         }
     }
 
