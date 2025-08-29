@@ -180,6 +180,10 @@ class AudioProcessor:
                 'privacy_level': privacy_level
             }
             
+            # 保存上传时的metadata（包含课程信息）
+            if metadata:
+                results['upload_metadata'] = metadata
+            
             # 按隐私级别保存结果
             self.result_storage.save_markdown_result(audio_path.stem, results, privacy_level=privacy_level)
             self.result_storage.save_json_result(audio_path.stem, results, privacy_level=privacy_level)

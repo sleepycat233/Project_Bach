@@ -1150,6 +1150,19 @@ def create_app(config=None):
                         except:
                             pass
                         
+                        # 尝试从对应的JSON文件读取upload_metadata
+                        json_filename = filename.replace('_result.html', '_result.json')
+                        json_file = html_file.parent / json_filename
+                        upload_metadata = {}
+                        
+                        if json_file.exists():
+                            try:
+                                with open(json_file, 'r', encoding='utf-8') as f:
+                                    json_data = json.load(f)
+                                    upload_metadata = json_data.get('upload_metadata', {})
+                            except Exception as e:
+                                logger.warning(f"Failed to read JSON metadata from {json_filename}: {e}")
+
                         content_files.append({
                             'filename': filename,
                             'title': title,
@@ -1157,7 +1170,8 @@ def create_app(config=None):
                             'size': html_file.stat().st_size,
                             'content_type': content_type,
                             'summary': summary,
-                            'is_private': is_private
+                            'is_private': is_private,
+                            'upload_metadata': upload_metadata
                         })
                     
                     return content_files, lecture_count, youtube_count
@@ -1203,6 +1217,78 @@ def create_app(config=None):
                         'filename': file_info['filename']
                     })
                 
+                # 生成organized_content数据结构
+                def organize_content_by_type(content_list):
+                    """将内容按类型和课程组织为树形结构"""
+                    organized = {
+                        'lectures': {},
+                        'videos': {},
+                        'articles': [],
+                        'podcasts': []
+                    }
+                    
+                    for content in content_list:
+                        content_type = content.get('content_type', 'others')
+                        
+                        if content_type == 'lecture':
+                            # 优先从upload_metadata中获取课程信息
+                            upload_metadata = content.get('upload_metadata', {})
+                            course_name = "General"  # 默认值
+                            
+                            # 尝试从upload_metadata中获取课程信息
+                            if upload_metadata:
+                                # 从subcategory中获取课程代码 (如CS101, PHYS101)
+                                subcategory = upload_metadata.get('subcategory', '')
+                                if subcategory and subcategory != 'other':
+                                    course_name = subcategory
+                                # 或者从custom_subcategory中获取
+                                elif subcategory == 'other':
+                                    custom_subcategory = upload_metadata.get('custom_subcategory', '')
+                                    if custom_subcategory:
+                                        course_name = custom_subcategory
+                            
+                            # 如果没有metadata，回退到从文件名解析
+                            if course_name == "General":
+                                filename = content.get('filename', '')
+                                course_match = re.search(r'\d{8}_\d{6}_([A-Z]+\d+)_LEC_', filename)
+                                if course_match:
+                                    course_name = course_match.group(1)  # 例如 CS101, PHYS101
+                            
+                            if course_name not in organized['lectures']:
+                                organized['lectures'][course_name] = []
+                            
+                            organized['lectures'][course_name].append({
+                                'title': content.get('title', 'Untitled'),
+                                'url': content.get('url', '#'),
+                                'date': content.get('date', ''),
+                                'filename': filename
+                            })
+                        
+                        elif content_type == 'youtube':
+                            # YouTube视频按系列组织 (如果需要的话)
+                            series_name = "YouTube Videos"  # 默认系列名
+                            if series_name not in organized['videos']:
+                                organized['videos'][series_name] = []
+                            
+                            organized['videos'][series_name].append({
+                                'title': content.get('title', 'Untitled'),
+                                'url': content.get('url', '#'),
+                                'date': content.get('date', ''),
+                                'filename': content.get('filename', '')
+                            })
+                    
+                    # 对每个课程内的内容按日期排序 (最新在前)
+                    for course_name, lectures in organized['lectures'].items():
+                        lectures.sort(key=lambda x: x.get('date', ''), reverse=True)
+                    
+                    for series_name, videos in organized['videos'].items():
+                        videos.sort(key=lambda x: x.get('date', ''), reverse=True)
+                    
+                    return organized
+                
+                # 生成组织化的内容结构
+                organized_content = organize_content_by_type(all_content)
+                
                 # 计算内容统计
                 content_counts = {
                     'lecture': len([c for c in all_content if c.get('content_type') == 'lecture']),
@@ -1226,6 +1312,7 @@ def create_app(config=None):
                                      site_title="Project Bach",
                                      description="私人内容区域 - 浏览所有内容，支持公私筛选",
                                      all_content=all_content,  # 传入合并的内容数据
+                                     organized_content=organized_content,  # 传入组织化的内容结构
                                      content_counts=content_counts,
                                      stats={
                                          'total_processed': total_content,
