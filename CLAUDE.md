@@ -23,7 +23,7 @@
 
 **常用类型**:
 - `feat:` - 新功能
-- `fix:` - Bug修复  
+- `fix:` - Bug修复
 - `docs:` - 文档更新
 - `style:` - 代码格式（不影响功能）
 - `refactor:` - 重构代码
@@ -33,7 +33,7 @@
 ## 已完成功能概要
 
 ✅ **Phase 1-6**: 完整的端到端音频处理与发布系统
-- **基础框架**: 音频处理→转录→匿名化→AI生成→结果存储 
+- **基础框架**: 音频处理→转录→匿名化→AI生成→结果存储
 - **自动化监控**: watchdog文件监控，处理队列管理
 - **WhisperKit集成**: 真实音频转录，中英文双语支持
 - **架构模块化**: 从954行重构为6个独立模块，减少68%代码
@@ -49,7 +49,7 @@
 #### 已完成核心功能 ✅
 - ✅ **配置系统扩展**: 支持content_types和分类配置
 - ✅ **ContentClassifier**: 智能内容分类器 (18个测试通过)
-- ✅ **YouTubeProcessor**: yt-dlp集成 (15个测试通过)  
+- ✅ **YouTubeProcessor**: yt-dlp集成 (15个测试通过)
 - ✅ **AudioUploadProcessor**: 音频上传+分类选择 (23个测试通过)
 - ✅ **前端架构现代化**: 模板系统重构，静态资源分离 (39个文件变更)
 - ✅ **Web界面基础**: Flask应用框架，核心功能完整 (13/19测试通过)
@@ -57,32 +57,12 @@
 - ✅ **文件组织系统**: 智能分类，子分类支持 (22个新增测试)
 - ✅ **测试系统整合**: 17/17推荐系统测试通过
 
-#### 支持的内容类型
-```yaml
-content_types:
-  lecture:     # 🎓 学术讲座
-    subcategories: [PHYS101, CS101, ML301]
-    processor: AudioUploadProcessor
-    
-  youtube:     # 📺 YouTube视频  
-    processor: YouTubeProcessor
-    features: [yt-dlp音频提取, 元数据提取]
-    
-  rss:         # 📰 RSS文章
-    processor: RSSProcessor (基础实现)
-    status: 需要网络功能完善
-    
-  podcast:     # 🎙️ 播客内容
-    processor: AudioUploadProcessor
-    features: [访谈识别, 自动分类]
-```
-
 #### Web前端技术架构
 ```
 Flask Web应用 (src/web_frontend/app.py)
 ├── handlers/              # 请求处理器
 │   ├── AudioUploadHandler # 音频文件上传处理
-│   ├── YouTubeHandler     # YouTube URL处理  
+│   ├── YouTubeHandler     # YouTube URL处理
 │   └── RSSHandler         # RSS订阅管理 (基础实现)
 ├── processors/            # 业务处理器
 │   ├── ContentClassifier  # 智能内容分类
@@ -96,7 +76,7 @@ Flask Web应用 (src/web_frontend/app.py)
 #### 当前待完成功能 (25%)
 - 📋 **RSS处理器网络功能完善**: feedparser集成，网络错误处理
 - 📋 **Tailscale安全配置**: ACL访问控制规则，网络分段，SSL/TLS证书
-- 📋 **JavaScript客户端功能**: 分类筛选，搜索功能，统计仪表板  
+- 📋 **JavaScript客户端功能**: 分类筛选，搜索功能，统计仪表板
 - 📋 **高级Web功能**: 用户认证，会话管理，flask_limiter集成
 
 #### 完成标准
@@ -106,8 +86,122 @@ Flask Web应用 (src/web_frontend/app.py)
 - 📋 Tailscale私有Web界面安全配置 (基础框架完成)
 - ✅ 端到端处理性能 (<5分钟/文件)
 
+## 📋 当前开发任务：Phase 8 UI体验增强 (2025-08-29启动)
 
-## 当前待解决问题
+### 核心目标
+基于ui_ref.png参考设计，实现GitBook风格三栏文档布局，优化YouTube内容命名，提升用户体验。
+
+### 技术方案决策
+**选择**: 继续使用Jinja2模板系统，不迁移Jekyll  
+**原因**: 现有1,383行代码成熟稳定，18个模板+6个CSS文件资产投入巨大，迁移成本过高  
+**优势**: Python生态无缝集成，零重构风险，5-6天完成(优化40%工作量)
+
+### 详细实施计划
+
+#### 第一阶段：GitBook风格三栏布局 (2-3天)
+
+**Day 1: 模板结构重构**
+```
+文件修改:
+├── templates/base/github_base.html
+│   └── 实现CSS Grid三栏结构: 左导航 + 主内容 + 右TOC
+├── templates/components/navigation.html  
+│   └── 扩展为左侧导航树 (可折叠分类)
+└── templates/components/toc.html [NEW]
+    └── 右侧"On this page"目录组件
+```
+
+**Day 2: CSS样式实现**
+```
+样式文件:
+├── static/css/github-pages.css
+│   └── 添加CSS Grid布局: grid-template-columns: 18rem minmax(auto,48rem) auto
+├── static/css/components/navigation.css
+│   └── 导航树样式: 层级缩进 + 图标 + 高亮状态  
+└── static/css/components/toc.css [NEW]
+    └── TOC样式: 固定定位 + 滚动同步
+```
+
+**Day 3: JavaScript功能增强**
+```
+交互功能:
+├── static/js/github-pages.js
+│   └── TOC自动生成: 解析h1-h6标签，生成目录树
+├── 导航搜索功能
+│   └── 实时筛选导航树，高亮匹配项
+└── 响应式交互
+    └── 移动端左侧栏变抽屉，折叠/展开动画
+```
+
+#### 第二阶段：YouTube命名优化 (1天)
+
+**实现要点**:
+```
+处理器优化:
+├── src/web_frontend/processors/youtube_processor.py
+│   ├── 标题截取: 30-40字符限制  
+│   ├── 特殊字符处理: 替换/移除不安全字符
+│   └── 文件命名格式: youtube_Title_Truncated_VideoID_result.html
+模板显示:
+├── templates/github_pages/*.html
+│   └── 显示完整视频标题而非文件名ID
+向后兼容:
+└── 支持现有dQw4w9WgXcQ格式文件正常访问
+```
+
+#### 第三阶段：搜索与响应式优化 (1-2天)
+
+**功能集成**:
+```
+搜索功能:
+├── 左侧栏搜索框: 实时筛选导航树
+├── 全站内容搜索: 标题+摘要+标签
+└── 键盘快捷键: / 激活搜索，Esc 关闭
+响应式设计:
+├── < 768px: 单栏布局，左侧栏变抽屉
+├── 768-1024px: 双栏布局，隐藏右侧TOC
+└── > 1024px: 完整三栏布局
+```
+
+#### 第四阶段：模板引擎数据支持 (1天)
+
+**后端数据准备**:
+```
+模板引擎扩展:
+├── src/publishing/template_engine.py  
+│   ├── 提供导航树数据结构
+│   ├── 支持分类统计和计数
+│   └── TOC数据生成函数
+发布器更新:
+└── src/publishing/git_publisher.py
+    ├── 适配新文件命名格式
+    ├── 维护现有发布流程 
+    └── 确保向后兼容性
+```
+
+### 预期技术效果
+
+**用户体验提升**:
+- GitBook风格现代导航，媲美专业文档平台
+- YouTube视频真实标题显示，提升内容识别  
+- 响应式设计，移动端友好体验
+- 实时搜索和内容发现功能
+
+**技术架构强化**:
+- 基于成熟Jinja2系统的渐进式扩展
+- 组件化前端架构，代码复用性高
+- 现有文件链接和发布流程完全兼容
+- 零风险实施，保持系统稳定性
+
+**完成标准**:
+- 三栏布局在各设备正常显示
+- YouTube文件命名和显示优化完成
+- 搜索功能和响应式交互正常
+- 所有现有测试用例继续通过
+
+---
+
+## 其他待解决问题
 
 ### 技术债务
 - 大音频文件内存管理优化
@@ -256,7 +350,7 @@ AudioProcessor (编排器)
 - 查看后续扩展计划和优先级
 **内容**: 核心目标定义，MVP功能清单，Post-MVP迭代计划
 
-### doc/system_architecture.md  
+### doc/system_architecture.md
 **用途**: 系统架构设计和技术选型说明
 **何时使用**:
 - 理解整体系统架构和设计原则
@@ -266,7 +360,7 @@ AudioProcessor (编排器)
 
 ### doc/implementation_plan.md
 **用途**: 详细的阶段实施计划和完成状态追踪
-**何时使用**: 
+**何时使用**:
 - 需要了解具体开发步骤和时间规划
 - 查阅已完成阶段的详细技术实现
 - 追踪项目进度和完成状态 (✅📋标记)
