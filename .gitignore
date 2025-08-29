@@ -95,6 +95,7 @@ audio/
 !README.md
 !doc/*.md
 !docs/*.md
+!static/*.md
 
 # Processing artifacts
 anonymized_*
@@ -106,3 +107,6 @@ result_*
 
 # WhisperKit models - large files, should not be in git
 models/
+
+# Static assets (logos, images, etc.) should be tracked
+!static/assets/
