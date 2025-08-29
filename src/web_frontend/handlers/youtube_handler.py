@@ -35,7 +35,7 @@ class YouTubeHandler:
             logger.warning(f"YouTubeProcessor not available: {e}")
             self.youtube_processor = None
     
-    def process_url(self, url, content_type='youtube', metadata=None, privacy_level='public'):
+    def process_url(self, url, content_type='youtube', metadata=None, privacy_level='public', force_whisper=False):
         """
         处理YouTube URL
         
@@ -44,6 +44,7 @@ class YouTubeHandler:
             content_type: 内容类型
             metadata: 额外元数据
             privacy_level: 隐私级别 ('public' 或 'private')
+            force_whisper: 是否强制使用Whisper转录（即使有手动字幕）
             
         Returns:
             dict: 处理结果
@@ -93,7 +94,7 @@ class YouTubeHandler:
                         # 使用YouTubeProcessor + AudioProcessor完整处理流程
                         if self.youtube_processor:
                             logger.info(f"Processing YouTube video: {url} (Privacy level: {privacy_level})")
-                            result = self.youtube_processor.process_youtube_url(url)
+                            result = self.youtube_processor.process_youtube_url(url, force_whisper)
                             
                             if result.get('success'):
                                 tracker.update_stage(ProcessingStage.AI_GENERATING, 50, "YouTube content extracted, starting AI content generation")
@@ -101,7 +102,7 @@ class YouTubeHandler:
                                 # 集成AudioProcessor进行AI内容生成
                                 from ...core.dependency_container import DependencyContainer
                                 container = DependencyContainer(self.config_manager)
-                                audio_processor = container.get_audio_processor()
+                                audio_processor = container.get_configured_audio_processor()
                                 
                                 # 调用完整的YouTube内容处理
                                 success = audio_processor.process_youtube_content(
@@ -287,7 +288,7 @@ class YouTubeHandler:
                 import json
                 
                 # 获取配置中的超时设置 - 增加超时时间以处理网络延迟
-                timeout = 15  # 默认15秒，处理网络波动和复杂视频
+                timeout = 25  # 默认25秒，处理网络波动和复杂视频
                 if self.config_manager:
                     try:
                         youtube_config = self.config_manager.get_nested_config('youtube')
@@ -327,8 +328,8 @@ class YouTubeHandler:
                             'tags': video_info.get('tags', [])[:10] if video_info.get('tags') else []  # 恢复到10个标签
                         }
                         
-                        # 超快速字幕检测 - 直接从已获取的video_info中提取
-                        subtitle_info = self._ultra_quick_subtitle_detection(video_info)
+                        # 字幕检测 - 直接从已获取的video_info中提取
+                        subtitle_info = self.subtitle_detection(video_info)
                         metadata['subtitle_info'] = subtitle_info
                         
                         return metadata
@@ -397,7 +398,7 @@ class YouTubeHandler:
         total_time = base_time + download_time + transcription_time
         return max(int(total_time), 120)  # 最少2分钟
     
-    def _ultra_quick_subtitle_detection(self, video_info):
+    def subtitle_detection(self, video_info):
         """超快速字幕检测 - 直接从video_info提取，无额外API调用
         
         Args:

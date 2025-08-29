@@ -15,8 +15,8 @@ from .anonymization import NameAnonymizer
 from .ai_generation import AIContentGenerator
 from ..storage.transcript_storage import TranscriptStorage
 from ..storage.result_storage import ResultStorage
+from ..publishing.git_publisher import GitPublisher
 from ..monitoring.file_monitor import FileMonitor
-from ..publishing.publishing_workflow import PublishingWorkflow
 from ..utils.config import ConfigManager
 from .processing_service import ProcessingService, ProcessingStage, get_processing_service
 
@@ -39,13 +39,15 @@ class AudioProcessor:
         self.ai_generation_service: Optional[AIContentGenerator] = None
         self.transcript_storage: Optional[TranscriptStorage] = None
         self.result_storage: Optional[ResultStorage] = None
-        self.publishing_workflow: Optional[PublishingWorkflow] = None
         
         # 处理状态服务
         self.processing_service: ProcessingService = get_processing_service()
         
         # 文件监控器（可选）
         self.file_monitor: Optional[FileMonitor] = None
+        
+        # Git发布服务（可选）
+        self.git_publisher: Optional[GitPublisher] = None
     
     def set_transcription_service(self, service: TranscriptionService):
         """设置转录服务
@@ -93,14 +95,13 @@ class AudioProcessor:
         """
         self.file_monitor = monitor
     
-    def set_publishing_workflow(self, workflow: PublishingWorkflow):
-        """设置发布工作流
+    def set_git_publisher(self, publisher: GitPublisher):
+        """设置Git发布服务
         
         Args:
-            workflow: 发布工作流实例
+            publisher: Git发布服务实例
         """
-        self.publishing_workflow = workflow
-        self.logger.debug("发布工作流已设置")
+        self.git_publisher = publisher
     
     def process_audio_file(self, audio_path: str, privacy_level: str = 'public', metadata: Dict[str, Any] = None, processing_id: str = None) -> bool:
         """处理单个音频文件的完整流程
@@ -184,37 +185,19 @@ class AudioProcessor:
             self.result_storage.save_json_result(audio_path.stem, results, privacy_level=privacy_level)
             self.result_storage.save_html_result(audio_path.stem, results, privacy_level=privacy_level)
             
-            # 步骤5: 自动部署到GitHub Pages (仅公开内容)
-            if privacy_level == 'public' and self.publishing_workflow and self._should_auto_deploy():
-                self.logger.info("步骤5: 开始自动部署到GitHub Pages")
-                if processing_id:
-                    self.processing_service.update_status(processing_id, ProcessingStage.PUBLISHING, 90, "Deploying to GitHub Pages...")
-                try:
-                    deploy_result = self.publishing_workflow.deploy_to_github_pages()
-                    if deploy_result.get('success'):
-                        self.logger.info("✅ 自动部署成功!")
-                        if 'website_url' in deploy_result:
-                            self.logger.info(f"🔗 网站地址: {deploy_result['website_url']}")
-                            if processing_id:
-                                # 保持PUBLISHING状态，让deployment monitor检查真实部署状态
-                                self.processing_service.update_status(processing_id, ProcessingStage.PUBLISHING, 95, f"Code pushed to GitHub, verifying deployment...")
-                    else:
-                        self.logger.warning(f"⚠️  自动部署失败: {deploy_result.get('error', '未知错误')}")
-                        if processing_id:
-                            self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, f"Deployment failed but processing complete: {deploy_result.get('error', 'Unknown error')}")
-                except Exception as e:
-                    self.logger.error(f"❌ 自动部署异常: {e}")
-                    if processing_id:
-                        self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, f"Deployment error but processing complete: {str(e)}")
-            elif privacy_level == 'private':
-                self.logger.info("私人内容，跳过GitHub Pages部署")
-                if processing_id:
-                    self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, "Processing complete (private content, not deployed)")
-            else:
-                # 公开内容但没有启用部署或没有配置部署工作流
-                self.logger.info("处理完成，但未配置自动部署")
-                if processing_id:
-                    self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, "Processing complete (auto deployment not configured)")
+            # 自动发布到GitHub Pages
+            if self.git_publisher and privacy_level == 'public':
+                result_filename = f"{audio_path.stem}_result.html"
+                publish_success = self.git_publisher.publish_result(result_filename, privacy_level)
+                if publish_success:
+                    self.logger.info(f"音频处理结果已自动发布到GitHub Pages: {result_filename}")
+                else:
+                    self.logger.warning(f"GitHub Pages自动发布失败: {result_filename}")
+            
+            # 完成处理
+            if processing_id:
+                status_msg = f"Processing complete ({privacy_level} content)"
+                self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, status_msg)
             
             elapsed = time.time() - start_time
             self.logger.info(f"处理完成: {audio_path.name} (耗时: {elapsed:.2f}秒, 隐私级别: {privacy_level})")
@@ -226,17 +209,6 @@ class AudioProcessor:
                 self.processing_service.update_status(processing_id, ProcessingStage.FAILED, 0, f"Processing failed: {str(e)}")
             return False
     
-    def _should_auto_deploy(self) -> bool:
-        """检查是否应该自动部署
-        
-        Returns:
-            是否应该自动部署
-        """
-        try:
-            config = self.config_manager.get_full_config()
-            return config.get('github', {}).get('publishing', {}).get('auto_deploy', False)
-        except Exception:
-            return False
     
     def _validate_dependencies(self) -> bool:
         """验证所有必要的依赖是否已设置
@@ -351,13 +323,12 @@ class AudioProcessor:
                         return False
                     
                     self.logger.info("使用Whisper转录音频")
-                    transcription_result = self.transcription_service.transcribe_audio(audio_file_path)
+                    transcript_text = self.transcription_service.transcribe_audio(Path(audio_file_path))
                     
-                    if transcription_result.get('success'):
-                        transcript_text = transcription_result['transcript']
+                    if transcript_text and transcript_text.strip():
                         self.logger.info(f"Whisper转录完成: {len(transcript_text)}字符")
                     else:
-                        self.logger.error(f"Whisper转录失败: {transcription_result.get('error')}")
+                        self.logger.error("Whisper转录失败或结果为空")
                         return False
                 else:
                     self.logger.error("音频文件路径无效")
@@ -425,22 +396,14 @@ class AudioProcessor:
                     privacy_level=privacy_level
                 )
             
-            # 发布到GitHub Pages（仅公开内容 + 敏感内容保护）
-            if privacy_level == 'public' and self.publishing_workflow:
-                # 政治敏感内容检测 🕵️
-                sensitive_keywords = ['习近平', '政治', '中共', '权力', '斯大林', '传闻', '听床师', '政府', '党', '领导人']
-                is_sensitive = any(keyword in video_title.lower() or keyword in transcript_text[:500] 
-                                 for keyword in sensitive_keywords)
-                
-                if is_sensitive:
-                    self.logger.warning(f"🚨 检测到政治敏感内容，智能保护启动，跳过GitHub Pages发布: {video_title}")
-                    self.logger.info("💡 建议: 如需发布此内容，请手动设置为Private模式")
+            # 自动发布到GitHub Pages
+            if self.git_publisher and privacy_level == 'public':
+                result_filename = f"youtube_{video_id}_result.html"
+                publish_success = self.git_publisher.publish_result(result_filename, privacy_level)
+                if publish_success:
+                    self.logger.info(f"YouTube内容已自动发布到GitHub Pages: {result_filename}")
                 else:
-                    try:
-                        self.logger.info("发布YouTube内容到GitHub Pages")
-                        self.publishing_workflow.deploy_to_github_pages()
-                    except Exception as e:
-                        self.logger.warning(f"GitHub Pages发布失败: {e}")
+                    self.logger.warning(f"GitHub Pages自动发布失败: {result_filename}")
             
             self.logger.info(f"YouTube内容处理完成: {video_title}")
             return True

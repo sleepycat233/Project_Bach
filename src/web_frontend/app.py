@@ -216,6 +216,9 @@ def create_app(config=None):
             # 获取隐私级别
             privacy_level = request.form.get('privacy_level', 'public')
             
+            # 获取强制使用Whisper选项
+            force_whisper = request.form.get('force_whisper') == 'on'
+            
             # 处理YouTube URL
             handler = app.config['YOUTUBE_HANDLER']
             result = handler.process_url(
@@ -223,9 +226,11 @@ def create_app(config=None):
                 content_type=content_type,
                 metadata={
                     'tags': request.form.get('tags', ''),
-                    'description': request.form.get('description', '')
+                    'description': request.form.get('description', ''),
+                    'force_whisper': force_whisper
                 },
-                privacy_level=privacy_level
+                privacy_level=privacy_level,
+                force_whisper=force_whisper
             )
             
             if result['status'] == 'success':

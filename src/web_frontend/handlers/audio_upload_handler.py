@@ -190,7 +190,7 @@ class AudioUploadHandler:
                 
                 # 获取完整的音频处理器
                 container = DependencyContainer(self.config_manager)
-                audio_processor = container.get_audio_processor()
+                audio_processor = container.get_configured_audio_processor()
                 processing_service = get_processing_service()
                 
                 # 使用processing_service更新状态跟踪

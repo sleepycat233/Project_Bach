@@ -15,7 +15,7 @@ from .audio_processor import AudioProcessor
 from ..storage.transcript_storage import TranscriptStorage
 from ..storage.result_storage import ResultStorage
 from ..monitoring.file_monitor import FileMonitor
-from ..publishing.publishing_workflow import PublishingWorkflow
+from ..publishing.git_publisher import GitPublisher
 
 
 class DependencyContainer:
@@ -139,18 +139,6 @@ class DependencyContainer:
         
         return self._services['file_monitor']
     
-    def get_publishing_workflow(self) -> PublishingWorkflow:
-        """获取发布工作流实例
-        
-        Returns:
-            发布工作流实例
-        """
-        if 'publishing_workflow' not in self._services:
-            config = self.config_manager.get_full_config()
-            self._services['publishing_workflow'] = PublishingWorkflow(config)
-            self.logger.debug("创建发布工作流实例")
-        
-        return self._services['publishing_workflow']
     
     def get_audio_processor(self) -> AudioProcessor:
         """获取音频处理器实例（完全装配的）
@@ -170,7 +158,6 @@ class DependencyContainer:
                 self.get_transcript_storage(),
                 self.get_result_storage()
             )
-            processor.set_publishing_workflow(self.get_publishing_workflow())
             
             self._services['audio_processor'] = processor
             self.logger.debug("创建并装配音频处理器实例")
@@ -198,6 +185,9 @@ class DependencyContainer:
             self._services['file_monitor'] = file_monitor
         
         processor.set_file_monitor(self._services['file_monitor'])
+        
+        # 设置Git发布服务
+        processor.set_git_publisher(self.get_git_publisher())
         
         return processor
     
@@ -270,6 +260,18 @@ class DependencyContainer:
             }
         
         return status
+    
+    def get_git_publisher(self) -> GitPublisher:
+        """获取Git发布服务实例
+        
+        Returns:
+            Git发布服务实例
+        """
+        if 'git_publisher' not in self._services:
+            self._services['git_publisher'] = GitPublisher(self.config_manager)
+            self.logger.debug("创建Git发布服务实例")
+        
+        return self._services['git_publisher']
     
     def clear_cache(self):
         """清除服务缓存（用于测试或重置）"""
