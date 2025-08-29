@@ -424,6 +424,7 @@
 
 .subtitle-found,
 .subtitle-auto,
+.subtitle-whisper,
 .subtitle-none {
     display: flex;
     align-items: flex-start;
@@ -437,6 +438,11 @@
 
 .subtitle-auto .subtitle-icon {
     color: var(--color-warning);
+    font-size: var(--font-size-xl);
+}
+
+.subtitle-whisper .subtitle-icon {
+    color: var(--color-info);
     font-size: var(--font-size-xl);
 }
 
