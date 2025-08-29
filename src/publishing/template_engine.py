@@ -98,21 +98,41 @@ class TemplateEngine:
             except:
                 return str(data)
         
+        # 时间距离过滤器
+        def timeago_filter(value):
+            """时间距离过滤器"""
+            if not value:
+                return "Recently"
+            try:
+                if isinstance(value, str):
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(value.replace('Z', '+00:00').replace('+00:00', ''))
+                else:
+                    dt = value
+                now = datetime.now()
+                diff = now - dt
+                if diff.days > 0:
+                    return f"{diff.days}天前"
+                elif diff.seconds > 3600:
+                    return f"{diff.seconds // 3600}小时前"
+                else:
+                    return f"{diff.seconds // 60}分钟前"
+            except:
+                return "Recently"
+        
         # 注册过滤器
         self.env.filters['markdown'] = markdown_filter
         self.env.filters['truncate_words'] = truncate_words_filter
         self.env.filters['format_date'] = format_date_filter
         self.env.filters['file_size'] = file_size_filter
         self.env.filters['json_pretty'] = json_pretty_filter
+        self.env.filters['timeago'] = timeago_filter
     
     def _ensure_default_templates(self):
         """确保默认模板存在"""
-        templates = {
-            'base.html': self._get_base_template(),
-            'content.html': self._get_content_template(),
-            'index.html': self._get_index_template(),
-            'error.html': self._get_error_template()
-        }
+        # 不再硬编码模板，直接使用文件系统中的模板
+        # 这些硬编码模板已被删除，现在使用templates/目录下的实际文件
+        templates = {}
         
         for template_name, template_content in templates.items():
             template_path = self.template_dir / template_name
@@ -669,8 +689,9 @@ class TemplateEngine:
                     'error': f'模板未找到: {template_name}'
                 }
             
-            # 添加默认上下文变量
+            # 添加默认上下文变量和静态Flask对象
             full_context = self._build_context(context)
+            full_context.update(self._get_static_flask_context())
             
             # 渲染模板
             rendered_content = template.render(**full_context)
@@ -696,6 +717,50 @@ class TemplateEngine:
                 'error': f'渲染异常: {str(e)}',
                 'template_name': template_name
             }
+    
+    def _get_static_flask_context(self) -> Dict[str, Any]:
+        """获取静态Flask上下文对象
+        
+        Returns:
+            静态Flask上下文
+        """
+        class StaticRequest:
+            """静态request对象"""
+            @property
+            def endpoint(self):
+                return 'index'
+            
+            @property
+            def url_rule(self):
+                return type('Rule', (), {'rule': '/'})()
+        
+        return {
+            'url_for': self._static_url_for,
+            'request': StaticRequest(),
+            'config': {},
+            'session': {}
+        }
+    
+    def _static_url_for(self, endpoint: str, **kwargs) -> str:
+        """静态版本的url_for函数，用于GitHub Pages环境
+        
+        Args:
+            endpoint: 路由端点名称
+            **kwargs: Flask url_for的其他参数（在静态环境下忽略）
+            
+        Returns:
+            静态URL路径
+        """
+        mappings = {
+            'lectures': 'lectures.html',
+            'videos': 'videos.html', 
+            'articles': 'articles.html',
+            'podcasts': 'podcasts.html',
+            'upload_page': 'upload.html',
+            'all_content': 'archive.html',
+            'index': 'index.html'
+        }
+        return mappings.get(endpoint, f'{endpoint}.html')
     
     def _build_context(self, custom_context: Dict[str, Any]) -> Dict[str, Any]:
         """构建完整的模板上下文
@@ -736,7 +801,7 @@ class TemplateEngine:
             'content': content_data
         }
         
-        return self.render_template('content.html', context)
+        return self.render_template('github_pages/content.html', context)
     
     def render_index_page(self, results: List[Dict[str, Any]], stats: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """渲染首页
@@ -756,7 +821,7 @@ class TemplateEngine:
             'stats': stats or {}
         }
         
-        return self.render_template('index.html', context)
+        return self.render_template('github_pages/index.html', context)
     
     def render_error_page(self, error_message: str, error_code: Optional[int] = None) -> Dict[str, Any]:
         """渲染错误页面
@@ -775,7 +840,7 @@ class TemplateEngine:
             'error_code': error_code
         }
         
-        return self.render_template('error.html', context)
+        return self.render_template('web_app/error.html', context)
     
     def validate_template_files(self) -> Dict[str, Any]:
         """验证模板文件
@@ -783,7 +848,7 @@ class TemplateEngine:
         Returns:
             验证结果
         """
-        required_templates = ['base.html', 'content.html', 'index.html']
+        required_templates = ['github_pages/index.html', 'github_pages/content.html', 'web_app/error.html']
         validation_results = {}
         all_valid = True
         

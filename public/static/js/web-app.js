@@ -65,11 +65,18 @@ class WebApp {
             contextTextareaId: 'youtube-context'
         });
 
-        // 模型选择器
+        // 模型选择器 - Audio标签页
         this.components.modelSelector = new ModelSelector({
             languageSelectId: 'languageSelect',
             modelSelectId: 'modelSelect',
             modelInfoId: 'modelInfoContent'
+        });
+
+        // 模型选择器 - YouTube标签页
+        this.components.youtubeModelSelector = new ModelSelector({
+            languageSelectId: 'youtubeLanguageSelect',
+            modelSelectId: 'youtubeModelSelect',
+            modelInfoId: 'youtubeModelInfoContent'
         });
 
         // 状态跟踪器

@@ -241,6 +241,7 @@ export class YouTubeHandler {
         subtitleInfo.style.display = 'block';
         
         const subtitleDetails = document.getElementById('subtitle-details');
+        const forceWhisperOption = document.getElementById('force-whisper-option');
         if (!subtitleDetails) return;
 
         // 检查是否有字幕信息
@@ -249,7 +250,7 @@ export class YouTubeHandler {
             const manualSubtitles = metadata.subtitles.filter(sub => !sub.auto_generated);
             
             if (manualSubtitles.length > 0) {
-                // 有人工字幕
+                // 有人工字幕 - 显示字幕信息和强制Whisper选项
                 const languages = manualSubtitles.map(sub => sub.language || sub.language_code).join(', ');
                 subtitleDetails.innerHTML = `
                     <div class="subtitle-found">
@@ -257,23 +258,43 @@ export class YouTubeHandler {
                         <div class="subtitle-text">
                             <strong>Manual Subtitles Found</strong>
                             <br><small>Languages: ${languages}</small>
-                            <br><small>✨ No transcription needed - will use subtitle text directly</small>
+                            <br><small>✨ Will use subtitle text directly</small>
                         </div>
                     </div>
                 `;
+                
+                // 显示强制使用Whisper的选项
+                if (forceWhisperOption) {
+                    forceWhisperOption.style.display = 'block';
+                    
+                    // 重置复选框状态
+                    const checkbox = document.getElementById('force-whisper-checkbox');
+                    if (checkbox) {
+                        checkbox.checked = false;
+                        
+                        // 添加事件监听器来更新显示
+                        checkbox.addEventListener('change', () => {
+                            this.updateSubtitleDisplay(metadata, checkbox.checked);
+                        });
+                    }
+                }
+                
             } else {
-                // 只有自动生成字幕
-                const languages = metadata.subtitles.map(sub => sub.language || sub.language_code).join(', ');
+                // 只有自动生成字幕，将使用Whisper转录
                 subtitleDetails.innerHTML = `
-                    <div class="subtitle-auto">
-                        <span class="subtitle-icon">⚠️</span>
+                    <div class="subtitle-whisper">
+                        <span class="subtitle-icon">🎙️</span>
                         <div class="subtitle-text">
-                            <strong>Auto-Generated Subtitles Only</strong>
-                            <br><small>Languages: ${languages}</small>
-                            <br><small>⏳ Recommend using audio transcription for better quality</small>
+                            <strong>Will Use Audio Transcription</strong>
+                            <br><small>Auto-generated subtitles detected - using Whisper for better quality</small>
                         </div>
                     </div>
                 `;
+                
+                // 隐藏强制Whisper选项（因为本来就会用Whisper）
+                if (forceWhisperOption) {
+                    forceWhisperOption.style.display = 'none';
+                }
             }
         } else {
             // 没有字幕
@@ -286,6 +307,49 @@ export class YouTubeHandler {
                     </div>
                 </div>
             `;
+            
+            // 隐藏强制Whisper选项（因为本来就会用Whisper）
+            if (forceWhisperOption) {
+                forceWhisperOption.style.display = 'none';
+            }
+        }
+    }
+
+    updateSubtitleDisplay(metadata, forceWhisper) {
+        const subtitleDetails = document.getElementById('subtitle-details');
+        if (!subtitleDetails) return;
+        
+        if (metadata.subtitles && metadata.subtitles.length > 0) {
+            const manualSubtitles = metadata.subtitles.filter(sub => !sub.auto_generated);
+            
+            if (manualSubtitles.length > 0) {
+                const languages = manualSubtitles.map(sub => sub.language || sub.language_code).join(', ');
+                
+                if (forceWhisper) {
+                    // 强制使用Whisper
+                    subtitleDetails.innerHTML = `
+                        <div class="subtitle-whisper">
+                            <span class="subtitle-icon">🎙️</span>
+                            <div class="subtitle-text">
+                                <strong>Will Use Audio Transcription</strong>
+                                <br><small>Manual subtitles found (${languages}) but will use Whisper as requested</small>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // 使用字幕文本
+                    subtitleDetails.innerHTML = `
+                        <div class="subtitle-found">
+                            <span class="subtitle-icon">✅</span>
+                            <div class="subtitle-text">
+                                <strong>Manual Subtitles Found</strong>
+                                <br><small>Languages: ${languages}</small>
+                                <br><small>✨ Will use subtitle text directly</small>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
         }
     }
 
