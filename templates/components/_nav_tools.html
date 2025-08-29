@@ -4,21 +4,18 @@
     <ul class="nav-links">
         <li>
             <a href="{% if is_private_page %}/{% else %}{{ url_for('upload_page') }}{% endif %}">
-                <span class="nav-icon">📤</span>
                 Upload Content
             </a>
         </li>
         {% if is_private_page %}
         <li>
             <a href="{{ github_pages_url }}" target="_blank">
-                <span class="nav-icon">🌐</span>
                 GitHub Pages
             </a>
         </li>
         {% else %}
         <li>
             <a href="{{ url_for('status_page') }}">
-                <span class="nav-icon">📊</span>
                 Processing Status
             </a>
         </li>
@@ -26,7 +23,6 @@
         <li>
             <a href="javascript:void(0);" class="content-item-link" 
                data-url="/static/about.md" data-title="About Project Bach" data-type="about">
-                <span class="nav-icon">ℹ️</span>
                 About
             </a>
         </li>

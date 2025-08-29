@@ -18,6 +18,7 @@ class GitHubPagesNavigation {
 
     init() {
         this.setupMobileNavigation();
+        this.setupSidebarToggleControls();
         this.setupSidebarInteractions();
         this.setupNavigationTree();
         this.setupSearchFunctionality();
@@ -45,31 +46,175 @@ class GitHubPagesNavigation {
         }
     }
 
-    setupNavigationTree() {
-        // 设置导航树折叠/展开功能
-        const treeToggles = document.querySelectorAll('.nav-tree-toggle');
-        
-        treeToggles.forEach(toggle => {
-            toggle.addEventListener('click', () => {
-                const targetId = toggle.dataset.target;
-                const submenu = document.getElementById(targetId);
-                const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    setupSidebarToggleControls() {
+        // 桌面端侧边栏切换按钮控制
+        const leftToggle = document.querySelector('.left-toggle');
+        const rightToggle = document.querySelector('.right-toggle');
+        const container = document.querySelector('.gitbook-container');
+        const leftSidebar = document.querySelector('.left-sidebar');
+        const rightSidebar = document.querySelector('.right-sidebar');
+
+        if (leftToggle && container && leftSidebar) {
+            leftToggle.addEventListener('click', () => {
+                const isHidden = leftSidebar.classList.contains('hidden');
                 
-                if (submenu) {
-                    toggle.setAttribute('aria-expanded', !expanded);
-                    submenu.classList.toggle('collapsed', expanded);
-                    
-                    // 更新图标
-                    const expandIcon = toggle.querySelector('.nav-expand-icon');
-                    if (expandIcon) {
-                        expandIcon.textContent = expanded ? '▶' : '▼';
+                if (isHidden) {
+                    // 显示左侧栏
+                    leftSidebar.classList.remove('hidden');
+                    container.classList.remove('left-hidden', 'both-hidden');
+                    leftToggle.classList.remove('active');
+                } else {
+                    // 隐藏左侧栏
+                    leftSidebar.classList.add('hidden');
+                    if (rightSidebar && rightSidebar.classList.contains('hidden')) {
+                        container.classList.add('both-hidden');
+                        container.classList.remove('left-hidden');
+                    } else {
+                        container.classList.add('left-hidden');
+                        container.classList.remove('both-hidden');
                     }
+                    leftToggle.classList.add('active');
                 }
             });
+        }
+
+        if (rightToggle && container && rightSidebar) {
+            rightToggle.addEventListener('click', () => {
+                const isHidden = rightSidebar.classList.contains('hidden');
+                
+                if (isHidden) {
+                    // 显示右侧栏
+                    rightSidebar.classList.remove('hidden');
+                    container.classList.remove('right-hidden', 'both-hidden');
+                    rightToggle.classList.remove('active');
+                } else {
+                    // 隐藏右侧栏
+                    rightSidebar.classList.add('hidden');
+                    if (leftSidebar && leftSidebar.classList.contains('hidden')) {
+                        container.classList.add('both-hidden');
+                        container.classList.remove('right-hidden');
+                    } else {
+                        container.classList.add('right-hidden');
+                        container.classList.remove('both-hidden');
+                    }
+                    rightToggle.classList.add('active');
+                }
+            });
+        }
+    }
+
+    setupNavigationTree() {
+        const nav = document.querySelector('.sidebar-nav, nav');
+        if (!nav) return;
+
+        // 核心函数：根据指定的链接元素，更新整个树的状态
+        const setTreeState = (targetElement) => {
+            if (!targetElement) return;
+
+            // 如果是toggle按钮，获取其父级li
+            const targetItem = targetElement.closest('.nav-tree-item');
+            if (!targetItem) return;
+
+            // 1. 清除所有active和is-active-path状态（但保留is-open状态用于折叠控制）
+            nav.querySelectorAll('.active, .is-active-path').forEach(el => {
+                el.classList.remove('active', 'is-active-path');
+            });
+
+            // 2. 设置新的激活项
+            targetItem.classList.add('active');
+
+            // 3. 沿着路径向上，设置父级的is-active-path状态
+            let current = targetItem.parentElement;
+            while (current && current !== nav) {
+                if (current.classList.contains('nav-tree-submenu')) {
+                    current.classList.add('is-active-path');
+                }
+                const parentItem = current.closest('.nav-tree-item');
+                if (parentItem) {
+                    parentItem.classList.add('is-active-path');
+                }
+                current = current.parentElement;
+            }
+        };
+
+        // 事件委托：处理所有在导航树内的点击
+        nav.addEventListener('click', (event) => {
+            const toggle = event.target.closest('.nav-tree-toggle');
+            
+            if (toggle) {
+                event.preventDefault();
+                const parentLi = toggle.closest('.nav-tree-item');
+                const targetId = toggle.dataset.target;
+                const submenu = document.getElementById(targetId);
+                
+                if (parentLi && submenu) {
+                    const isOpen = parentLi.classList.contains('is-open');
+                    
+                    // 手风琴效果：关闭同级的其他菜单
+                    const parentContainer = parentLi.parentElement;
+                    if (parentContainer && !isOpen) {
+                        // 只在打开时关闭其他菜单
+                        parentContainer.querySelectorAll(':scope > .nav-tree-item.is-open').forEach(sibling => {
+                            if (sibling !== parentLi) {
+                                sibling.classList.remove('is-open');
+                                const siblingToggle = sibling.querySelector(':scope > .nav-tree-toggle');
+                                if (siblingToggle) {
+                                    siblingToggle.setAttribute('aria-expanded', 'false');
+                                }
+                            }
+                        });
+                    }
+                    
+                    // 切换当前菜单的折叠状态
+                    parentLi.classList.toggle('is-open');
+                    toggle.setAttribute('aria-expanded', !isOpen);
+                    
+                    // 设置为当前激活项
+                    setTreeState(toggle);
+                }
+            } else {
+                // 处理链接点击
+                const link = event.target.closest('.nav-tree-link');
+                if (link) {
+                    // 对于所有链接（包括content-item-link），设置高亮状态
+                    setTreeState(link);
+                }
+            }
         });
 
-        // 活动链接高亮
+        // 初始化：展开包含活动链接的所有父级
         this.highlightActiveNavItems();
+        
+        // 确保初始状态正确
+        this.initializeNavigationState();
+    }
+
+    initializeNavigationState() {
+        // 初始化导航树状态，确保展开包含活动链接的分支
+        const activeLink = document.querySelector('.nav-tree-link.active, .nav-tree-link.current');
+        if (activeLink) {
+            let parent = activeLink.closest('.nav-tree-item');
+            while (parent) {
+                // 向上遍历，展开所有父级
+                const parentItem = parent.parentElement.closest('.nav-tree-item');
+                if (parentItem) {
+                    parentItem.classList.add('is-open', 'is-active-path');
+                    const toggle = parentItem.querySelector(':scope > .nav-tree-toggle');
+                    if (toggle) {
+                        toggle.setAttribute('aria-expanded', 'true');
+                    }
+                }
+                parent = parentItem;
+            }
+        }
+
+        // 同步所有is-open状态到aria-expanded
+        document.querySelectorAll('.nav-tree-item.is-open').forEach(item => {
+            const toggle = item.querySelector(':scope > .nav-tree-toggle');
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', 'true');
+            }
+        });
     }
 
     setupSidebarInteractions() {
@@ -363,14 +508,16 @@ class GitHubPagesNavigation {
                 this.highlightSearchTermInNav(item, query);
                 
                 // 展开父级菜单
-                const parentSubmenu = item.closest('.nav-tree-submenu');
-                if (parentSubmenu) {
-                    parentSubmenu.classList.remove('collapsed');
-                    const parentToggle = document.querySelector(`[data-target="${parentSubmenu.id}"]`);
-                    if (parentToggle) {
-                        parentToggle.setAttribute('aria-expanded', 'true');
-                        const expandIcon = parentToggle.querySelector('.nav-expand-icon');
-                        if (expandIcon) expandIcon.textContent = '▼';
+                const parentItem = item.closest('.nav-tree-item');
+                if (parentItem) {
+                    let parent = parentItem.parentElement.closest('.nav-tree-item');
+                    while (parent) {
+                        parent.classList.add('is-open');
+                        const toggle = parent.querySelector(':scope > .nav-tree-toggle');
+                        if (toggle) {
+                            toggle.setAttribute('aria-expanded', 'true');
+                        }
+                        parent = parent.parentElement.closest('.nav-tree-item');
                     }
                 }
             } else {
@@ -430,15 +577,27 @@ class GitHubPagesNavigation {
         navLinks.forEach(link => {
             const href = link.getAttribute('href');
             if (href && (href === currentPath || href === currentPath.replace('.html', ''))) {
-                link.classList.add('active');
-                
-                // 展开父级菜单
-                const parentSubmenu = link.closest('.nav-tree-submenu');
-                if (parentSubmenu) {
-                    parentSubmenu.classList.remove('collapsed');
-                    const parentToggle = document.querySelector(`[data-target="${parentSubmenu.id}"]`);
-                    if (parentToggle) {
-                        parentToggle.setAttribute('aria-expanded', 'true');
+                // 使用新的active类在nav-tree-item上
+                const navItem = link.closest('.nav-tree-item');
+                if (navItem) {
+                    navItem.classList.add('active');
+                    
+                    // 展开所有父级菜单并添加is-active-path类
+                    let parent = navItem.parentElement.closest('.nav-tree-item');
+                    while (parent) {
+                        parent.classList.add('is-open', 'is-active-path');
+                        const toggle = parent.querySelector(':scope > .nav-tree-toggle');
+                        if (toggle) {
+                            toggle.setAttribute('aria-expanded', 'true');
+                        }
+                        parent = parent.parentElement.closest('.nav-tree-item');
+                    }
+                    
+                    // 标记所有父级submenu为active path
+                    let submenu = navItem.parentElement.closest('.nav-tree-submenu');
+                    while (submenu) {
+                        submenu.classList.add('is-active-path');
+                        submenu = submenu.parentElement.closest('.nav-tree-submenu');
                     }
                 }
             }
