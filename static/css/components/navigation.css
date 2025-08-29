@@ -20,6 +20,16 @@
     margin-bottom: var(--spacing-xl);
 }
 
+.nav-title-link {
+    text-decoration: none;
+    display: block;
+    transition: var(--transition-fast);
+}
+
+.nav-title-link:hover {
+    transform: translateX(2px);
+}
+
 .sidebar-nav .nav-title {
     font-size: var(--font-size-xxl);
     font-weight: 700;
@@ -27,6 +37,12 @@
     margin-bottom: var(--spacing-sm);
     border-bottom: 2px solid var(--color-primary);
     padding-bottom: var(--spacing-sm);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.nav-title-link:hover .nav-title {
+    color: var(--color-primary-dark, var(--color-primary));
 }
 
 .sidebar-nav .nav-subtitle {
@@ -291,6 +307,151 @@
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
+}
+
+/* ===== 搜索框样式 ===== */
+.nav-search {
+    margin-bottom: var(--spacing-xl);
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-input {
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg) var(--spacing-md) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: var(--font-size-sm);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    transition: var(--transition-fast);
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.2);
+}
+
+.search-shortcut {
+    position: absolute;
+    right: var(--spacing-md);
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    background-color: var(--bg-card);
+    padding: 2px var(--spacing-xs);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+/* ===== 树形导航样式 ===== */
+.nav-tree {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-tree-item {
+    margin-bottom: var(--spacing-xs);
+}
+
+.nav-tree-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    text-align: left;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+}
+
+.nav-tree-toggle:hover {
+    background-color: var(--bg-secondary);
+    color: var(--color-primary);
+}
+
+.nav-tree-icon {
+    margin-right: var(--spacing-sm);
+    font-size: var(--font-size-base);
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.nav-tree-label {
+    flex: 1;
+}
+
+.nav-expand-icon {
+    margin-left: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    transition: transform var(--transition-fast);
+    color: var(--text-secondary);
+}
+
+.nav-tree-toggle[aria-expanded="false"] .nav-expand-icon {
+    transform: rotate(-90deg);
+}
+
+.nav-tree-submenu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    padding-left: var(--spacing-lg);
+    margin-top: var(--spacing-xs);
+    border-left: 1px solid var(--border-color);
+    transition: all var(--transition-fast);
+}
+
+.nav-tree-submenu.collapsed {
+    display: none;
+}
+
+.nav-tree-link {
+    display: flex;
+    align-items: center;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius-sm);
+    transition: var(--transition-fast);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.nav-tree-link:hover {
+    background-color: var(--bg-secondary);
+    color: var(--color-primary);
+    transform: translateX(3px);
+}
+
+.nav-tree-link.active {
+    background-color: var(--color-primary);
+    color: white;
+    position: relative;
+}
+
+.nav-tree-link.active::before {
+    content: "";
+    position: absolute;
+    left: -17px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 16px;
+    background-color: var(--color-primary);
+    border-radius: 1px;
 }
 
 /* ===== 下拉菜单导航 ===== */

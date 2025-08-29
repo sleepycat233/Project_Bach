@@ -2,19 +2,23 @@
  * 专用于静态网站的左侧边栏布局和导航样式
  */
 
-/* ===== GitHub Pages 布局 ===== */
-.github-container {
-    display: flex;
+/* ===== GitBook 风格三栏布局 ===== */
+.gitbook-container {
+    display: grid;
+    grid-template-columns: 18rem 1fr 16rem;
+    grid-template-areas: "left-sidebar main-content right-sidebar";
     min-height: 100vh;
+    background-color: var(--bg-primary);
 }
 
-/* ===== 左侧边栏样式 ===== */
-.sidebar {
-    width: 280px;
+/* ===== 左侧导航面板 ===== */
+.left-sidebar {
+    grid-area: left-sidebar;
     background-color: var(--bg-card);
     border-right: var(--border-width) solid var(--border-color);
     padding: var(--spacing-lg);
     position: fixed;
+    width: 18rem;
     height: 100vh;
     overflow-y: auto;
     left: 0;
@@ -22,12 +26,148 @@
     z-index: var(--z-fixed);
 }
 
-/* 主内容区域 */
+/* ===== 主内容区域 ===== */
 .main-content {
-    flex: 1;
-    margin-left: 280px;
+    grid-area: main-content;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    background-color: var(--bg-primary);
+    min-width: 0;
+}
+
+/* ===== 右侧TOC面板 ===== */
+.right-sidebar {
+    grid-area: right-sidebar;
+    background-color: var(--bg-secondary);
+    border-left: var(--border-width) solid var(--border-color);
     padding: var(--spacing-lg);
-    max-width: calc(100% - 280px);
+    position: fixed;
+    width: 16rem;
+    height: 100vh;
+    overflow-y: auto;
+    right: 0;
+    top: 0;
+    z-index: var(--z-fixed);
+}
+
+/* ===== Markdown 内容样式 ===== */
+.markdown-content {
+    line-height: 1.7;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+    margin: 1.5em 0 0.5em 0;
+    font-weight: 600;
+    color: var(--text-heading);
+    line-height: 1.3;
+}
+
+.markdown-content h1 {
+    font-size: 2rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.markdown-content h2 {
+    font-size: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.3rem;
+}
+
+.markdown-content h3 { font-size: 1.25rem; }
+.markdown-content h4 { font-size: 1.1rem; }
+.markdown-content h5 { font-size: 1rem; }
+.markdown-content h6 { font-size: 0.9rem; }
+
+.markdown-content p {
+    margin: 1em 0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+    margin: 1em 0;
+    padding-left: 1.5rem;
+}
+
+.markdown-content li {
+    margin: 0.5em 0;
+}
+
+.markdown-content code {
+    background-color: var(--bg-code-inline);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9em;
+}
+
+.markdown-content pre {
+    background-color: var(--bg-code-block);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1rem;
+    margin: 1.5em 0;
+    overflow-x: auto;
+}
+
+.markdown-content pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.9rem;
+}
+
+.markdown-content strong {
+    font-weight: 600;
+}
+
+.markdown-content em {
+    font-style: italic;
+}
+
+.markdown-content a {
+    color: var(--color-accent);
+    text-decoration: none;
+}
+
+.markdown-content a:hover {
+    text-decoration: underline;
+}
+
+.markdown-content table.markdown-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1.5em 0;
+    border: 1px solid var(--border-color);
+}
+
+.markdown-content table.markdown-table th,
+.markdown-content table.markdown-table td {
+    border: 1px solid var(--border-color);
+    padding: 0.75em;
+    text-align: left;
+}
+
+.markdown-content table.markdown-table th {
+    background-color: var(--bg-secondary);
+    font-weight: 600;
+}
+
+.markdown-content table.markdown-table tr:nth-child(even) {
+    background-color: var(--bg-secondary);
+}
+
+.markdown-content hr {
+    border: none;
+    border-top: 2px solid var(--border-color);
+    margin: 2em 0;
 }
 
 /* 侧边栏标题 */
@@ -114,23 +254,40 @@
     background-color: rgba(255, 255, 255, 0.3);
 }
 
-/* ===== 页面头部样式 ===== */
-.header {
-    border-bottom: 2px solid var(--color-primary);
+/* ===== 内容头部样式 ===== */
+.content-header {
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: var(--spacing-lg);
     margin-bottom: var(--spacing-xl);
 }
 
-.header h1 {
+.page-title {
     font-size: var(--font-size-xxxl);
     font-weight: 700;
-    color: var(--color-primary);
+    color: var(--text-primary);
     margin-bottom: var(--spacing-sm);
+    line-height: 1.2;
 }
 
-.header p {
+.page-subtitle {
     color: var(--text-secondary);
     font-size: var(--font-size-lg);
+    line-height: 1.4;
+}
+
+/* ===== 内容主体样式 ===== */
+.content-body {
+    line-height: 1.6;
+    font-size: var(--font-size-base);
+}
+
+.content-footer {
+    margin-top: var(--spacing-xxl);
+    padding-top: var(--spacing-xl);
+    border-top: var(--border-width) solid var(--border-color);
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
 }
 
 /* ===== 内容区域样式 ===== */
@@ -356,37 +513,49 @@
         display: block;
     }
     
-    .sidebar {
+    .gitbook-container {
+        grid-template-columns: 1fr;
+        grid-template-areas: "main-content";
+    }
+    
+    .left-sidebar {
         width: 100%;
         position: fixed;
         height: 100vh;
         transform: translateX(-100%);
         transition: transform var(--transition-normal);
-        z-index: var(--z-fixed);
+        z-index: calc(var(--z-fixed) + 10);
+        box-shadow: var(--shadow-lg);
     }
     
-    .sidebar.open {
+    .left-sidebar.open {
         transform: translateX(0);
+    }
+    
+    .right-sidebar {
+        display: none;
     }
     
     .main-content {
         margin-left: 0;
-        max-width: 100%;
+        margin-right: 0;
+        max-width: none;
         padding: var(--spacing-md);
         padding-top: 60px;
     }
     
-    .github-container {
-        flex-direction: column;
-    }
-    
-    .header h1 {
+    .page-title {
         font-size: var(--font-size-xxl);
     }
     
     .quick-nav-grid {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: var(--spacing-sm);
+    }
+    
+    /* Mobile search improvements */
+    .search-input {
+        font-size: 16px; /* Prevents zoom on iOS */
     }
 }
 
@@ -396,21 +565,32 @@
         padding-top: 60px;
     }
     
-    .header {
+    .content-header {
         padding-bottom: var(--spacing-md);
         margin-bottom: var(--spacing-lg);
     }
     
-    .sidebar {
+    .left-sidebar {
         padding: var(--spacing-md);
     }
     
+    .nav-tree-link,
     .nav-links a {
         padding: var(--spacing-sm) var(--spacing-md);
+        font-size: var(--font-size-sm);
     }
     
     .quick-nav-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .page-title {
+        font-size: var(--font-size-xl);
+        line-height: 1.3;
+    }
+    
+    .search-input {
+        padding: var(--spacing-sm);
     }
 }
 
