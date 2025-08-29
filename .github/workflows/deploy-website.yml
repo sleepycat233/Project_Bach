@@ -19,6 +19,20 @@ jobs:
       - name: Checkout main branch 🛎️
         uses: actions/checkout@v4
 
+      - name: Prepare static resources 📦
+        run: |
+          # 确保public目录存在
+          mkdir -p public
+          
+          # 复制static文件夹到public目录
+          if [ -d "static" ]; then
+            echo "📁 Copying static resources..."
+            cp -r static public/
+            echo "✅ Static files copied to public/static/"
+          else
+            echo "⚠️ No static directory found"
+          fi
+
       - name: Verify website files 📋
         run: |
           if [ -d "public" ]; then
@@ -29,6 +43,11 @@ jobs:
               echo "✅ Main index.html found"
             else
               echo "⚠️ No index.html found"
+            fi
+            if [ -d "public/static" ]; then
+              echo "✅ Static resources found"
+            else
+              echo "⚠️ No static resources"
             fi
           else
             echo "❌ No public directory found - website not generated yet"

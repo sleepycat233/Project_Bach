@@ -79,6 +79,9 @@ class GitPublisher:
             shutil.copy2(source_file, target_file)
             self.logger.info(f"文件已复制到public目录: {target_file.name}")
             
+            # 同步static资源
+            self._sync_static_resources()
+            
             # 更新index.html
             self._update_index_html()
             
@@ -95,6 +98,26 @@ class GitPublisher:
         except Exception as e:
             self.logger.error(f"发布结果文件失败: {result_filename}, 错误: {str(e)}")
             return False
+    
+    def _sync_static_resources(self):
+        """同步static资源到public目录"""
+        try:
+            static_source = self.project_root / "static"
+            static_target = self.public_dir / "static"
+            
+            if static_source.exists():
+                # 删除旧的static目录
+                if static_target.exists():
+                    shutil.rmtree(static_target)
+                
+                # 复制整个static目录
+                shutil.copytree(static_source, static_target)
+                self.logger.info("Static resources已同步到public/static")
+            else:
+                self.logger.warning("Static source directory not found")
+                
+        except Exception as e:
+            self.logger.error(f"同步static资源失败: {str(e)}")
     
     def _update_index_html(self):
         """使用模板引擎更新public/index.html文件，支持分类统计"""
