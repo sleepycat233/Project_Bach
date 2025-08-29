@@ -745,13 +745,19 @@ class TemplateEngine:
         """静态版本的url_for函数，用于GitHub Pages环境
         
         Args:
-            endpoint: 路由端点名称
-            **kwargs: Flask url_for的其他参数（在静态环境下忽略）
+            endpoint: 路由端点名称或'static'
+            **kwargs: Flask url_for的其他参数，特别是filename
             
         Returns:
             静态URL路径
         """
-        mappings = {
+        # 处理静态资源文件 url_for('static', filename='css/style.css')
+        if endpoint == 'static':
+            filename = kwargs.get('filename', '')
+            return f'static/{filename}'
+        
+        # 处理页面路由
+        page_mappings = {
             'lectures': 'lectures.html',
             'videos': 'videos.html', 
             'articles': 'articles.html',
@@ -760,7 +766,7 @@ class TemplateEngine:
             'all_content': 'archive.html',
             'index': 'index.html'
         }
-        return mappings.get(endpoint, f'{endpoint}.html')
+        return page_mappings.get(endpoint, f'{endpoint}.html')
     
     def _build_context(self, custom_context: Dict[str, Any]) -> Dict[str, Any]:
         """构建完整的模板上下文
