@@ -3,17 +3,14 @@
 {% block body_class %}private-pages{% endblock %}
 
 {% block navigation %}
-{% include 'components/private_navigation.html' %}
+{% set is_private_page = true %}
+{% include 'components/navigation.html' %}
 {% endblock %}
 
 {% block page_header %}
-<div style="display: flex; justify-content: space-between; align-items: flex-start;">
-    <div>
-        <h1 class="page-title">{% block page_title %}Private Content Hub{% endblock %}</h1>
-        <p class="page-subtitle">{% block page_subtitle %}Access your processed content and analysis{% endblock %}</p>
-    </div>
+<div style="display: flex; justify-content: flex-end; align-items: flex-start;">
     <div style="display: flex; flex-direction: column; gap: var(--spacing-xs); align-items: flex-end;">
-        <button id="darkModeToggle" class="dark-mode-toggle-btn" title="Toggle dark mode">🌙</button>
+        <!-- <button id="darkModeToggle" class="dark-mode-toggle-btn" title="Toggle dark mode">🌙</button> -->
     </div>
 </div>
 {% endblock %}

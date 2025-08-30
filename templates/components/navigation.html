@@ -1,28 +1,41 @@
-<nav class="sidebar-nav" role="navigation">
-    <div class="nav-header">
-        <a href="/" class="nav-title-link">
-            <h2 class="nav-title">Project Bach</h2>
-        </a>
-        <p class="nav-subtitle">{% if is_private_page %}Private Content Hub{% else %}Documentation{% endif %}</p>
-    </div>
+<!-- 左侧导航栏包装器 -->
+<div class="sidebar-wrapper">
+    <!-- 导航内容容器 -->
+    <nav class="sidebar-container" id="sidebarContainer" role="navigation">
+        <div class="nav-content">
+            <div class="nav-header">
+            <a href="/" class="nav-title-link">
+                <h2 class="nav-title">Project Bach</h2>
+            </a>
+            <p class="nav-subtitle">{% if is_private_page %}Private Content Hub{% else %}Documentation{% endif %}</p>
+            </div>
+            
+            {% if not is_private_page %}
+            <!-- 搜索框 (仅在公共页面显示) -->
+            <div class="nav-search">
+                <div class="search-input-wrapper">
+                    <input type="text" id="nav-search" placeholder="Search..." class="search-input" 
+                           aria-label="Search content">
+                    <span class="search-shortcut">⌘K</span>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- 可复用的内容树组件 -->
+            {% include 'components/_nav_content_tree.html' %}
+            
+            <!-- 可复用的工具组件 -->
+            {% include 'components/_nav_tools.html' %}
+            
+            <!-- 可复用的统计组件 -->
+            {% include 'components/_nav_stats.html' %}
+        </div> <!-- end of nav-content -->
+    </nav>
     
-    {% if not is_private_page %}
-    <!-- 搜索框 (仅在公共页面显示) -->
-    <div class="nav-search">
-        <div class="search-input-wrapper">
-            <input type="text" id="nav-search" placeholder="Search..." class="search-input" 
-                   aria-label="Search content">
-            <span class="search-shortcut">⌘K</span>
-        </div>
-    </div>
-    {% endif %}
-    
-    <!-- 可复用的内容树组件 -->
-    {% include 'components/_nav_content_tree.html' %}
-    
-    <!-- 可复用的工具组件 -->
-    {% include 'components/_nav_tools.html' %}
-    
-    <!-- 可复用的统计组件 -->
-    {% include 'components/_nav_stats.html' %}
-</nav>
+    <!-- 左侧导航切换按钮 -->
+    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+    </button>
+</div>

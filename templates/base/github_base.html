@@ -10,9 +10,8 @@
 {% block body_class %}github-pages{% endblock %}
 
 {% block body_content %}
+
 <div class="gitbook-container">
-    <button class="mobile-menu-toggle" aria-label="Toggle navigation">☰</button>
-    
     <!-- Left Navigation Panel -->
     <aside class="left-sidebar" role="navigation" aria-label="Main navigation">
         {% block navigation %}
@@ -41,9 +40,7 @@
     </main>
     
     <!-- Right Table of Contents Panel -->
-    <aside class="right-sidebar" role="complementary" aria-label="Table of contents">
-        {% include 'components/toc.html' %}
-    </aside>
+    {% include 'components/toc.html' %}
 </div>
 {% endblock %}
 

@@ -3,7 +3,90 @@
  * 特征：clean配色、精致高亮、细腻dropdown交互
  */
 
-/* ===== 导航容器 ===== */
+/* ===== 左侧导航包装器 ===== */
+.sidebar-wrapper {
+    display: flex;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    z-index: 100;
+    align-items: flex-start;  /* 让内容从顶部开始对齐 */
+}
+
+/* 导航内容容器 */
+.sidebar-container {
+    width: 280px;
+    background: var(--bg-sidebar);
+    border-right: var(--border-width) solid var(--border-color);
+    padding: var(--spacing-lg);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 隐藏状态 - 桌面端 */
+.sidebar-container.hidden {
+    width: 0;
+    padding: 0;
+    border: none;
+    opacity: 0;
+    transform: translateX(-20px);
+    pointer-events: none;
+    overflow: hidden;
+}
+
+
+/* 左侧导航切换按钮 */
+.sidebar-toggle {
+    width: 40px;
+    height: 40px;
+    background: #3498db;  /* 蓝色背景 */
+    color: white;
+    border: none;
+    border-radius: 0 8px 8px 0;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    margin-top: 3rem;  /* 从2rem改为3rem，向下移动 */
+    flex-shrink: 0;
+}
+
+.sidebar-toggle:hover {
+    background: #2980b9;  /* 深蓝色hover */
+    transform: scale(1.1);
+}
+
+.sidebar-toggle:active {
+    transform: scale(0.95);
+}
+
+.sidebar-toggle svg {
+    width: 24px;
+    height: 24px;
+    transition: transform 0.3s ease;
+    stroke: white !important;  /* 始终白色 */
+    fill: none !important;
+}
+
+.sidebar-toggle.collapsed svg {
+    transform: rotate(180deg);
+}
+
+/* 导航内容区域 */
+.nav-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+    width: 100%;  /* 改为100%，适应容器宽度 */
+    max-width: 280px;  /* 设置最大宽度 */
+}
+
 .nav-header {
     padding: var(--spacing-lg) 0;
     border-bottom: var(--border-width) solid var(--border-color);
@@ -43,6 +126,12 @@
     font-weight: 400;
 }
 
+/* ===== 导航分组 ===== */
+.nav-section {
+    margin: var(--spacing-lg) 0;
+    padding: 0;
+}
+
 /* ===== 导航分组标题 ===== */
 .nav-section-title {
     font-size: 0.75rem;
@@ -52,6 +141,38 @@
     letter-spacing: 0.5px;
     margin: var(--spacing-xl) 0 var(--spacing-md) 0;
     padding: 0;
+}
+
+/* ===== 导航链接列表 ===== */
+.nav-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.nav-links li {
+    margin: var(--spacing-xs) 0;
+}
+
+.nav-links a {
+    display: block;
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+}
+
+.nav-links a:hover {
+    background: var(--bg-sidebar-hover);
+    color: var(--text-primary);
+}
+
+/* ===== 统计内容容器 ===== */
+.nav-stats {
+    padding: 0;
+    margin: 0;
 }
 
 /* ===== 导航树结构 ===== */
@@ -188,7 +309,7 @@
     height: 0.5em;
     border-right: 2px solid #9ca3af;
     border-bottom: 2px solid #9ca3af;
-    transform: rotate(45deg) translateY(-0.15em);
+    transform: rotate(-45deg) translateY(-0.15em);
     transition: transform 0.3s ease;
     flex-shrink: 0;
 }
@@ -196,7 +317,7 @@
 /* 展开时箭头旋转向下 */
 .nav-tree-toggle[aria-expanded="true"] .nav-expand-icon,
 .nav-tree-item.is-open > .nav-tree-toggle .nav-expand-icon {
-    transform: rotate(-135deg) translateY(-0.15em);
+    transform: rotate(45deg) translateY(-0.15em);
 }
 
 /* 统计数字 */
@@ -303,7 +424,7 @@
 }
 
 /* ===== 统计卡片 ===== */
-.stats-grid {
+.stats-grid, .stat-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--spacing-sm);
@@ -328,4 +449,89 @@
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: 2px;
+}
+
+/* ===== 移动端响应式设计 ===== */
+@media (max-width: 768px) {
+    /* 移动端左侧导航样式 */
+    .sidebar-wrapper {
+        position: fixed;  /* 保持fixed定位以确保z-index生效 */
+        left: 0;
+        top: 0;
+        z-index: 1000;  /* 确保在其他内容之上 */
+        height: 100vh;
+        pointer-events: none;  /* 让wrapper不阻挡点击 */
+        align-items: stretch;
+    }
+    
+    .sidebar-container {
+        position: fixed !important;  /* container直接fixed定位 */
+        left: 0 !important;
+        top: 0 !important;
+        height: 100vh !important;
+        z-index: 1002;  /* 提高z-index确保在最上层 */
+        box-shadow: 4px 0 20px rgba(0,0,0,0.2);
+        pointer-events: auto;  /* 但container可以接收点击 */
+        width: 260px !important;  /* 使用固定宽度 */
+        max-width: 85vw !important;  /* 最大不超过视窗宽度的85% */
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);  /* 添加过渡动画 */
+        background: white !important;  /* 改回白色背景 */
+        display: flex !important;
+        flex-direction: column !important;
+        padding: var(--spacing-lg) !important;
+        border-right: var(--border-width) solid var(--border-color) !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+    
+    /* 移动端隐藏状态 */
+    .sidebar-container.hidden {
+        width: 260px !important;  /* 保持相同宽度 */
+        max-width: 85vw !important;
+        opacity: 1 !important;
+        padding: var(--spacing-lg) !important;
+        border-right: var(--border-width) solid var(--border-color) !important;
+        transform: translateX(-100%) !important;  /* 通过transform隐藏 */
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        pointer-events: none;
+    }
+    
+    
+    .sidebar-toggle {
+        position: fixed !important;  /* 强制fixed定位 */
+        left: 1rem !important;  /* 留一点边距 */
+        top: 1rem !important;   /* 固定在顶部 */
+        transform: none !important;  /* 移除居中变换 */
+        border-radius: 8px;  /* 四角都圆角 */
+        z-index: 1003;  /* 确保按钮在最上层 */
+        margin-top: 0;
+        background: #3498db;  /* 确保移动端也是蓝色 */
+        width: 45px;  /* 稍微大一点，更容易点击 */
+        height: 45px;
+        pointer-events: auto;  /* 确保按钮可点击 */
+    }
+    
+    .sidebar-toggle.collapsed {
+        left: 1rem !important;  /* 保持位置不变 */
+    }
+    
+    .sidebar-toggle:hover {
+        transform: scale(1.1) !important;  /* 只缩放，不平移 */
+        background: #2980b9;
+    }
+    
+    .sidebar-toggle:active {
+        transform: scale(0.95) !important;
+    }
+    
+    /* 确保left-sidebar不会影响布局 */
+    .left-sidebar {
+        position: static !important;
+        width: 0 !important;
+        height: 0 !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        border: none !important;
+    }
 }

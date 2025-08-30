@@ -13,98 +13,75 @@ class GitHubPagesNavigation {
         this.sidebarOpen = false;
         this.searchActive = false;
         this.scrollObserver = null;
+        this.sidebarCollapsed = false;
+        this.isMobile = window.innerWidth <= 768;
         this.init();
     }
 
     init() {
-        this.setupMobileNavigation();
-        this.setupSidebarToggleControls();
+        this.initSidebar();
         this.setupSidebarInteractions();
         this.setupNavigationTree();
         this.setupSearchFunctionality();
         this.setupKeyboardShortcuts();
         this.setupTOC();
     }
-
-    setupMobileNavigation() {
-        const toggleButton = document.querySelector('.mobile-menu-toggle');
-        const leftSidebar = document.querySelector('.left-sidebar');
-
-        if (toggleButton && leftSidebar) {
-            toggleButton.addEventListener('click', () => {
-                this.toggleSidebar();
-            });
-
-            // 点击内容区域关闭侧边栏
-            document.addEventListener('click', (e) => {
-                if (this.sidebarOpen && 
-                    !leftSidebar.contains(e.target) && 
-                    !toggleButton.contains(e.target)) {
-                    this.closeSidebar();
-                }
-            });
+    
+    initSidebar() {
+        this.sidebar = document.getElementById('sidebarContainer');
+        this.sidebarToggle = document.getElementById('sidebarToggle');
+        
+        if (!this.sidebar || !this.sidebarToggle) {
+            console.warn('Sidebar elements not found');
+            return;
         }
+        
+        // 从localStorage读取状态
+        const savedState = localStorage.getItem('sidebarCollapsed');
+        if (savedState !== null) {
+            this.sidebarCollapsed = savedState === 'true';
+        } else {
+            // 移动端默认隐藏
+            this.sidebarCollapsed = this.isMobile;
+        }
+        
+        this.updateSidebarState();
+        
+        // 绑定切换按钮事件
+        this.sidebarToggle.addEventListener('click', () => {
+            this.toggleSidebar();
+        });
+        
+        // 窗口大小变化事件
+        window.addEventListener('resize', () => {
+            const currentIsMobile = window.innerWidth <= 768;
+            if (!this.isMobile && currentIsMobile && !this.sidebarCollapsed) {
+                // 从桌面切换到移动端时自动隐藏
+                this.sidebarCollapsed = true;
+                this.updateSidebarState();
+            }
+            this.isMobile = currentIsMobile;
+        });
     }
-
-    setupSidebarToggleControls() {
-        // 桌面端侧边栏切换按钮控制
-        const leftToggle = document.querySelector('.left-toggle');
-        const rightToggle = document.querySelector('.right-toggle');
-        const container = document.querySelector('.gitbook-container');
-        const leftSidebar = document.querySelector('.left-sidebar');
-        const rightSidebar = document.querySelector('.right-sidebar');
-
-        if (leftToggle && container && leftSidebar) {
-            leftToggle.addEventListener('click', () => {
-                const isHidden = leftSidebar.classList.contains('hidden');
-                
-                if (isHidden) {
-                    // 显示左侧栏
-                    leftSidebar.classList.remove('hidden');
-                    container.classList.remove('left-hidden', 'both-hidden');
-                    leftToggle.classList.remove('active');
-                } else {
-                    // 隐藏左侧栏
-                    leftSidebar.classList.add('hidden');
-                    if (rightSidebar && rightSidebar.classList.contains('hidden')) {
-                        container.classList.add('both-hidden');
-                        container.classList.remove('left-hidden');
-                    } else {
-                        container.classList.add('left-hidden');
-                        container.classList.remove('both-hidden');
-                    }
-                    leftToggle.classList.add('active');
-                }
-            });
-        }
-
-        if (rightToggle && container && rightSidebar) {
-            rightToggle.addEventListener('click', () => {
-                const isHidden = rightSidebar.classList.contains('hidden');
-                
-                if (isHidden) {
-                    // 显示右侧栏
-                    rightSidebar.classList.remove('hidden');
-                    container.classList.remove('right-hidden', 'both-hidden');
-                    rightToggle.classList.remove('active');
-                } else {
-                    // 隐藏右侧栏
-                    rightSidebar.classList.add('hidden');
-                    if (leftSidebar && leftSidebar.classList.contains('hidden')) {
-                        container.classList.add('both-hidden');
-                        container.classList.remove('right-hidden');
-                    } else {
-                        container.classList.add('right-hidden');
-                        container.classList.remove('both-hidden');
-                    }
-                    rightToggle.classList.add('active');
-                }
-            });
+    
+    toggleSidebar() {
+        this.sidebarCollapsed = !this.sidebarCollapsed;
+        this.updateSidebarState();
+        localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed);
+    }
+    
+    updateSidebarState() {
+        if (this.sidebarCollapsed) {
+            this.sidebar.classList.add('hidden');
+            this.sidebarToggle.classList.add('collapsed');
+        } else {
+            this.sidebar.classList.remove('hidden');
+            this.sidebarToggle.classList.remove('collapsed');
         }
     }
 
     setupNavigationTree() {
-        const nav = document.querySelector('.sidebar-nav, nav');
+        const nav = document.querySelector('.sidebar-container');
         if (!nav) return;
 
         // 核心函数：根据指定的链接元素，更新整个树的状态
@@ -178,6 +155,14 @@ class GitHubPagesNavigation {
                 if (link) {
                     // 对于所有链接（包括content-item-link），设置高亮状态
                     setTreeState(link);
+                    
+                    // 处理链接点击 - 移动端点击后自动关闭侧边栏
+                    if (link && this.isMobile && !this.sidebarCollapsed) {
+                        // 延迟关闭，让用户看到点击效果
+                        setTimeout(() => {
+                            this.toggleSidebar();
+                        }, 200);
+                    }
                 }
             }
         });
@@ -289,7 +274,7 @@ class GitHubPagesNavigation {
                 }
             }
 
-            // Escape key to close search or sidebar
+            // Escape key to close search
             if (e.key === 'Escape') {
                 if (this.searchActive) {
                     const searchInput = document.querySelector('#nav-search');
@@ -298,8 +283,6 @@ class GitHubPagesNavigation {
                         searchInput.value = '';
                         this.clearNavSearch();
                     }
-                } else if (this.sidebarOpen) {
-                    this.closeSidebar();
                 }
             }
 
@@ -318,34 +301,86 @@ class GitHubPagesNavigation {
     setupTOC() {
         this.generateTOC();
         this.setupTOCInteractions();
+        this.initTOCToggle();
     }
-
-    toggleSidebar() {
-        const leftSidebar = document.querySelector('.left-sidebar');
-        if (leftSidebar) {
-            this.sidebarOpen = !this.sidebarOpen;
-            leftSidebar.classList.toggle('open', this.sidebarOpen);
-            
-            // 更新切换按钮图标
-            const toggleButton = document.querySelector('.mobile-menu-toggle');
-            if (toggleButton) {
-                toggleButton.innerHTML = this.sidebarOpen ? '✕' : '☰';
+    
+    initTOCToggle() {
+        const tocContainer = document.getElementById('tocContainer');
+        const tocToggle = document.getElementById('tocToggle');
+        const mainContent = document.querySelector('.main-content');
+        
+        if (!tocToggle || !tocContainer) return;
+        
+        // 保存移动端状态
+        this.isMobile = window.innerWidth <= 768;
+        
+        // 从 localStorage 读取折叠状态
+        const savedState = localStorage.getItem('tocCollapsed');
+        
+        // 初始状态：移动端默认折叠，桌面端根据保存状态
+        if (savedState !== null) {
+            this.tocCollapsed = savedState === 'true';
+        } else {
+            this.tocCollapsed = this.isMobile;
+        }
+        
+        this.updateTOCToggleState();
+        
+        // 绑定切换按钮事件
+        tocToggle.addEventListener('click', () => {
+            this.toggleTOC();
+        });
+        
+        // 监听窗口大小变化
+        window.addEventListener('resize', () => {
+            const currentIsMobile = window.innerWidth <= 768;
+            // 从桌面切换到移动端时，如果TOC是展开的，自动折叠
+            if (!this.isMobile && currentIsMobile && !this.tocCollapsed) {
+                this.tocCollapsed = true;
+                this.updateTOCToggleState();
+            }
+            this.isMobile = currentIsMobile;
+        });
+    }
+    
+    toggleTOC() {
+        const tocContainer = document.getElementById('tocContainer');
+        const tocToggle = document.getElementById('tocToggle');
+        const mainContent = document.querySelector('.main-content');
+        
+        if (!tocContainer || !tocToggle) return;
+        
+        this.tocCollapsed = !this.tocCollapsed;
+        this.updateTOCToggleState();
+        
+        // 保存状态到 localStorage
+        localStorage.setItem('tocCollapsed', this.tocCollapsed);
+        
+        // 更新内容区域宽度（桌面端）
+        if (window.innerWidth > 768) {
+            if (this.tocCollapsed) {
+                mainContent?.classList.add('full-width');
+            } else {
+                mainContent?.classList.remove('full-width');
             }
         }
     }
-
-    closeSidebar() {
-        const leftSidebar = document.querySelector('.left-sidebar');
-        if (leftSidebar && this.sidebarOpen) {
-            this.sidebarOpen = false;
-            leftSidebar.classList.remove('open');
-            
-            const toggleButton = document.querySelector('.mobile-menu-toggle');
-            if (toggleButton) {
-                toggleButton.innerHTML = '☰';
-            }
+    
+    updateTOCToggleState() {
+        const tocContainer = document.getElementById('tocContainer');
+        const tocToggle = document.getElementById('tocToggle');
+        
+        if (this.tocCollapsed) {
+            tocContainer?.classList.add('hidden');
+            tocToggle?.classList.add('collapsed');
+            tocToggle?.setAttribute('data-tooltip', 'Show TOC');
+        } else {
+            tocContainer?.classList.remove('hidden');
+            tocToggle?.classList.remove('collapsed');
+            tocToggle?.setAttribute('data-tooltip', 'Hide TOC');
         }
     }
+
 
     // ===== TOC 功能 =====
     generateTOC() {
@@ -409,6 +444,11 @@ class GitHubPagesNavigation {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             this.scrollToHeading(heading);
+            
+            // 移动端点击后自动关闭TOC
+            if (this.isMobile && !this.tocCollapsed) {
+                this.toggleTOC();
+            }
         });
 
         li.appendChild(link);
