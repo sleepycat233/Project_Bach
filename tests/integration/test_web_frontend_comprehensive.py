@@ -60,7 +60,7 @@ class TestWebFrontendComprehensive:
             'output', 
             'temp',
             'data/logs',
-            'data/transcripts',
+            'data/output/public/transcripts',
             'data/output/public',
             'data/output/private',
             'web_frontend/static',

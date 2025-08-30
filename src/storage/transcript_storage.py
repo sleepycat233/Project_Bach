@@ -25,14 +25,12 @@ class TranscriptStorage:
         # 支持按privacy_level分别存储
         self.public_transcripts_folder = self.data_folder / 'output' / 'public' / 'transcripts'
         self.private_transcripts_folder = self.data_folder / 'output' / 'private' / 'transcripts'
-        # 旧版本兼容
-        self.transcripts_folder = self.data_folder / 'transcripts'
         self.logger = logging.getLogger('project_bach.transcript_storage')
         
         # 确保目录存在
         self.public_transcripts_folder.mkdir(parents=True, exist_ok=True)
         self.private_transcripts_folder.mkdir(parents=True, exist_ok=True)
-        self.transcripts_folder.mkdir(parents=True, exist_ok=True)
+        # 移除旧版本transcripts文件夹的创建，现在使用output下的分层结构
         
     def save_raw_transcript(self, filename: str, content: str, privacy_level: str = 'public') -> str:
         """保存原始转录文本
@@ -134,43 +132,51 @@ class TranscriptStorage:
                 self.logger.debug(f"加载转录文件: {file_path}")
                 return content
             else:
-                # 尝试从旧位置加载（兼容性）
-                old_file_path = self.transcripts_folder / f"{filename}_{suffix}.txt"
-                if old_file_path.exists():
-                    with open(old_file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    self.logger.debug(f"从旧位置加载转录文件: {old_file_path}")
-                    return content
-                else:
-                    self.logger.warning(f"转录文件不存在: {file_path}")
-                    return None
+                self.logger.warning(f"转录文件不存在: {file_path}")
+                return None
                 
         except Exception as e:
             self.logger.error(f"加载转录文件失败: {file_path}, 错误: {str(e)}")
             return None
     
-    def list_transcripts(self, suffix: Optional[str] = None) -> List[str]:
-        """列出所有转录文件
+    def list_transcripts(self, suffix: Optional[str] = None, privacy_level: str = 'both') -> List[str]:
+        """列出转录文件
         
         Args:
             suffix: 可选的后缀过滤器
+            privacy_level: 隐私级别 ('public', 'private', 'both')
             
         Returns:
             文件名列表（不包含路径和扩展名）
         """
         try:
             pattern = f"*_{suffix}.txt" if suffix else "*.txt"
-            files = list(self.transcripts_folder.glob(pattern))
+            all_files = []
+            
+            # 根据隐私级别选择文件夹
+            folders_to_check = []
+            if privacy_level == 'both':
+                folders_to_check = [self.public_transcripts_folder, self.private_transcripts_folder]
+            elif privacy_level == 'private':
+                folders_to_check = [self.private_transcripts_folder]
+            else:
+                folders_to_check = [self.public_transcripts_folder]
+            
+            # 从所有相关文件夹收集文件
+            for folder in folders_to_check:
+                if folder.exists():
+                    all_files.extend(list(folder.glob(pattern)))
             
             # 提取基础文件名
             base_names = []
-            for file_path in files:
+            for file_path in all_files:
                 name = file_path.stem
                 if suffix:
                     # 移除后缀
                     if name.endswith(f"_{suffix}"):
                         base_name = name[:-len(f"_{suffix}")]
-                        base_names.append(base_name)
+                        if base_name not in base_names:
+                            base_names.append(base_name)
                 else:
                     # 移除所有已知后缀
                     for known_suffix in ["raw", "anonymized", "processed"]:
@@ -190,48 +196,61 @@ class TranscriptStorage:
             self.logger.error(f"列出转录文件失败: {str(e)}")
             return []
     
-    def delete_transcript(self, filename: str, suffix: Optional[str] = None) -> bool:
+    def delete_transcript(self, filename: str, suffix: Optional[str] = None, privacy_level: str = 'both') -> bool:
         """删除转录文件
         
         Args:
             filename: 文件名（不包含扩展名）
             suffix: 可选的后缀，如果为None则删除所有相关文件
+            privacy_level: 隐私级别 ('public', 'private', 'both')
             
         Returns:
             是否成功删除
         """
         try:
-            if suffix:
-                # 删除特定后缀的文件
-                file_path = self.transcripts_folder / f"{filename}_{suffix}.txt"
-                if file_path.exists():
-                    file_path.unlink()
-                    self.logger.info(f"删除转录文件: {file_path}")
-                    return True
-                else:
-                    self.logger.warning(f"要删除的文件不存在: {file_path}")
-                    return False
+            deleted_count = 0
+            
+            # 根据隐私级别选择文件夹
+            folders_to_check = []
+            if privacy_level == 'both':
+                folders_to_check = [self.public_transcripts_folder, self.private_transcripts_folder]
+            elif privacy_level == 'private':
+                folders_to_check = [self.private_transcripts_folder]
             else:
-                # 删除所有相关文件
-                deleted_count = 0
-                for known_suffix in ["raw", "anonymized", "processed"]:
-                    file_path = self.transcripts_folder / f"{filename}_{known_suffix}.txt"
+                folders_to_check = [self.public_transcripts_folder]
+            
+            for folder in folders_to_check:
+                if suffix:
+                    # 删除特定后缀的文件
+                    file_path = folder / f"{filename}_{suffix}.txt"
                     if file_path.exists():
                         file_path.unlink()
                         deleted_count += 1
                         self.logger.info(f"删除转录文件: {file_path}")
-                
-                return deleted_count > 0
+                else:
+                    # 删除所有相关文件
+                    for known_suffix in ["raw", "anonymized", "processed"]:
+                        file_path = folder / f"{filename}_{known_suffix}.txt"
+                        if file_path.exists():
+                            file_path.unlink()
+                            deleted_count += 1
+                            self.logger.info(f"删除转录文件: {file_path}")
+            
+            if deleted_count == 0 and suffix:
+                self.logger.warning(f"要删除的文件不存在: {filename}_{suffix}.txt")
+            
+            return deleted_count > 0
                 
         except Exception as e:
             self.logger.error(f"删除转录文件失败: {filename}, 错误: {str(e)}")
             return False
     
-    def get_transcript_info(self, filename: str) -> Dict[str, any]:
+    def get_transcript_info(self, filename: str, privacy_level: str = 'both') -> Dict[str, any]:
         """获取转录文件信息
         
         Args:
             filename: 文件名（不包含扩展名）
+            privacy_level: 隐私级别 ('public', 'private', 'both')
             
         Returns:
             包含文件信息的字典
@@ -245,23 +264,36 @@ class TranscriptStorage:
         }
         
         try:
-            for suffix in ["raw", "anonymized", "processed"]:
-                file_path = self.transcripts_folder / f"{filename}_{suffix}.txt"
-                if file_path.exists():
-                    stat = file_path.stat()
-                    info['files'][suffix] = {
-                        'path': str(file_path),
-                        'size': stat.st_size,
-                        'created': datetime.fromtimestamp(stat.st_ctime),
-                        'modified': datetime.fromtimestamp(stat.st_mtime)
-                    }
-                    info['total_size'] += stat.st_size
-                    
-                    # 更新总体时间信息
-                    if info['created_time'] is None or info['files'][suffix]['created'] < info['created_time']:
-                        info['created_time'] = info['files'][suffix]['created']
-                    if info['modified_time'] is None or info['files'][suffix]['modified'] > info['modified_time']:
-                        info['modified_time'] = info['files'][suffix]['modified']
+            # 根据隐私级别选择文件夹
+            folders_to_check = []
+            if privacy_level == 'both':
+                folders_to_check = [self.public_transcripts_folder, self.private_transcripts_folder]
+            elif privacy_level == 'private':
+                folders_to_check = [self.private_transcripts_folder]
+            else:
+                folders_to_check = [self.public_transcripts_folder]
+            
+            for folder in folders_to_check:
+                folder_name = 'public' if folder == self.public_transcripts_folder else 'private'
+                for suffix in ["raw", "anonymized", "processed"]:
+                    file_path = folder / f"{filename}_{suffix}.txt"
+                    if file_path.exists():
+                        stat = file_path.stat()
+                        key = f"{folder_name}_{suffix}" if privacy_level == 'both' else suffix
+                        info['files'][key] = {
+                            'path': str(file_path),
+                            'size': stat.st_size,
+                            'created': datetime.fromtimestamp(stat.st_ctime),
+                            'modified': datetime.fromtimestamp(stat.st_mtime),
+                            'privacy_level': folder_name
+                        }
+                        info['total_size'] += stat.st_size
+                        
+                        # 更新总体时间信息
+                        if info['created_time'] is None or info['files'][key]['created'] < info['created_time']:
+                            info['created_time'] = info['files'][key]['created']
+                        if info['modified_time'] is None or info['files'][key]['modified'] > info['modified_time']:
+                            info['modified_time'] = info['files'][key]['modified']
             
             return info
             
@@ -269,11 +301,12 @@ class TranscriptStorage:
             self.logger.error(f"获取文件信息失败: {filename}, 错误: {str(e)}")
             return info
     
-    def cleanup_old_files(self, days: int = 30) -> int:
+    def cleanup_old_files(self, days: int = 30, privacy_level: str = 'both') -> int:
         """清理旧的转录文件
         
         Args:
             days: 保留天数，超过此天数的文件将被删除
+            privacy_level: 隐私级别 ('public', 'private', 'both')
             
         Returns:
             删除的文件数量
@@ -282,11 +315,22 @@ class TranscriptStorage:
             cutoff_time = datetime.now().timestamp() - (days * 24 * 60 * 60)
             deleted_count = 0
             
-            for file_path in self.transcripts_folder.glob("*.txt"):
-                if file_path.stat().st_mtime < cutoff_time:
-                    file_path.unlink()
-                    deleted_count += 1
-                    self.logger.info(f"清理旧文件: {file_path}")
+            # 根据隐私级别选择文件夹
+            folders_to_check = []
+            if privacy_level == 'both':
+                folders_to_check = [self.public_transcripts_folder, self.private_transcripts_folder]
+            elif privacy_level == 'private':
+                folders_to_check = [self.private_transcripts_folder]
+            else:
+                folders_to_check = [self.public_transcripts_folder]
+            
+            for folder in folders_to_check:
+                if folder.exists():
+                    for file_path in folder.glob("*.txt"):
+                        if file_path.stat().st_mtime < cutoff_time:
+                            file_path.unlink()
+                            deleted_count += 1
+                            self.logger.info(f"清理旧文件: {file_path}")
             
             self.logger.info(f"清理完成，删除了 {deleted_count} 个文件")
             return deleted_count
@@ -306,7 +350,8 @@ class TranscriptMetadata:
             storage: 转录存储实例
         """
         self.storage = storage
-        self.metadata_file = storage.transcripts_folder / "metadata.json"
+        # 使用public文件夹作为主元数据存储位置
+        self.metadata_file = storage.public_transcripts_folder / "metadata.json"
         self.logger = logging.getLogger('project_bach.transcript_metadata')
         self._metadata = self._load_metadata()
     

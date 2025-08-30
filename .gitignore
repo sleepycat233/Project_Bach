@@ -49,7 +49,6 @@ Thumbs.db
 
 # Project specific
 data/logs/
-data/transcripts/
 *.log
 temp/
 tmp/

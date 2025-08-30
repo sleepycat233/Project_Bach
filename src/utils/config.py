@@ -366,7 +366,7 @@ class DirectoryManager:
         data_folder = paths_config.get('data_folder')
         if data_folder:
             directories.extend([
-                os.path.join(data_folder, 'transcripts'),
+                # 移除transcripts，现在使用output下的分层结构
                 os.path.join(data_folder, 'logs')
             ])
         

@@ -301,8 +301,7 @@ class TestDirectoryManager(unittest.TestCase):
         self.assertTrue(Path(paths_config['data_folder']).exists())
         self.assertTrue(Path(paths_config['output_folder']).exists())
         
-        # 验证子目录被创建
-        self.assertTrue(Path(paths_config['data_folder'], 'transcripts').exists())
+        # 验证子目录被创建 (不再创建data/transcripts，现在使用output下的分层结构)
         self.assertTrue(Path(paths_config['data_folder'], 'logs').exists())
     
     def test_setup_directories_with_empty_paths(self):

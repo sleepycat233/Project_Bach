@@ -50,16 +50,14 @@ class AudioUploadProcessor:
         if not self.content_types_config:
             raise ValueError("内容分类配置缺失，请检查config.yaml中的content_classification部分")
         
-        # 设置目录路径
-        self.upload_dir = Path("./data/uploads")
-        self.watch_dir = Path("./watch_folder")
-        self.upload_dir.mkdir(parents=True, exist_ok=True)
+        # 设置监控目录路径 (上传文件直接放到监控目录)
+        paths_config = config_manager.get_paths_config()
+        self.watch_dir = Path(paths_config.get('watch_folder', './data/uploads'))
         self.watch_dir.mkdir(parents=True, exist_ok=True)
         
         # 加载音频上传配置
         upload_config = config_manager.get_nested_config('audio_upload') or {}
         self.auto_process = upload_config.get('auto_process', True)
-        self.preserve_original = upload_config.get('preserve_original', True)
         self.filename_sanitization = upload_config.get('filename_sanitization', True)
         
         self.logger.info("音频上传处理器初始化完成")
@@ -248,9 +246,7 @@ class AudioUploadProcessor:
             shutil.copy2(source_file_path, target_path)
             self.logger.info(f"文件已复制到: {target_path}")
             
-            # 5. 不再保留原始文件副本，避免重复存储
-            
-            # 6. 创建处理元数据
+            # 5. 创建处理元数据
             processing_metadata = {
                 'source_file': str(source_file_path),
                 'target_file': str(target_path),
@@ -278,7 +274,7 @@ class AudioUploadProcessor:
             
             processing_metadata['classification_result'] = classification_result
             
-            # 8. 返回成功结果
+            # 7. 返回成功结果
             result = {
                 'success': True,
                 'target_file_path': str(target_path),
@@ -337,33 +333,11 @@ class AudioUploadProcessor:
             watch_files = list(self.watch_dir.glob('*'))
             audio_files = [f for f in watch_files if f.suffix.lower() in self.SUPPORTED_FORMATS]
             
-            # 统计upload目录中的文件
-            upload_files = list(self.upload_dir.glob('*'))
-            preserved_files = [f for f in upload_files if f.name.startswith('original_')]
-            
-            # 按内容类型统计
-            type_stats = {}
-            for audio_file in audio_files:
-                # 从文件名前缀推断类型
-                name_parts = audio_file.stem.split('_')
-                if len(name_parts) >= 1:
-                    type_prefix = name_parts[0]
-                    # 反向查找内容类型
-                    for content_type in self.content_types_config:
-                        if content_type[:3].upper() == type_prefix:
-                            type_stats[content_type] = type_stats.get(content_type, 0) + 1
-                            break
-                    else:
-                        type_stats['unknown'] = type_stats.get('unknown', 0) + 1
-                else:
-                    type_stats['unknown'] = type_stats.get('unknown', 0) + 1
+            # 统计watch目录中的文件
             
             return {
                 'total_audio_files': len(audio_files),
-                'total_preserved_files': len(preserved_files),
-                'content_type_distribution': type_stats,
                 'watch_directory': str(self.watch_dir),
-                'upload_directory': str(self.upload_dir),
                 'supported_formats': list(self.SUPPORTED_FORMATS),
                 'last_updated': datetime.now().isoformat()
             }
@@ -394,7 +368,7 @@ class AudioUploadProcessor:
             total_cleaned_size = 0
             
             # 清理upload目录中的旧文件
-            for file_path in self.upload_dir.iterdir():
+            for file_path in self.watch_dir.iterdir():
                 if file_path.is_file():
                     file_stat = file_path.stat()
                     if file_stat.st_mtime < cutoff_timestamp:

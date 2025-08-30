@@ -267,8 +267,8 @@ class TestPrivateContentEndToEndWorkflow(unittest.TestCase):
             }
         }
         
-        # 创建必要目录
-        for path in ['data/output/private', 'data/transcripts', 'watch_folder']:
+        # 创建必要目录 (移除旧版本data/transcripts)
+        for path in ['data/output/private', 'data/output/public', 'watch_folder']:
             Path(self.test_dir, path).mkdir(parents=True, exist_ok=True)
     
     @patch('src.core.transcription.TranscriptionService')

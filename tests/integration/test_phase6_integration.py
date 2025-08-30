@@ -32,7 +32,7 @@ class TestPhase6Integration:
             'output',
             'temp',
             'data/logs',
-            'data/transcripts',
+            'data/output/public/transcripts',
             'data/output',
             'web_frontend/static',
             'web_frontend/templates'

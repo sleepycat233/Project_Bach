@@ -84,18 +84,19 @@ class TestAudioUploadProcessor:
                     else:
                         return None
                 return current
+            
+            def get_paths_config(self):
+                return self.config.get('paths', {})
         
         return SimpleConfigManager(config_data)
     
     @pytest.fixture
     def upload_processor(self, config_manager, temp_dir):
         """创建音频上传处理器实例"""
-        # 使用临时目录作为上传和监控目录
+        # 使用临时目录作为监控目录 (upload和watch是同一个目录)
         processor = AudioUploadProcessor(config_manager)
-        processor.upload_dir = Path(temp_dir) / "data/uploads"
-        processor.watch_dir = Path(temp_dir) / "watch"
-        processor.upload_dir.mkdir(exist_ok=True)
-        processor.watch_dir.mkdir(exist_ok=True)
+        processor.watch_dir = Path(temp_dir) / "data/uploads"
+        processor.watch_dir.mkdir(parents=True, exist_ok=True)
         return processor
     
     @pytest.fixture
@@ -252,7 +253,6 @@ class TestAudioUploadProcessor:
         
         assert result['success'] is True
         assert 'target_file_path' in result
-        assert 'preserved_file_path' in result
         assert 'processing_metadata' in result
         assert '类型: 讲座' in result['message']
         
@@ -261,12 +261,6 @@ class TestAudioUploadProcessor:
         assert target_path.exists()
         assert target_path.parent == upload_processor.watch_dir
         assert 'LEC_' in target_path.name  # 应该有内容类型前缀
-        
-        # 检查原始文件是否被保留
-        if result['preserved_file_path']:
-            preserved_path = Path(result['preserved_file_path'])
-            assert preserved_path.exists()
-            assert preserved_path.parent == upload_processor.upload_dir
         
         # 检查处理元数据
         metadata = result['processing_metadata']
@@ -298,15 +292,13 @@ class TestAudioUploadProcessor:
         assert '无效的内容类型' in result['error']
         assert 'available_types' in result
     
-    def test_process_uploaded_file_preserve_original_disabled(self, upload_processor, sample_audio_files):
-        """测试禁用原始文件保留"""
-        upload_processor.preserve_original = False
-        
+    def test_process_uploaded_file_no_custom_metadata(self, upload_processor, sample_audio_files):
+        """测试无自定义元数据的文件处理"""
         source_file = sample_audio_files['valid_mp3']
         result = upload_processor.process_uploaded_file(source_file, 'lecture')
         
         assert result['success'] is True
-        assert result['preserved_file_path'] is None
+        assert 'target_file_path' in result
     
     def test_process_uploaded_file_unique_filename(self, upload_processor, sample_audio_files):
         """测试文件名唯一性处理"""
@@ -356,28 +348,23 @@ class TestAudioUploadProcessor:
     def test_get_upload_statistics(self, upload_processor, sample_audio_files):
         """测试获取上传统计信息"""
         # 处理几个文件
-        upload_processor.process_uploaded_file(sample_audio_files['valid_mp3'], 'lecture')
-        upload_processor.process_uploaded_file(sample_audio_files['valid_wav'], 'podcast')
+        result1 = upload_processor.process_uploaded_file(sample_audio_files['valid_mp3'], 'lecture')
+        result2 = upload_processor.process_uploaded_file(sample_audio_files['valid_wav'], 'podcast')
         
         stats = upload_processor.get_upload_statistics()
         
         assert 'total_audio_files' in stats
-        assert 'total_preserved_files' in stats
-        assert 'content_type_distribution' in stats
         assert 'watch_directory' in stats
-        assert 'upload_directory' in stats
         assert 'supported_formats' in stats
         assert 'last_updated' in stats
         
         assert stats['total_audio_files'] >= 2
-        assert stats['content_type_distribution'].get('lecture', 0) >= 1
-        assert stats['content_type_distribution'].get('podcast', 0) >= 1
         assert '.mp3' in stats['supported_formats']
     
     def test_cleanup_old_files(self, upload_processor, temp_dir):
         """测试清理旧文件"""
         # 创建一些测试文件
-        old_file = upload_processor.upload_dir / "old_file.mp3"
+        old_file = upload_processor.watch_dir / "old_file.mp3"
         old_file.write_bytes(b"old content")
         
         # 修改文件时间为31天前
@@ -386,7 +373,7 @@ class TestAudioUploadProcessor:
         old_timestamp = old_time.timestamp()
         os.utime(old_file, (old_timestamp, old_timestamp))
         
-        new_file = upload_processor.upload_dir / "new_file.mp3"
+        new_file = upload_processor.watch_dir / "new_file.mp3"
         new_file.write_bytes(b"new content")
         
         # 清理30天前的文件
