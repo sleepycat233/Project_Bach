@@ -390,7 +390,10 @@ class GitHubPagesNavigation {
             tocList.appendChild(tocItem);
         });
 
-        this.setupScrollSync();
+        // 延迟设置滚动同步，确保DOM完全渲染
+        setTimeout(() => {
+            this.setupScrollSync();
+        }, 100);
     }
 
     createTOCItem(heading, level) {
@@ -452,35 +455,129 @@ class GitHubPagesNavigation {
             return;
         }
 
-        // 清除之前的观察器（如果存在）
-        if (this.scrollObserver) {
-            this.scrollObserver.disconnect();
+        // 清除之前的滚动监听器
+        if (this.scrollHandler) {
+            window.removeEventListener('scroll', this.scrollHandler);
         }
 
-        // 最简单的滚动高亮逻辑
-        this.scrollObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const id = entry.target.id;
-                    const tocLink = document.querySelector(`.toc-link[href="#${id}"]`);
-                    
-                    if (tocLink) {
-                        // 移除所有活动状态
-                        tocLinks.forEach(link => link.classList.remove('active'));
-                        // 添加当前活动状态
-                        tocLink.classList.add('active');
-                    }
+        // 收集标题信息
+        this.headingData = Array.from(headings).map(heading => ({
+            element: heading,
+            id: heading.id,
+            offsetTop: heading.offsetTop
+        }));
+
+        this.tocItems = Array.from(tocLinks);
+        this.currentActiveIndex = -1;
+
+        // 创建优化的滚动处理器
+        let ticking = false;
+        this.scrollHandler = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    this.updateActiveHeading();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        // 监听滚动事件
+        window.addEventListener('scroll', this.scrollHandler);
+
+        // 监听窗口大小变化，更新偏移位置
+        if (this.resizeHandler) {
+            window.removeEventListener('resize', this.resizeHandler);
+        }
+        this.resizeHandler = () => {
+            this.updateHeadingOffsets();
+        };
+        window.addEventListener('resize', this.resizeHandler);
+
+        // 初始更新
+        this.updateActiveHeading();
+    }
+
+    updateHeadingOffsets() {
+        // 更新所有标题的偏移位置
+        if (this.headingData) {
+            this.headingData.forEach(heading => {
+                heading.offsetTop = heading.element.offsetTop;
+            });
+        }
+    }
+
+    updateActiveHeading() {
+        if (!this.headingData || !this.tocItems) return;
+
+        const scrollPosition = window.scrollY + 100; // 添加偏移量以提前触发
+        
+        // 从后向前遍历，找到第一个offsetTop小于滚动位置的标题
+        let activeIndex = -1;
+        for (let i = this.headingData.length - 1; i >= 0; i--) {
+            if (scrollPosition >= this.headingData[i].offsetTop) {
+                activeIndex = i;
+                break;
+            }
+        }
+
+        // 如果激活项发生变化，更新样式
+        if (activeIndex !== this.currentActiveIndex) {
+            // 移除之前的激活状态
+            this.tocItems.forEach(item => {
+                item.classList.remove('active');
+                // 也移除父级li的active类（如果存在）
+                const parentLi = item.closest('.toc-item');
+                if (parentLi) {
+                    parentLi.classList.remove('active');
                 }
             });
-        });
 
-        headings.forEach(heading => this.scrollObserver.observe(heading));
+            // 添加新的激活状态
+            if (activeIndex >= 0 && activeIndex < this.tocItems.length) {
+                const activeLink = this.tocItems[activeIndex];
+                activeLink.classList.add('active');
+                
+                // 也为父级li添加active类
+                const parentLi = activeLink.closest('.toc-item');
+                if (parentLi) {
+                    parentLi.classList.add('active');
+                }
+
+                // 确保激活项在TOC容器中可见
+                this.ensureTOCItemVisible(activeLink);
+            }
+
+            this.currentActiveIndex = activeIndex;
+        }
+    }
+
+    ensureTOCItemVisible(element) {
+        const tocContainer = element.closest('.toc, .toc-content');
+        if (!tocContainer) return;
+
+        const containerRect = tocContainer.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+
+        // 如果元素不在容器可见区域内，滚动使其可见
+        if (elementRect.top < containerRect.top || 
+            elementRect.bottom > containerRect.bottom) {
+            element.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest'
+            });
+        }
     }
 
     scrollToHeading(heading) {
-        heading.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
+        // 计算目标位置，考虑固定header的高度
+        const offset = 20; // 顶部偏移量
+        const elementPosition = heading.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+        window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
         });
     }
 
