@@ -2,6 +2,11 @@ api:
   openrouter:
     key: "${OPENROUTER_API_KEY}"  # 从环境变量读取
     base_url: "https://openrouter.ai/api/v1"
+
+  # HuggingFace API配置 (用于Speaker Diarization)
+  huggingface:
+    token: "${HUGGINGFACE_TOKEN}"  # 从环境变量读取
+
     models:
       summary: "google/gemma-3n-e2b-it:free"  # Google免费快速模型
       mindmap: "google/gemma-3n-e2b-it:free"  # Google免费快速模型
@@ -27,66 +32,84 @@ paths:
 spacy:
   model: "zh_core_web_sm"
 
-whisperkit:
-  # 模型路径配置
-  model_path: "./models"  # 项目本地模型目录
+# Phase 10: MLX Whisper配置 (替代WhisperKit)
+mlx_whisper:
+  # 默认模型配置 - 使用标准MLX命名
+  default_model: "whisper-tiny-mlx"  # 默认使用的模型
 
-  # 模型提供商配置 - 支持本地和API服务（可扩展）
-  providers:
-    local:
-      enabled: true
-      type: "whisperkit_local"
-      path: "./models/whisperkit-coreml"
-      # 自动发现本地模型，读取config.json
-      auto_discovery: true
+  # 可用模型列表（统一使用标准MLX命名）
+  available_models:
+    - "mlx-community/whisper-tiny-mlx"
+    - "mlx-community/whisper-base-mlx"
+    - "mlx-community/whisper-small-mlx"
+    - "mlx-community/whisper-medium-mlx"
+    - "mlx-community/whisper-large-v3-mlx"
+    - "mlx-community/whisper-large-v3-turbo"
 
-    # 未来API支持（可配置启用）
-    openai_api:
-      enabled: false  # 当前未启用
-      type: "openai_whisper_api"
-      api_key: "${OPENAI_API_KEY}"
-      base_url: "https://api.openai.com/v1"
-      display_info:
-        provider_name: "OpenAI"
-      models:
-        - name: "whisper-1"
-          display_name: "Whisper V1"
-          multilingual_support: true
-          english_support: true
-        - name: "whisper-large-v3-turbo"
-          display_name: "Whisper Large V3 Turbo"
-          multilingual_support: true
-          english_support: true
+  # 统一使用HuggingFace缓存，不支持本地下载（更好的跨项目共享）
 
-    elevenlabs_api:
-      enabled: false  # 当前未启用
-      type: "elevenlabs_api"
-      api_key: "${ELEVENLABS_API_KEY}"
-      base_url: "https://api.elevenlabs.io/v1"
-      display_info:
-        provider_name: "ElevenLabs"
-      models:
-        - name: "speech"
-          display_name: "Speech Recognition"
-          multilingual_support: true
-          english_support: true
+  # 转录参数配置
+  transcription:
+    word_timestamps: true                         # 词级时间戳(原生支持)
+    language_detection: "auto"                    # 自动语言检测
+    supported_languages: ["en", "zh", "ja", "ko", "de", "fr", "es", "it", "pt", "ru"]
 
-    azure_speech:
-      enabled: false  # 当前未启用
-      type: "azure_cognitive_services"
-      api_key: "${AZURE_SPEECH_KEY}"
-      region: "eastus"
-      display_info:
-        provider_name: "Azure"
-      models:
-        - name: "speech"
-          display_name: "Speech Recognition"
-          multilingual_support: true
-          english_support: true
+# Speaker Diarization配置
+diarization:
+  provider: "pyannote"   # 使用pyannote-audio
+  max_speakers: 6
+  min_segment_duration: 1.0
+  model_path: "./models/diarization"            # 说话人分离模型目录
 
-  # 参考性能数据（从实际测试获得）：
-  # - distil-large-v3: 18x实时 (英文专用)
-  # - openai-large-v3: 4x实时 (多语言)
+  # 基于content type和subcategory的diarization配置
+  content_type_defaults:
+    # 主分类默认设置
+    lecture: false       # 讲座通常单人，默认不启用
+    meeting: true        # 会议多人对话，默认启用
+
+    # Lecture子分类配置 - 用户可自定义
+    lecture_subcategories:
+      CS101: false          # CS课程，单人讲授
+      seminar: true      # 研讨会，可能有讨论环节
+      workshop: true     # 工作坊，可能有互动
+
+  # 输出格式配置
+  output_format:
+    group_by_speaker: true          # 默认按说话人分组，便于阅读
+    timestamp_precision: 1          # 时间戳精度(小数位数)
+    include_confidence: false       # 是否包含置信度信息
+
+# Phase 6: 多媒体内容分类与Web界面配置
+content_classification:
+  # 支持的内容类型定义
+  content_types:
+    lecture:      # 🎓 学术讲座
+      icon: "🎓"
+      display_name: "Academic Lecture"
+      subcategories:  # 课程子分类
+        - "PHYS101"
+        - "CS101"
+        - "Seminar"
+      recommendations:
+        english:
+          - "whisper-base-mlx"
+          - "whisper-small-mlx"  # 英文快速模型
+        multilingual:
+          - "whisper-large-v3-mlx"         # 多语言高精度
+
+    meeting:      # 🏢 会议录音
+      icon: "🏢"
+      display_name: "Meeting Recording (Limited support, requires ElevenLabs speaker diarization)"
+      subcategories:  # 会议子分类
+        - "team_meeting"
+        - "project_review"
+        - "client_call"
+        - "standup"
+      recommendations:
+        english:
+          - "whisper-base-mlx"                     # MLX英文处理
+        multilingual:
+          - "whisper-large-v3-mlx"                 # MLX多语言处理
 
 # 系统配置
 system:
@@ -162,8 +185,8 @@ github:
 
   # 网站配置
   website:
-    title: "Project Bach - 智能音频处理系统"
-    description: "基于 WhisperKit + OpenRouter + spaCy 的智能音频处理与内容生成系统"
+    title: "Project Bach"
+    description: "基于 MLX Whisper + OpenRouter + spaCy 的智能音频处理与内容生成系统"
     theme: "dark"  # 默认主题: light, dark, auto
 
   # 部署设置
@@ -203,57 +226,6 @@ templates:
     search: false  # 搜索功能 (未来功能)
     rss_feed: false  # RSS订阅 (未来功能)
     comments: false  # 评论系统 (未来功能)
-
-# Phase 6: 多媒体内容分类与Web界面配置
-content_classification:
-  # 支持的内容类型定义
-  content_types:
-    lecture:      # 🎓 学术讲座
-      icon: "🎓"
-      display_name: "Academic Lecture"
-      subcategories:  # 课程子分类
-        - "PHYS101"
-        - "CS101"
-        - "ML301"
-        - "PHYS401"
-      recommendations:
-        english:
-          - "distil-whisper_distil-large-v3"  # 英文快速模型
-        multilingual:
-          - "openai_whisper-large-v3"         # 多语言高精度
-
-    meeting:      # 🏢 会议录音
-      icon: "🏢"
-      display_name: "Meeting Recording (Limited support, requires ElevenLabs speaker diarization)"
-      subcategories:  # 会议子分类
-        - "team_meeting"
-        - "project_review"
-        - "client_call"
-        - "standup"
-      recommendations:
-        english:
-          - "openai_whisper-large-v3"         # 英文高精度多人对话
-          - "elevenlabs_api_speech"            # 英文说话者分离
-        multilingual:
-          - "openai_whisper-large-v3"         # 多语言高精度多人对话
-          - "elevenlabs_api_speech"            # 多语言说话者分离
-
-    others:       # 📄 其他内容
-      icon: "📄"
-      display_name: "Others"
-      subcategories:  # 其他子分类
-        - "podcast"
-        - "interview"
-        - "presentation"
-        - "training"
-      recommendations:
-        english:
-          - "distil-whisper_distil-large-v3"  # 英文快速处理
-          - "openai_whisper-medium"            # 英文平衡选择
-        multilingual:
-          - "openai_whisper-large-v3"         # 多语言平衡选择
-          - "openai_whisper-medium"            # 多语言备选方案
-
   # 分类算法配置
   classification:
     confidence_threshold: 0.5        # 分类置信度阈值

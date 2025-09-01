@@ -54,20 +54,31 @@ pip3.11 install -r requirements.txt
 cp .env.template .env
 # 编辑.env文件填入真实密钥
 
-# 3. 下载WhisperKit模型（必需）
-# 创建模型目录
-mkdir -p ./models/whisperkit-coreml
+# 3. 下载MLX Whisper模型（必需）
+# 设置HuggingFace token（如果.env文件中已有，自动使用）
+source .env
 
-# 下载英文优化模型（推荐）- 使用空音频触发下载
-echo "创建临时音频文件用于模型下载..."
-ffmpeg -f lavfi -i "anullsrc=channel_layout=mono:sample_rate=16000" -t 1 temp_download.wav -y 2>/dev/null
-whisperkit-cli transcribe --model large-v3 --model-prefix distil --download-model-path ./models/whisperkit-coreml --audio-path temp_download.wav
-rm temp_download.wav
+# 下载推荐的基础模型
+./venv/bin/python -c "
+import os
+from huggingface_hub import snapshot_download
+token = os.getenv('HUGGINGFACE_TOKEN')
 
-# 下载多语言通用模型（可选）
-# ffmpeg -f lavfi -i "anullsrc=channel_layout=mono:sample_rate=16000" -t 1 temp_download.wav -y 2>/dev/null
-# whisperkit-cli transcribe --model large-v3 --model-prefix openai --download-model-path ./models/whisperkit-coreml --audio-path temp_download.wav
-# rm temp_download.wav
+# 下载基础模型组合
+models = [
+    'mlx-community/whisper-tiny-mlx',    # 默认快速模型
+    'mlx-community/whisper-base-mlx',    # 英文推荐模型
+    'mlx-community/whisper-medium-mlx'   # 平衡模型
+]
+
+for model in models:
+    try:
+        print(f'Downloading {model}...')
+        cache_path = snapshot_download(model, token=token)
+        print(f'✅ {model} downloaded to: {cache_path}')
+    except Exception as e:
+        print(f'❌ Failed to download {model}: {e}')
+"
 
 # 4. 生成配置文件
 python3.11 src/utils/env_manager.py
@@ -139,74 +150,111 @@ Project_Bach/
    - 提交到Git
    - 团队成员重新运行 `python3.11 src/utils/env_manager.py`
 
-## 🎯 WhisperKit模型管理
+## 🎯 MLX Whisper模型管理
 
 ### 模型下载详细说明
 
-Project Bach需要WhisperKit模型进行音频转录。模型会下载到项目本地的`./models/whisperkit-coreml/`目录。
+Project Bach使用MLX Whisper模型进行音频转录。模型会自动缓存到HuggingFace Hub缓存目录 `~/.cache/huggingface/hub/`。
 
 #### 推荐模型组合
 
 ```bash
-# 方案1：仅英文处理（推荐，节省存储空间）
-ffmpeg -f lavfi -i "anullsrc=channel_layout=mono:sample_rate=16000" -t 1 temp_download.wav -y 2>/dev/null
-whisperkit-cli transcribe --model large-v3 --model-prefix distil --download-model-path ./models/whisperkit-coreml --audio-path temp_download.wav
-rm temp_download.wav
+# 设置HuggingFace认证
+source .env  # 加载HUGGINGFACE_TOKEN
 
-# 方案2：英文+多语言支持（完整功能）
-ffmpeg -f lavfi -i "anullsrc=channel_layout=mono:sample_rate=16000" -t 1 temp_download.wav -y 2>/dev/null
-whisperkit-cli transcribe --model large-v3 --model-prefix distil --download-model-path ./models/whisperkit-coreml --audio-path temp_download.wav
-whisperkit-cli transcribe --model large-v3 --model-prefix openai --download-model-path ./models/whisperkit-coreml --audio-path temp_download.wav
-rm temp_download.wav
+# 方案1：基础模型组合（推荐，3个模型）
+./venv/bin/python -c "
+import os
+from huggingface_hub import snapshot_download
+token = os.getenv('HUGGINGFACE_TOKEN')
+
+models = [
+    'mlx-community/whisper-tiny-mlx',    # 默认快速模型 (~39MB)
+    'mlx-community/whisper-base-mlx',    # 英文推荐模型 (~142MB)  
+    'mlx-community/whisper-medium-mlx'   # 平衡性能模型 (~769MB)
+]
+
+for model in models:
+    print(f'📥 Downloading {model}...')
+    cache_path = snapshot_download(model, token=token)
+    print(f'✅ Downloaded to: {cache_path}')
+"
+
+# 方案2：完整模型支持（高级用户）
+./venv/bin/python -c "
+import os
+from huggingface_hub import snapshot_download
+token = os.getenv('HUGGINGFACE_TOKEN')
+
+models = [
+    'mlx-community/whisper-tiny-mlx',      # 快速模型
+    'mlx-community/whisper-base-mlx',      # 英文推荐
+    'mlx-community/whisper-small-mlx',     # 英文推荐  
+    'mlx-community/whisper-medium-mlx',    # 平衡模型
+    'mlx-community/whisper-large-v3-mlx',  # 多语言推荐
+    'mlx-community/whisper-large-v3-turbo' # 最新turbo版本
+]
+
+for model in models:
+    print(f'📥 Downloading {model}...')
+    cache_path = snapshot_download(model, token=token)
+    print(f'✅ Downloaded to: {cache_path}')
+"
 ```
 
-#### 所有可用模型
+#### 单独下载特定模型
 
 ```bash
-# 下载辅助函数（复制使用）
-download_model() {
-    local model=$1
-    local prefix=$2
-    echo "下载 $prefix-$model 模型..."
-    ffmpeg -f lavfi -i "anullsrc=channel_layout=mono:sample_rate=16000" -t 1 temp_download.wav -y 2>/dev/null
-    whisperkit-cli transcribe --model $model --model-prefix $prefix --download-model-path ./models/whisperkit-coreml --audio-path temp_download.wav
-    rm temp_download.wav
-    echo "✅ $prefix-$model 下载完成"
+# 下载辅助函数
+download_mlx_model() {
+    local model_name=$1
+    source .env
+    ./venv/bin/python -c "
+import os
+from huggingface_hub import snapshot_download
+token = os.getenv('HUGGINGFACE_TOKEN')
+model = 'mlx-community/$model_name'
+print(f'📥 Downloading {model}...')
+cache_path = snapshot_download(model, token=token)
+print(f'✅ {model} downloaded to: {cache_path}')
+"
 }
 
-# 英文专用模型（distil前缀）
-download_model large-v3 distil  # 推荐
-download_model medium distil
-
-# 多语言模型（openai前缀）  
-download_model large-v3 openai  # 推荐
-download_model large-v2 openai
-download_model medium openai
-download_model small openai
-download_model base openai
-download_model tiny openai
+# 使用示例
+download_mlx_model whisper-large-v3-mlx
+download_mlx_model whisper-small-mlx
 ```
 
 #### 检查已下载模型
 
 ```bash
-# 查看已下载的模型
-ls -la ./models/whisperkit-coreml/
+# 查看HuggingFace缓存中的MLX模型
+ls -la ~/.cache/huggingface/hub/ | grep whisper
 
-# 检查模型完整性
-find ./models/whisperkit-coreml/ -name "*.mlmodelc" | head -10
+# 使用API检查模型状态
+curl -s http://localhost:8080/api/models/smart-config | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+print('📊 MLX Whisper模型状态:')
+for model in data['all']:
+    status = '✅ Downloaded' if model['downloaded'] else '📦 Not downloaded'
+    default = ' (default)' if model.get('is_default') else ''
+    print(f'  {model[\"name\"]}: {status}{default}')
+"
 ```
 
 #### 模型存储说明
 
-- **存储位置**: `./models/whisperkit-coreml/`
+- **存储位置**: `~/.cache/huggingface/hub/models--mlx-community--*`
 - **模型大小**: 
-  - tiny: ~39MB
-  - base: ~142MB  
-  - small: ~244MB
-  - medium: ~600-769MB
-  - large-v3: ~1.5-2.9GB
-- **推荐磁盘空间**: 至少5GB可用空间
+  - whisper-tiny-mlx: ~39MB
+  - whisper-base-mlx: ~142MB  
+  - whisper-small-mlx: ~244MB
+  - whisper-medium-mlx: ~769MB
+  - whisper-large-v3-mlx: ~1.5GB
+  - whisper-large-v3-turbo: ~1.5GB
+- **推荐磁盘空间**: 至少3GB可用空间（基础组合）
+- **跨项目共享**: 缓存模型可被其他MLX项目重用
 
 ## 🔧 故障排除
 
@@ -232,35 +280,69 @@ tailscale up --authkey=你的密钥
 tailscale status
 ```
 
-### 问题4: "WhisperKit模型未找到"
+### 问题4: "MLX Whisper模型未找到"
 ```bash
-# 解决方案：重新下载推荐模型
-whisperkit-cli download --model large-v3 --model-prefix distil --download-model-path ./models/whisperkit-coreml
+# 解决方案：检查模型下载状态
+curl -s http://localhost:8080/api/models/smart-config | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for model in data['all']:
+    if not model['downloaded']:
+        print(f'📦 Missing: {model[\"name\"]}')
+"
 
-# 检查下载结果
-ls -la ./models/whisperkit-coreml/
+# 重新下载缺失的模型
+source .env
+./venv/bin/python -c "
+import os
+from huggingface_hub import snapshot_download
+token = os.getenv('HUGGINGFACE_TOKEN')
+snapshot_download('mlx-community/whisper-tiny-mlx', token=token)
+"
 ```
 
-### 问题5: "whisperkit-cli命令不存在"
+### 问题5: "HuggingFace认证失败"
 ```bash
-# 解决方案：安装WhisperKit CLI
-# macOS (推荐使用Homebrew)
-brew install argmaxinc/whisperkit/whisperkit
+# 解决方案1：检查.env文件中的token
+grep HUGGINGFACE_TOKEN .env
 
-# 或直接下载
-curl -L https://github.com/argmaxinc/WhisperKit/releases/latest/download/whisperkit-cli-macos.zip -o whisperkit-cli.zip
-unzip whisperkit-cli.zip
-sudo mv whisperkit-cli /usr/local/bin/
+# 解决方案2：获取新的HuggingFace token
+# 1. 访问 https://huggingface.co/settings/tokens
+# 2. 创建新的 Read token
+# 3. 更新 .env 文件中的 HUGGINGFACE_TOKEN
+
+# 解决方案3：测试认证
+source .env
+./venv/bin/python -c "
+import os
+from huggingface_hub import HfApi
+api = HfApi(token=os.getenv('HUGGINGFACE_TOKEN'))
+user_info = api.whoami()
+print(f'✅ Logged in as: {user_info.get(\"name\", \"Unknown\")}')
+"
 ```
 
 ### 问题6: "模型下载速度慢或失败"
 ```bash
 # 解决方案1：使用代理（如果需要）
 export https_proxy=http://your-proxy:port
-whisperkit-cli download --model large-v3 --model-prefix distil --download-model-path ./models/whisperkit-coreml
+export http_proxy=http://your-proxy:port
+source .env
+./venv/bin/python -c "
+import os
+from huggingface_hub import snapshot_download
+token = os.getenv('HUGGINGFACE_TOKEN')
+snapshot_download('mlx-community/whisper-tiny-mlx', token=token)
+"
 
 # 解决方案2：分步下载较小模型
-whisperkit-cli download --model medium --model-prefix distil --download-model-path ./models/whisperkit-coreml
+# 先下载tiny模型测试网络连接
+./venv/bin/python -c "
+import os
+from huggingface_hub import snapshot_download
+token = os.getenv('HUGGINGFACE_TOKEN')
+snapshot_download('mlx-community/whisper-tiny-mlx', token=token)
+"
 ```
 
 ## 📞 获取帮助

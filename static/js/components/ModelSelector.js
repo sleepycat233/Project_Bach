@@ -208,18 +208,13 @@ export class ModelSelector {
                     ? model.is_english_recommended 
                     : model.is_multilingual_recommended;
                 
-                const hasLanguageSupport = language === 'english' 
-                    ? model.english_support 
-                    : model.multilingual_support;
-                
-                const matchesLanguage = isRecommended || hasLanguageSupport;
-                
                 // 设置推荐标志
                 model.recommended = language === 'english' 
                     ? model.is_english_recommended 
                     : model.is_multilingual_recommended;
                 
-                return matchesLanguage;
+                // MLX模型都支持双语，无需额外过滤
+                return true;
             });
         } else {
             // 回退到全局语言模型
