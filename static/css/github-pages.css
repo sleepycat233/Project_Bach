@@ -97,9 +97,9 @@
     transition: max-width 0.3s ease;
 }
 
-/* 内容全宽模式（TOC隐藏时） */
+/* 内容全宽模式（TOC隐藏时） - 保持合理的最大宽度 */
 .main-content.full-width {
-    max-width: 100%;
+    max-width: 60rem; /* 设置合理的最大宽度，避免内容过宽 */
 }
 
 

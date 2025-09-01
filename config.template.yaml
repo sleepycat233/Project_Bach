@@ -20,8 +20,8 @@ api:
         credit_to_requests_ratio: 100  # 每个credit允许100个请求/天
 
 paths:
-  watch_folder: "./watch_folder"  # 音频文件监控目录
   data_folder: "./data"  # 数据存储目录 (转录文本、日志等)
+  watch_folder: "./data/uploads"  # 音频文件监控目录 - 直接监控上传目录
   output_folder: "./data/output"  # 处理结果输出目录
 
 spacy:
@@ -206,12 +206,6 @@ templates:
 
 # Phase 6: 多媒体内容分类与Web界面配置
 content_classification:
-  # 课程配置 (用于lecture_series多选)
-  courses:
-    - "PHYS101"
-    - "CS101"
-    - "ML301"
-    - "PHYS401"
   # 支持的内容类型定义
   content_types:
     lecture:      # 🎓 学术讲座
@@ -219,7 +213,7 @@ content_classification:
       display_name: "Academic Lecture"
       subcategories:  # 课程子分类
         - "PHYS101"
-        - "CS101" 
+        - "CS101"
         - "ML301"
         - "PHYS401"
       recommendations:

@@ -1,6 +1,14 @@
 # 🎼 Project Bach
 
-<img src="/static/assets/logo1.jpg" alt="Project Bach Logo" style="max-width: 200px; height: auto; margin: 20px 0;" />
+<div style="display: flex; align-items: center; gap: 20px; margin: 20px 0;">
+  <img src="/static/assets/logo1.jpg" alt="Project Bach Logo" style="max-width: 200px; height: auto; flex-shrink: 0;" />
+  <div style="flex: 1;">
+    <blockquote style="font-style: italic; font-size: 1.1em; margin: 0; padding: 0; border-left: none;">
+      "Algebra is like sheet music; the important thing isn't can you read music, it's can you hear it. Can you hear the music, Robert?"
+    </blockquote>
+    <p style="text-align: right; margin: 10px 0 0 0; font-size: 0.9em; color: #666;">— (not) Bach</p>
+  </div>
+</div>
 
 An intelligent audio processing system that transforms lectures, meetings, and multimedia content into structured knowledge.
 

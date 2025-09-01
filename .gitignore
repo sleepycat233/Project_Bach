@@ -93,7 +93,7 @@ audio/
 *.md
 !README.md
 !doc/*.md
-!docs/*.md
+!doc/technical_doc/*.md
 !static/*.md
 
 # Processing artifacts
