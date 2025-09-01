@@ -293,25 +293,6 @@ paths:
                 items:
                   $ref: '#/components/schemas/ProcessedContent'
 
-  /api/github/pages-status:
-    get:
-      summary: GitHub Pages Deployment Status
-      description: |
-        Get real-time GitHub Pages deployment status using GitHub REST API.
-        Provides detailed information about the latest deployment.
-      tags:
-        - GitHub Integration
-      responses:
-        '200':
-          description: GitHub Pages status retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GitHubPagesStatus'
-        '408':
-          description: GitHub API request timeout
-        '503':
-          description: Network error accessing GitHub API
 
   /api/youtube/metadata:
     get:
@@ -342,50 +323,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /api/models/check:
-    get:
-      summary: Check Model Availability
-      description: |
-        Check if a specific Whisper model is available locally and ready for use.
-        Validates model files and directory structure.
-      tags:
-        - Model Management
-      parameters:
-        - name: model
-          in: query
-          schema:
-            type: string
-            default: "large-v3"
-          description: Model name
-        - name: prefix
-          in: query
-          schema:
-            type: string
-            default: "distil"
-          description: Model prefix
-      responses:
-        '200':
-          description: Model status checked successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ModelStatus'
 
-  /api/models/available:
-    get:
-      summary: Get Available Models
-      description: |
-        Retrieve information about all available Whisper models (both local and API-based).
-        Includes model specifications, sizes, and capabilities.
-      tags:
-        - Model Management
-      responses:
-        '200':
-          description: Available models retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AvailableModels'
 
   /api/models/smart-config:
     get:
@@ -557,64 +495,6 @@ components:
           type: string
           description: Type of processed content
 
-    GitHubPagesStatus:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [deployed, deploying, error, not_enabled, api_error, timeout, network_error]
-          description: Current deployment status
-        message:
-          type: string
-          description: Status description
-        last_checked:
-          type: string
-          format: date-time
-          description: Last status check timestamp
-        api_method:
-          type: string
-          description: Method used to retrieve status
-        repository:
-          type: string
-          description: GitHub repository identifier
-        deployment_info:
-          type: object
-          properties:
-            id:
-              type: string
-              description: Deployment ID
-            state:
-              type: string
-              description: GitHub deployment state
-            description:
-              type: string
-              description: Deployment description
-            created_at:
-              type: string
-              format: date-time
-            updated_at:
-              type: string
-              format: date-time
-            environment_url:
-              type: string
-              format: uri
-              description: Live environment URL
-        pages_info:
-          type: object
-          properties:
-            status:
-              type: string
-              description: GitHub Pages status
-            html_url:
-              type: string
-              format: uri
-              description: GitHub Pages site URL
-            source:
-              type: object
-              description: Pages source configuration
-            https_enforced:
-              type: boolean
-              description: Whether HTTPS is enforced
 
     YouTubeMetadata:
       type: object
@@ -713,9 +593,6 @@ components:
         display_name:
           type: string
           description: Human-readable display name
-        size:
-          type: string
-          description: Model size (e.g., "1.5GB")
         multilingual_support:
           type: boolean
           description: Whether model supports multiple languages

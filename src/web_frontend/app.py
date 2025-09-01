@@ -34,7 +34,7 @@ def create_app(config=None):
     template_dir = os.path.join(project_root, 'templates')
     static_dir = os.path.join(project_root, 'static')
     app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
-    
+
     # 默认配置
     app.config.update({
         'SECRET_KEY': os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production'),
@@ -45,15 +45,15 @@ def create_app(config=None):
         'RATE_LIMIT_PER_MINUTE': 60,
         'WTF_CSRF_ENABLED': True
     })
-    
+
     # 应用测试配置
     if config:
         app.config.update(config)
-    
+
     # 创建上传目录
     upload_dir = Path(app.config['UPLOAD_FOLDER'])
     upload_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # 初始化配置管理器
     try:
         if config:
@@ -71,32 +71,32 @@ def create_app(config=None):
     except Exception as e:
         logger.warning(f"Failed to load config manager: {e}")
         app.config['CONFIG_MANAGER'] = None
-    
+
     # 简单的请求频率限制（生产环境需要flask_limiter）
     app.config['SIMPLE_RATE_LIMIT'] = True
-    
+
     # 初始化处理服务
     app.config['AUDIO_HANDLER'] = AudioUploadHandler(config_manager)
     app.config['YOUTUBE_HANDLER'] = YouTubeHandler(config_manager)
     app.config['PROCESSING_SERVICE'] = get_processing_service()
-    
+
     # Tailscale安全中间件
     @app.before_request
     def security_middleware():
         if app.config.get('TESTING'):
             return  # 测试环境跳过安全检查
-            
+
         # 检查配置管理器中的Tailscale设置
         config_manager = app.config.get('CONFIG_MANAGER')
         if config_manager and config_manager.config.get('tailscale', {}).get('enabled', True) == False:
             return  # Tailscale安全检查被禁用
-            
+
         remote_ip = request.environ.get('REMOTE_ADDR', request.remote_addr)
-        
+
         try:
             tailscale_network = ipaddress.ip_network(app.config['TAILSCALE_NETWORK'])
             client_ip = ipaddress.ip_address(remote_ip)
-            
+
             if client_ip not in tailscale_network:
                 logger.warning(f"Access denied for IP: {remote_ip}")
                 return jsonify({
@@ -106,13 +106,13 @@ def create_app(config=None):
         except Exception as e:
             logger.error(f"Security middleware error: {e}")
             return jsonify({'error': 'Security check failed'}), 500
-    
+
     # 主页路由
     @app.route('/')
     def index():
         """主页 - 显示上传界面和分类选项"""
         config_manager = app.config.get('CONFIG_MANAGER')
-        
+
         # 获取内容类型配置
         if config_manager:
             content_types = config_manager.get_nested_config('content_classification', 'content_types') or {}
@@ -122,54 +122,53 @@ def create_app(config=None):
                 'meeting': {'icon': '🏢', 'display_name': 'Meeting Recording'},
                 'others': {'icon': '📄', 'display_name': 'Others'}
             }
-        
+
         # 获取完整配置用于模板
         config_dict = config_manager.get_full_config() if config_manager else {}
-        
-        return render_template('web_app/upload.html', 
+
+        return render_template('web_app/upload.html',
                                content_types=content_types,
                                config=config_dict)
-    
+
     # 音频上传路由
     @app.route('/upload/audio', methods=['POST'])
     def upload_audio():
         """处理音频文件上传"""
+
         try:
             # 检查文件是否存在
             if 'audio_file' not in request.files:
                 return jsonify({'error': 'No audio file provided'}), 400
-            
+
             file = request.files['audio_file']
             if file.filename == '':
                 return jsonify({'error': 'No file selected'}), 400
-            
+
             # 检查content_type
             content_type = request.form.get('content_type')
             if not content_type:
                 return jsonify({'error': 'content_type is required'}), 400
-            
+
             # 验证文件类型
             if not allowed_file(file.filename, app.config['ALLOWED_EXTENSIONS']):
                 return jsonify({'error': 'Invalid file type'}), 400
-            
+
             # 获取隐私级别
             privacy_level = request.form.get('privacy_level', 'public')
-            
+
             # 处理子分类信息
             subcategory = request.form.get('subcategory', '')
             custom_subcategory = request.form.get('custom_subcategory', '')
             audio_language = request.form.get('audio_language', 'english')
-            
-            # 处理模型选择
-            whisper_model = request.form.get('whisper_model', 'large-v3|distil')
-            model_parts = whisper_model.split('|')
-            model_name = model_parts[0] if len(model_parts) > 0 else 'large-v3'
-            model_prefix = model_parts[1] if len(model_parts) > 1 else 'distil'
-            
+
+            # 处理MLX模型选择
+            whisper_model = request.form.get('whisper_model', 'whisper-tiny')
+            # MLX模型使用简单的模型名称，无需前缀
+
             # 如果选择了other，使用自定义子分类名
             if subcategory == 'other' and custom_subcategory:
                 subcategory = custom_subcategory
-            
+
             # 处理上传
             handler = app.config['AUDIO_HANDLER']
             result = handler.process_upload(
@@ -180,24 +179,23 @@ def create_app(config=None):
                     'subcategory': subcategory,
                     'audio_language': audio_language,
                     'description': request.form.get('description', ''),
-                    'whisper_model': model_name,
-                    'model_prefix': model_prefix
+                    'whisper_model': whisper_model
                 }
             )
-            
+
             if result['status'] == 'success':
                 flash('Audio file uploaded successfully!', 'success')
-                return redirect(url_for('processing_status', 
+                return redirect(url_for('processing_status',
                                processing_id=result['processing_id']))
             else:
                 return jsonify({'error': result.get('message', 'Upload failed')}), 400
-                
+
         except RequestEntityTooLarge:
             return jsonify({'error': 'File too large'}), 413
         except Exception as e:
             logger.error(f"Audio upload error: {e}")
             return jsonify({'error': 'Internal server error'}), 500
-    
+
     # YouTube URL提交路由
     @app.route('/upload/youtube', methods=['POST'])
     def upload_youtube():
@@ -206,19 +204,19 @@ def create_app(config=None):
             youtube_url = request.form.get('youtube_url')
             if not youtube_url:
                 return jsonify({'error': 'YouTube URL is required'}), 400
-            
+
             content_type = 'youtube'  # YouTube视频固定为youtube类型
-            
+
             # 验证YouTube URL
             if not is_valid_youtube_url(youtube_url):
                 return jsonify({'error': 'Invalid YouTube URL'}), 400
-            
+
             # 获取隐私级别
             privacy_level = request.form.get('privacy_level', 'public')
-            
+
             # 获取强制使用Whisper选项
             force_whisper = request.form.get('force_whisper') == 'on'
-            
+
             # 处理YouTube URL
             handler = app.config['YOUTUBE_HANDLER']
             result = handler.process_url(
@@ -232,34 +230,34 @@ def create_app(config=None):
                 privacy_level=privacy_level,
                 force_whisper=force_whisper
             )
-            
+
             if result['status'] == 'success':
                 flash('YouTube video added to processing queue!', 'success')
-                return redirect(url_for('processing_status', 
+                return redirect(url_for('processing_status',
                                processing_id=result['processing_id']))
             else:
                 return jsonify({'error': result.get('message', 'Processing failed')}), 400
-                
+
         except Exception as e:
             logger.error(f"YouTube upload error: {e}")
             return jsonify({'error': 'Internal server error'}), 500
-    
+
     # 处理状态页面
     @app.route('/status/<processing_id>')
     def processing_status(processing_id):
         """显示处理状态页面"""
         service = app.config['PROCESSING_SERVICE']
         status = service.get_status(processing_id)
-        
+
         if status is None:
             return render_template('web_app/error.html',
                                  error_code=404,
                                  error_message=f"Processing session not found: {processing_id}"), 404
-        
-        return render_template('web_app/status.html', 
+
+        return render_template('web_app/status.html',
                              processing_id=processing_id,
                              status=status)
-    
+
     # API路由
     @app.route('/api/status/processing')
     def api_processing_status():
@@ -271,22 +269,22 @@ def create_app(config=None):
         except Exception as e:
             logger.error(f"Processing status API error: {e}")
             return jsonify({'error': 'Failed to get status'}), 500
-    
+
     @app.route('/api/status/<processing_id>')
     def api_single_status(processing_id):
         """获取单个处理状态API"""
         try:
             service = app.config['PROCESSING_SERVICE']
             status = service.get_status(processing_id)
-            
+
             if status is None:
                 return jsonify({'error': 'Processing session not found'}), 404
-                
+
             return jsonify(status)
         except Exception as e:
             logger.error(f"Single status API error: {e}")
             return jsonify({'error': 'Failed to get status'}), 500
-    
+
     @app.route('/api/categories')
     def api_categories():
         """内容分类API"""
@@ -303,167 +301,22 @@ def create_app(config=None):
                 'others': {'icon': '📄', 'display_name': 'Others'}
             }
             return jsonify(basic_categories)
-    
+
     @app.route('/api/results/recent')
     def api_recent_results():
         """最近结果API"""
         try:
             from ..storage.result_storage import ResultStorage
-            
+
             limit = request.args.get('limit', 10, type=int)
             storage = ResultStorage()
             results = storage.get_recent_results(limit=limit)
-            
+
             return jsonify(results)
         except Exception as e:
             logger.error(f"Recent results API error: {e}")
             return jsonify({'error': 'Failed to get recent results'}), 500
 
-    @app.route('/api/github/pages-status')
-    def api_github_pages_status():
-        """获取GitHub Pages部署状态API - 使用真实GitHub REST API"""
-        try:
-            import requests
-            import os
-            from datetime import datetime
-            
-            # 从配置获取GitHub信息
-            config_manager = app.config.get('CONFIG_MANAGER')
-            if not config_manager:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Configuration not available',
-                    'last_checked': datetime.now().isoformat()
-                }), 500
-                
-            config = config_manager.config
-            github_config = config.get('github', {})
-            
-            # GitHub API参数
-            owner = github_config.get('username', 'sleepycat233')
-            repo = github_config.get('repo_name', 'Project_Bach')
-            
-            # 获取GitHub token (可选，用于提高API限制)
-            github_token = os.environ.get('GITHUB_TOKEN') or github_config.get('token')
-            
-            headers = {
-                'Accept': 'application/vnd.github+json',
-                'X-GitHub-Api-Version': '2022-11-28'
-            }
-            
-            if github_token:
-                headers['Authorization'] = f'Bearer {github_token}'
-            
-            # 1. 首先检查Pages是否已启用
-            pages_url = f'https://api.github.com/repos/{owner}/{repo}/pages'
-            pages_response = requests.get(pages_url, headers=headers, timeout=10)
-            
-            result = {
-                'status': 'unknown',
-                'message': 'Unable to determine status',
-                'last_checked': datetime.now().isoformat(),
-                'api_method': 'github_rest_api',
-                'repository': f'{owner}/{repo}'
-            }
-            
-            if pages_response.status_code == 200:
-                pages_data = pages_response.json()
-                pages_status = pages_data.get('status', 'unknown')
-                
-                # 2. 获取Pages部署列表
-                deployments_url = f'https://api.github.com/repos/{owner}/{repo}/deployments'
-                deploy_params = {'environment': 'github-pages', 'per_page': 5}
-                deployments_response = requests.get(deployments_url, headers=headers, params=deploy_params, timeout=10)
-                
-                if deployments_response.status_code == 200:
-                    deployments = deployments_response.json()
-                    
-                    if deployments:
-                        latest_deployment = deployments[0]
-                        deployment_id = latest_deployment['id']
-                        
-                        # 3. 获取最新部署的状态
-                        status_url = f'https://api.github.com/repos/{owner}/{repo}/deployments/{deployment_id}/statuses'
-                        status_response = requests.get(status_url, headers=headers, timeout=10)
-                        
-                        if status_response.status_code == 200:
-                            statuses = status_response.json()
-                            if statuses:
-                                latest_status = statuses[0]
-                                deployment_state = latest_status.get('state', 'unknown')
-                                
-                                # 映射GitHub状态到我们的状态
-                                if deployment_state == 'success':
-                                    result['status'] = 'deployed'
-                                    result['message'] = f'GitHub Pages successfully deployed at {pages_data.get("html_url", "N/A")}'
-                                elif deployment_state in ['error', 'failure']:
-                                    result['status'] = 'error'
-                                    result['message'] = f'Deployment failed: {latest_status.get("description", "Unknown error")}'
-                                elif deployment_state in ['pending', 'in_progress']:
-                                    result['status'] = 'deploying'
-                                    result['message'] = 'Deployment in progress'
-                                else:
-                                    result['status'] = 'unknown'
-                                    result['message'] = f'Deployment state: {deployment_state}'
-                                
-                                # 添加详细信息
-                                result['deployment_info'] = {
-                                    'id': deployment_id,
-                                    'state': deployment_state,
-                                    'description': latest_status.get('description', ''),
-                                    'created_at': latest_deployment.get('created_at', ''),
-                                    'updated_at': latest_status.get('updated_at', ''),
-                                    'environment_url': latest_status.get('environment_url', pages_data.get('html_url', ''))
-                                }
-                            else:
-                                result['status'] = 'no_deployments'
-                                result['message'] = 'No deployment statuses found'
-                        else:
-                            result['status'] = 'api_error'
-                            result['message'] = f'Failed to get deployment status: {status_response.status_code}'
-                    else:
-                        result['status'] = 'no_deployments'
-                        result['message'] = 'No GitHub Pages deployments found'
-                else:
-                    result['status'] = 'api_error'
-                    result['message'] = f'Failed to get deployments: {deployments_response.status_code}'
-                    
-                # 添加Pages基本信息
-                result['pages_info'] = {
-                    'status': pages_status,
-                    'html_url': pages_data.get('html_url', ''),
-                    'source': pages_data.get('source', {}),
-                    'https_enforced': pages_data.get('https_enforced', False)
-                }
-                
-            elif pages_response.status_code == 404:
-                result['status'] = 'not_enabled'
-                result['message'] = 'GitHub Pages is not enabled for this repository'
-            else:
-                result['status'] = 'api_error'  
-                result['message'] = f'GitHub API error: {pages_response.status_code}'
-            
-            return jsonify(result)
-            
-        except requests.exceptions.Timeout:
-            return jsonify({
-                'status': 'timeout',
-                'message': 'GitHub API request timed out',
-                'last_checked': datetime.now().isoformat()
-            }), 408
-        except requests.exceptions.RequestException as e:
-            return jsonify({
-                'status': 'network_error',
-                'message': f'Network error: {str(e)}',
-                'last_checked': datetime.now().isoformat()
-            }), 503
-        except Exception as e:
-            logger.error(f"GitHub Pages status API error: {e}")
-            return jsonify({
-                'status': 'error',
-                'message': 'Internal server error',
-                'last_checked': datetime.now().isoformat()
-            }), 500
 
     @app.route('/api/youtube/metadata')
     def api_youtube_metadata():
@@ -472,19 +325,19 @@ def create_app(config=None):
             url = request.args.get('url')
             if not url:
                 return jsonify({'error': 'URL parameter is required'}), 400
-                
+
             # 使用YouTube处理器获取视频元数据
             handler = app.config.get('YOUTUBE_HANDLER')
             if not handler:
                 return jsonify({'error': 'YouTube handler not available'}), 503
-            
+
             metadata = handler.get_video_metadata(url)
-            
+
             if metadata:
                 # 转换字幕信息为前端期望的格式
                 subtitle_info = metadata.get('subtitle_info', {})
                 subtitles_list = []
-                
+
                 # 处理手动字幕
                 if subtitle_info.get('subtitles'):
                     for lang_code, subtitle_data in subtitle_info['subtitles'].items():
@@ -497,13 +350,13 @@ def create_app(config=None):
                                 language_name = first_format.get('name', lang_code)
                         elif isinstance(subtitle_data, dict):
                             language_name = subtitle_data.get('name', lang_code)
-                            
+
                         subtitles_list.append({
                             'language_code': lang_code,
                             'language': language_name,
                             'auto_generated': False
                         })
-                
+
                 # 处理自动生成字幕
                 if subtitle_info.get('auto_captions'):
                     for lang_code, caption_data in subtitle_info['auto_captions'].items():
@@ -515,13 +368,13 @@ def create_app(config=None):
                                 language_name = first_format.get('name', lang_code)
                         elif isinstance(caption_data, dict):
                             language_name = caption_data.get('name', lang_code)
-                            
+
                         subtitles_list.append({
                             'language_code': lang_code,
                             'language': language_name,
                             'auto_generated': True
                         })
-                
+
                 return jsonify({
                     'title': metadata.get('title', ''),
                     'description': metadata.get('description', ''),
@@ -532,538 +385,162 @@ def create_app(config=None):
                 })
             else:
                 return jsonify({'error': 'Failed to fetch video metadata'}), 400
-                
+
         except Exception as e:
             logger.error(f"YouTube metadata API error: {e}")
             return jsonify({'error': 'Failed to get video metadata'}), 500
-    
-    @app.route('/api/models/check')
-    def api_check_model():
-        """检查特定模型是否存在API"""
-        try:
-            from pathlib import Path
-            
-            model = request.args.get('model', 'large-v3')
-            prefix = request.args.get('prefix', 'distil')
-            
-            # 构建模型路径 - 修复distil模型路径格式
-            models_path = Path('./models/whisperkit-coreml')
-            if prefix == 'distil' and model == 'large-v3':
-                # 特殊处理 distil-large-v3 模型的路径格式
-                model_dir = models_path / "distil-whisper_distil-large-v3"
-            else:
-                model_dir = models_path / f"{prefix}_whisper-{model}"
-            
-            exists = model_dir.exists()
-            
-            if exists:
-                # 检查关键模型文件是否存在
-                required_files = ['MelSpectrogram.mlmodelc', 'AudioEncoder.mlmodelc', 'TextDecoder.mlmodelc']
-                missing_files = []
-                
-                for file_name in required_files:
-                    if not (model_dir / file_name).exists():
-                        missing_files.append(file_name)
-                
-                if missing_files:
-                    return jsonify({
-                        'exists': False,
-                        'status': 'incomplete',
-                        'message': f'Model exists but missing files: {", ".join(missing_files)}',
-                        'path': str(model_dir)
-                    })
-                else:
-                    return jsonify({
-                        'exists': True,
-                        'status': 'ready',
-                        'message': 'Model is ready to use',
-                        'path': str(model_dir)
-                    })
-            else:
-                return jsonify({
-                    'exists': False,
-                    'status': 'missing',
-                    'message': 'Model will be downloaded automatically on first use',
-                    'path': str(model_dir)
-                })
-                
-        except Exception as e:
-            logger.error(f"Model check API error: {e}")
-            return jsonify({'error': 'Failed to check model status'}), 500
-
-    @app.route('/api/models/available')
-    def api_available_models():
-        """获取可用模型信息API - 完全从配置文件和本地文件读取"""
-        try:
-            from pathlib import Path
-            from src.utils.config import ConfigManager
-            import os
-            import json
-            
-            # 从配置文件读取providers信息
-            config_manager = ConfigManager()
-            config = config_manager.get_full_config()
-            providers = config.get('whisperkit', {}).get('providers', {})
-            
-            available_models = {
-                'local': [],
-                'api': []
-            }
-            
-            # 处理本地模型
-            local_provider = providers.get('local', {})
-            if local_provider.get('enabled', False):
-                models_path = Path(local_provider.get('path', './models/whisperkit-coreml'))
-                
-                if models_path.exists():
-                    for model_dir in models_path.iterdir():
-                        if model_dir.is_dir() and not model_dir.name.startswith('.'):
-                            # 计算实际大小
-                            try:
-                                total_size = 0
-                                for dirpath, dirnames, filenames in os.walk(model_dir):
-                                    for filename in filenames:
-                                        filepath = os.path.join(dirpath, filename)
-                                        if os.path.exists(filepath):
-                                            total_size += os.path.getsize(filepath)
-                                
-                                if total_size >= 1024**3:  # >= 1GB
-                                    size_str = f"{total_size / (1024**3):.1f}GB"
-                                else:
-                                    size_str = f"{total_size // (1024**2)}MB"
-                            except:
-                                size_str = "Unknown"
-                            
-                            # 读取配置文件获取架构信息
-                            config_file = model_dir / 'config.json'
-                            config_info = {}
-                            if config_file.exists():
-                                try:
-                                    with open(config_file, 'r') as f:
-                                        model_config = json.load(f)
-                                    config_info = {
-                                        'vocab_size': model_config.get('vocab_size', 0),
-                                        'encoder_layers': model_config.get('encoder_layers', 0),
-                                        'decoder_layers': model_config.get('decoder_layers', 0),
-                                        'd_model': model_config.get('d_model', 0)
-                                    }
-                                except:
-                                    pass
-                            
-                            # 将文件夹名转换为正确格式
-                            folder_name = model_dir.name
-                            if folder_name == "distil-whisper_distil-large-v3":
-                                # 特殊处理distil模型的文件夹名
-                                model_value = "large-v3|distil"
-                                model_display_name = "distil-whisper_distil-large-v3"
-                            elif "_whisper-" in folder_name:
-                                # 标准格式: prefix_whisper-model -> model|prefix
-                                parts = folder_name.split("_whisper-")
-                                if len(parts) == 2:
-                                    prefix, model_name = parts
-                                    model_value = f"{model_name}|{prefix}"
-                                    model_display_name = folder_name
-                                else:
-                                    model_value = folder_name
-                                    model_display_name = folder_name
-                            else:
-                                model_value = folder_name
-                                model_display_name = folder_name
-                            
-                            available_models['local'].append({
-                                'value': model_value,
-                                'name': model_display_name,
-                                'display_name': model_display_name,
-                                'size': size_str,
-                                'multilingual_support': True,  # 简化：都支持多语言
-                                'english_support': True,       # 都支持英文
-                                'config_info': config_info,
-                                'available': True
-                            })
-            
-            # 处理API模型
-            for provider_name, provider_config in providers.items():
-                if provider_name == 'local' or not provider_config.get('enabled', False):
-                    continue
-                
-                provider_type = provider_config.get('type', '')
-                
-                if provider_type == 'openai_whisper_api':
-                    models_list = provider_config.get('models', [])
-                    for model in models_list:
-                        available_models['api'].append({
-                            'value': f"openai_api_{model}",
-                            'name': f"OpenAI {model}",
-                            'display_name': f"🌐 OpenAI {model}",
-                            'provider': 'openai_api',
-                            'multilingual_support': True,
-                            'english_support': True,
-                            'available': True,
-                            'requires_api_key': True
-                        })
-                
-                elif provider_type == 'elevenlabs_api':
-                    available_models['api'].append({
-                        'value': f"elevenlabs_speech",
-                        'name': "ElevenLabs Speech",
-                        'display_name': "🗣️ ElevenLabs Speech",
-                        'provider': 'elevenlabs_api',
-                        'multilingual_support': True,
-                        'english_support': True,
-                        'available': True,
-                        'requires_api_key': True
-                    })
-                
-                elif provider_type == 'azure_cognitive_services':
-                    available_models['api'].append({
-                        'value': f"azure_speech",
-                        'name': "Azure Speech",
-                        'display_name': "☁️ Azure Speech",
-                        'provider': 'azure_speech',
-                        'multilingual_support': True,
-                        'english_support': True,
-                        'available': True,
-                        'requires_api_key': True
-                    })
-            
-            # 从配置文件读取推荐策略
-            content_types = config.get('content_classification', {}).get('content_types', {})
-            recommendations = {}
-            for content_type, type_config in content_types.items():
-                recs = type_config.get('recommendations', [])
-                recommendations[content_type] = recs
-            
-            return jsonify({
-                'local_models': available_models['local'],
-                'api_models': available_models['api'],
-                'recommendations': recommendations,
-                'total_models': len(available_models['local']) + len(available_models['api'])
-            })
-            
-        except Exception as e:
-            logger.error(f"Models API error: {e}")
-            return jsonify({'error': 'Failed to get models info'}), 500
 
 
     @app.route('/api/models/smart-config')
     def api_models_smart_config():
-        """简化的模型配置 API - 简单排序逻辑"""
+        """MLX Whisper智能模型配置API
+
+        基于配置文件的动态推荐系统，为不同内容类型和语言模式提供智能模型推荐。
+        返回 {all: [...], lecture: [...], meeting: [...]} 格式的分类模型列表。
+        包含推荐标记、下载状态检查、按优先级排序等功能。
+        """
         try:
-            from pathlib import Path
             from src.utils.config import ConfigManager
-            import json
-            import os
-            
-            # 从配置读取推荐策略
+
+            def _check_model_downloaded(repo_name):
+                """检查MLX模型是否已在HuggingFace缓存中下载"""
+                try:
+                    import os
+                    from huggingface_hub import snapshot_download
+                    from huggingface_hub.utils import LocalEntryNotFoundError
+
+                    # 尝试获取本地缓存路径，如果不存在会抛出异常
+                    try:
+                        cache_path = snapshot_download(repo_name, local_files_only=True)
+                        return os.path.exists(cache_path)
+                    except LocalEntryNotFoundError:
+                        return False
+                except Exception as e:
+                    # 如果检查失败，默认为未下载
+                    logger.warning(f"Failed to check download status for {repo_name}: {e}")
+                    return False
+
+            # 构建MLX模型基础信息
             config_manager = ConfigManager()
             config = config_manager.get_full_config()
-            
-            # 获取内容类型推荐
+            mlx_config = config.get('mlx_whisper', {})
+            available_models = mlx_config.get('available_models', [])
+            default_model = mlx_config.get('default_model', 'whisper-tiny')
+
+            base_models = []
+            for model in available_models:
+                if isinstance(model, str):
+                    # 解析模型名称
+                    if '/' in model:
+                        model_name = model.split('/')[-1]
+                        repo_name = model
+                    else:
+                        model_name = model
+                        repo_name = f"mlx-community/{model}"
+
+                    is_default = model_name == default_model
+
+                    base_models.append({
+                        'value': model_name,
+                        'name': model_name,
+                        'repo': repo_name,
+                        'is_default': is_default
+                    })
+
+            # 为Smart Config API添加专用字段
+            all_models = []
+            for model in base_models:
+                # 检查真实下载状态
+                is_downloaded = _check_model_downloaded(model['repo'])
+
+                all_models.append({
+                    **model,  # 基础信息
+                    # 'display_name': f"{model['name']}" + (" (default)" if model['is_default'] else ""),
+                    'downloaded': is_downloaded,  # 真实下载状态
+                    'config_info': {}  # MLX模型无需复杂配置信息
+                })
+
+            # 从配置读取推荐策略
+            config = config_manager.get_full_config()
             content_types = config.get('content_classification', {}).get('content_types', {})
             content_type_recommendations = {}
             for content_type, type_config in content_types.items():
                 content_type_recommendations[content_type] = type_config.get('recommendations', [])
-            
-            def get_directory_size(directory_path):
-                """计算目录大小并返回人类可读格式"""
-                try:
-                    total_size = 0
-                    for dirpath, dirnames, filenames in os.walk(directory_path):
-                        for filename in filenames:
-                            filepath = os.path.join(dirpath, filename)
-                            if os.path.exists(filepath):
-                                total_size += os.path.getsize(filepath)
-                    
-                    if total_size >= 1024**3:  # >= 1GB
-                        return f"{total_size / (1024**3):.1f}GB"
-                    else:
-                        return f"{total_size // (1024**2)}MB"
-                except:
-                    return "Unknown"
-            
-            # 发现所有实际存在的模型
-            models_path = Path('./models/whisperkit-coreml')
-            all_models = []
-            
-            # 动态发现所有实际存在的模型
-            if models_path.exists():
-                for model_dir in models_path.iterdir():
-                    if model_dir.is_dir() and not model_dir.name.startswith('.'):
-                        # 读取模型配置
-                        config_file = model_dir / 'config.json'
-                        config_info = {}
-                        if config_file.exists():
-                            try:
-                                with open(config_file, 'r') as f:
-                                    model_config = json.load(f)
-                                config_info = {
-                                    'vocab_size': model_config.get('vocab_size', 0),
-                                    'encoder_layers': model_config.get('encoder_layers', 0),
-                                    'decoder_layers': model_config.get('decoder_layers', 0),
-                                    'd_model': model_config.get('d_model', 0)
-                                }
-                            except:
-                                pass
-                        
-                        if config_info:
-                            # 计算模型实际文件大小
-                            model_size = get_directory_size(model_dir)
-                            
-                            # 根据vocab_size判断多语言支持 (51865+表示多语言)
-                            multilingual = config_info.get('vocab_size', 0) >= 51865
-                            
-                            # 构建模型描述 - 将文件夹名转换为正确格式
-                            folder_name = model_dir.name
-                            if folder_name == "distil-whisper_distil-large-v3":
-                                # 特殊处理distil模型的文件夹名
-                                model_value = "large-v3|distil"
-                                model_display_name = "distil-whisper_distil-large-v3"
-                            elif "_whisper-" in folder_name:
-                                # 标准格式: prefix_whisper-model -> model|prefix
-                                parts = folder_name.split("_whisper-")
-                                if len(parts) == 2:
-                                    prefix, model_name = parts
-                                    model_value = f"{model_name}|{prefix}"
-                                    model_display_name = folder_name
-                                else:
-                                    model_value = folder_name
-                                    model_display_name = folder_name
-                            else:
-                                model_value = folder_name
-                                model_display_name = folder_name
-                            
-                            model = {
-                                'value': model_value,
-                                'name': model_display_name,
-                                'display_name': model_display_name,
-                                'downloaded': True,
-                                'config_info': config_info,
-                                'model_size': model_size,
-                                'english_support': True,
-                                'multilingual_support': multilingual
-                            }
-                            
-                            all_models.append(model)
-            
-            # 添加API模型 - 从config动态读取
-            providers = config.get('whisperkit', {}).get('providers', {})
-            for provider_name, provider_config in providers.items():
-                if provider_name == 'local' or not provider_config.get('enabled', False):
-                    continue
-                
-                provider_type = provider_config.get('type', '')
-                display_info = provider_config.get('display_info', {})
-                icon = display_info.get('icon', '🔗')
-                provider_display_name = display_info.get('provider_name', provider_name)
-                
-                # 获取模型列表
-                models_list = provider_config.get('models', [])
-                
-                # 处理不同的模型配置格式
-                if isinstance(models_list, list) and len(models_list) > 0:
-                    # 检查第一个元素是否为字符串（旧格式）或字典（新格式）
-                    if isinstance(models_list[0], str):
-                        # 旧格式：简单字符串列表，转换为新格式
-                        for model_name in models_list:
-                            all_models.append({
-                                'value': f"{provider_name}_{model_name}",
-                                'name': f"{provider_display_name} {model_name}",
-                                'display_name': f"{icon} {provider_display_name} {model_name}",
-                                'provider': provider_name,
-                                'multilingual_support': True,  # 默认值
-                                'english_support': True,       # 默认值
-                                'downloaded': False,
-                                'requires_api_key': True,
-                                'config_info': {'api_model': True}
-                            })
-                    else:
-                        # 新格式：完整配置字典
-                        for model_config in models_list:
-                            model_name = model_config.get('name', 'unknown')
-                            model_display_name = model_config.get('display_name', model_name)
-                            multilingual_support = model_config.get('multilingual_support', True)
-                            english_support = model_config.get('english_support', True)
-                            
-                            all_models.append({
-                                'value': f"{provider_name}_{model_name}",
-                                'name': f"{provider_display_name} {model_display_name}",
-                                'display_name': f"{icon} {provider_display_name} {model_display_name}",
-                                'provider': provider_name,
-                                'multilingual_support': multilingual_support,
-                                'english_support': english_support,
-                                'downloaded': False,
-                                'requires_api_key': True,
-                                'config_info': {'api_model': True}
-                            })
-            
-            # 新的按语言分组的排序函数
-            def apply_language_based_model_sorting(models, content_type):
-                """
-                根据语言模式和内容类型生成推荐模型列表
-                返回包含recommended和language_mode字段的模型列表
-                """
-                result_models = []
-                
-                # 获取当前内容类型的推荐配置
-                content_recommendations = content_type_recommendations.get(content_type, {})
-                
-                # 支持新格式（按语言分组）和旧格式（简单列表）的兼容处理
-                english_recommendations = []
-                multilingual_recommendations = []
-                
-                if isinstance(content_recommendations, dict):
-                    # 新格式：按语言分组
-                    english_recommendations = content_recommendations.get('english', [])
-                    multilingual_recommendations = content_recommendations.get('multilingual', [])
-                elif isinstance(content_recommendations, list):
-                    # 旧格式：简单列表，作为通用推荐
-                    english_recommendations = content_recommendations
-                    multilingual_recommendations = content_recommendations
-                
-                # 为每个模型添加推荐信息和语言模式
-                for model in models:
-                    model_copy = model.copy()
-                    model_value = model_copy.get('value', '')
-                    model_name = model_copy.get('name', '')
-                    
-                    # 检查是否为英文推荐模型 (精确匹配)
-                    is_english_recommended = any(
-                        rec_model == model_value or rec_model == model_name 
-                        for rec_model in english_recommendations
-                    )
-                    
-                    
-                    # 检查是否为多语言推荐模型 (精确匹配)
-                    is_multilingual_recommended = any(
-                        rec_model == model_value or rec_model == model_name
-                        for rec_model in multilingual_recommendations
-                    )
-                    
-                    # 创建英文模式的模型副本
-                    if is_english_recommended:
-                        english_model = model_copy.copy()
-                        english_model['recommended'] = True
-                        english_model['language_mode'] = 'english'
-                        result_models.append(english_model)
-                    
-                    # 创建多语言模式的模型副本
-                    if is_multilingual_recommended:
-                        multilingual_model = model_copy.copy()
-                        multilingual_model['recommended'] = True
-                        multilingual_model['language_mode'] = 'multilingual'
-                        result_models.append(multilingual_model)
-                    
-                    # 如果既不是英文推荐也不是多语言推荐，添加为非推荐模型
-                    if not is_english_recommended and not is_multilingual_recommended:
-                        non_recommended_model = model_copy.copy()
-                        non_recommended_model['recommended'] = False
-                        non_recommended_model['language_mode'] = 'general'
-                        result_models.append(non_recommended_model)
-                
-                # 排序：推荐模型优先，然后按参数复杂度排序
-                def get_sort_priority(model):
-                    is_recommended = model.get('recommended', False)
-                    config = model.get('config_info', {})
-                    d_model = config.get('d_model', 0)
-                    encoder_layers = config.get('encoder_layers', 0)
-                    complexity = d_model * encoder_layers
-                    
-                    # 推荐模型排在前面，复杂度高的排在前面
-                    return (not is_recommended, -complexity)
-                
-                result_models.sort(key=get_sort_priority)
-                return result_models
-            
-            # 为不同内容类型生成排序后的模型列表
+
+
+            def _set_recommendation_flags(model, english_recs, multilingual_recs):
+                """为模型设置推荐标志的共用函数"""
+                model_value = model.get('value', '')
+                model_name = model.get('name', '')
+
+                model['is_english_recommended'] = any(
+                    rec_model == model_value or rec_model == model_name
+                    for rec_model in english_recs
+                )
+                model['is_multilingual_recommended'] = any(
+                    rec_model == model_value or rec_model == model_name
+                    for rec_model in multilingual_recs
+                )
+                return model
+
+            # 收集所有内容类型的推荐模型（合并用于'all'类别）
+            all_english_recs = set()
+            all_multilingual_recs = set()
+
+            for content_type, recommendations in content_type_recommendations.items():
+                # 只支持新格式：{"english": [...], "multilingual": [...]}
+                all_english_recs.update(recommendations.get('english', []))
+                all_multilingual_recs.update(recommendations.get('multilingual', []))
+
+            # 生成结果
             result = {}
+
+            # 为每个内容类型生成专用模型列表
             for content_type in content_type_recommendations.keys():
-                # 获取当前内容类型的推荐配置
                 content_recommendations = content_type_recommendations.get(content_type, {})
-                english_recommendations = []
-                multilingual_recommendations = []
-                
-                if isinstance(content_recommendations, dict):
-                    english_recommendations = content_recommendations.get('english', [])
-                    multilingual_recommendations = content_recommendations.get('multilingual', [])
-                
-                # 为每个模型设置推荐标志
+                english_recommendations = content_recommendations.get('english', [])
+                multilingual_recommendations = content_recommendations.get('multilingual', [])
+
                 content_type_models = []
                 for model in all_models:
                     model_copy = model.copy()
-                    model_value = model_copy.get('value', '')
-                    model_name = model_copy.get('name', '')
-                    
-                    # 设置推荐标志
-                    model_copy['is_english_recommended'] = any(
-                        rec_model == model_value or rec_model == model_name 
-                        for rec_model in english_recommendations
-                    )
-                    model_copy['is_multilingual_recommended'] = any(
-                        rec_model == model_value or rec_model == model_name
-                        for rec_model in multilingual_recommendations
-                    )
-                    
+                    _set_recommendation_flags(model_copy, english_recommendations, multilingual_recommendations)
                     content_type_models.append(model_copy)
-                
+
                 result[content_type] = content_type_models
-            
-            # 为'all'类别也添加推荐信息（合并所有内容类型的推荐）
+
+            # 为'all'类别生成模型列表
             all_models_with_recommendations = []
-            all_english_recs = set()
-            all_multilingual_recs = set()
-            
-            # 收集所有内容类型的推荐模型
-            for content_type, recommendations in content_type_recommendations.items():
-                if isinstance(recommendations, dict):
-                    all_english_recs.update(recommendations.get('english', []))
-                    all_multilingual_recs.update(recommendations.get('multilingual', []))
-                elif isinstance(recommendations, list):
-                    all_english_recs.update(recommendations)
-                    all_multilingual_recs.update(recommendations)
-            
-            # 为all列表中的每个模型添加推荐信息
             for model in all_models:
                 model_copy = model.copy()
-                model_value = model_copy.get('value', '')
-                model_name = model_copy.get('name', '')
-                
-                # 检查是否为任何内容类型的推荐模型 (精确匹配)
-                is_english_recommended = any(
-                    rec_model == model_value or rec_model == model_name 
-                    for rec_model in all_english_recs
-                )
-                is_multilingual_recommended = any(
-                    rec_model == model_value or rec_model == model_name
-                    for rec_model in all_multilingual_recs
-                )
-                
+                _set_recommendation_flags(model_copy, all_english_recs, all_multilingual_recs)
+
                 # all列表不显示推荐标识，让前端根据语言模式过滤时显示
-                model_copy['recommended'] = False  # all列表中不标记推荐
-                model_copy['language_mode'] = 'general'  # all列表使用通用模式
-                
-                # 但保留推荐信息供前端使用
-                model_copy['is_english_recommended'] = is_english_recommended
-                model_copy['is_multilingual_recommended'] = is_multilingual_recommended
+                model_copy['recommended'] = False
+                model_copy['language_mode'] = 'general'
+
                 all_models_with_recommendations.append(model_copy)
-            
-            # 按推荐优先级和复杂度排序
+
+            # 按推荐优先级和默认模型排序
             def get_model_complexity(model):
-                is_recommended = model.get('recommended', False)
-                config = model.get('config_info', {})
-                d_model = config.get('d_model', 0)
-                encoder_layers = config.get('encoder_layers', 0)
-                complexity = d_model * encoder_layers
-                return (not is_recommended, -complexity)
-            
+                is_english_recommended = model.get('is_english_recommended', False)
+                is_multilingual_recommended = model.get('is_multilingual_recommended', False)
+                is_default = model.get('is_default', False)
+                model_name = model.get('name', '')
+
+                # 任何推荐的模型都排在前面，然后是默认模型，最后按名称排序
+                is_any_recommended = is_english_recommended or is_multilingual_recommended
+                return (not is_any_recommended, not is_default, model_name)
+
             all_models_with_recommendations.sort(key=get_model_complexity)
             result['all'] = all_models_with_recommendations
-            
+
             return jsonify(result)
-            
+
         except Exception as e:
             logger.error(f"Smart models config API error: {e}")
             return jsonify({'error': 'Failed to get smart models configuration'}), 500
-    
+
     # Private内容访问路由
     @app.route('/private/')
     @app.route('/private/<path:filepath>')
@@ -1074,7 +551,7 @@ def create_app(config=None):
             import os
             import re
             from datetime import datetime
-            
+
             # 私人内容根目录
             config_manager = app.config.get('CONFIG_MANAGER')
             if config_manager and hasattr(config_manager, 'config'):
@@ -1082,10 +559,10 @@ def create_app(config=None):
             else:
                 output_folder = './data/output'
             private_root = Path(output_folder) / 'private'
-            
+
             if not private_root.exists():
                 private_root.mkdir(parents=True, exist_ok=True)
-            
+
             if filepath is None:
                 # 获取公有和私有内容
                 def scan_directory_for_content(directory_path, is_private=False):
@@ -1093,18 +570,18 @@ def create_app(config=None):
                     content_files = []
                     if not directory_path.exists():
                         return content_files, 0, 0
-                    
+
                     lecture_count = 0
                     youtube_count = 0
-                    
+
                     for html_file in directory_path.glob('*.html'):
                         # 跳过index.html
                         if html_file.name == 'index.html':
                             continue
-                        
+
                         # 解析文件名获取信息
                         filename = html_file.name
-                        
+
                         # 解析日期 (格式: 20250824_034746_...)
                         date_match = re.match(r'(\d{8})_(\d{6})_', filename)
                         if date_match:
@@ -1117,7 +594,7 @@ def create_app(config=None):
                                 formatted_date = "Unknown"
                         else:
                             formatted_date = "Unknown"
-                        
+
                         # 生成显示标题和确定内容类型
                         content_type = 'others'
                         if 'youtube' in filename:
@@ -1137,7 +614,7 @@ def create_app(config=None):
                             title = filename.replace('_result.html', '').replace('_', ' ')
                             lecture_count += 1
                             content_type = 'lecture'  # 默认为lecture类型
-                        
+
                         # 尝试从HTML文件中提取摘要
                         summary = "Content summary"
                         try:
@@ -1149,12 +626,12 @@ def create_app(config=None):
                                 summary = summary_text.strip()[:150] + "..." if len(summary_text) > 150 else summary_text.strip()
                         except:
                             pass
-                        
+
                         # 尝试从对应的JSON文件读取upload_metadata
                         json_filename = filename.replace('_result.html', '_result.json')
                         json_file = html_file.parent / json_filename
                         upload_metadata = {}
-                        
+
                         if json_file.exists():
                             try:
                                 with open(json_file, 'r', encoding='utf-8') as f:
@@ -1173,26 +650,26 @@ def create_app(config=None):
                             'is_private': is_private,
                             'upload_metadata': upload_metadata
                         })
-                    
+
                     return content_files, lecture_count, youtube_count
-                
+
                 # 扫描私有内容
                 private_files, private_lecture_count, private_youtube_count = scan_directory_for_content(private_root, is_private=True)
-                
+
                 # 扫描公有内容（output/public目录）
                 public_root = Path(output_folder) / 'public'
                 public_files, public_lecture_count, public_youtube_count = scan_directory_for_content(public_root, is_private=False)
-                
+
                 # 合并所有内容
                 all_content_files = private_files + public_files
-                
+
                 # 按日期倒序排列 (最新的在前)
                 all_content_files.sort(key=lambda x: x['date'], reverse=True)
-                
+
                 # 统计计数
                 total_lecture_count = private_lecture_count + public_lecture_count
                 total_youtube_count = private_youtube_count + public_youtube_count
-                
+
                 # 转换为模板期望的格式
                 all_content = []
                 for file_info in all_content_files:
@@ -1203,7 +680,7 @@ def create_app(config=None):
                         # 公有内容的GitHub Pages链接（如果可用）
                         github_url = f"https://sleepycat233.github.io/Project_Bach/{file_info['filename']}"
                         url = github_url
-                    
+
                     all_content.append({
                         'title': file_info['title'],
                         'url': url,
@@ -1216,7 +693,7 @@ def create_app(config=None):
                         'is_private': file_info['is_private'],
                         'filename': file_info['filename']
                     })
-                
+
                 # 生成organized_content数据结构
                 def organize_content_by_type(content_list):
                     """将内容按类型和课程组织为树形结构"""
@@ -1226,15 +703,15 @@ def create_app(config=None):
                         'articles': [],
                         'podcasts': []
                     }
-                    
+
                     for content in content_list:
                         content_type = content.get('content_type', 'others')
-                        
+
                         if content_type == 'lecture':
                             # 优先从upload_metadata中获取课程信息
                             upload_metadata = content.get('upload_metadata', {})
                             course_name = "General"  # 默认值
-                            
+
                             # 尝试从upload_metadata中获取课程信息
                             if upload_metadata:
                                 # 从subcategory中获取课程代码 (如CS101, PHYS101)
@@ -1246,49 +723,49 @@ def create_app(config=None):
                                     custom_subcategory = upload_metadata.get('custom_subcategory', '')
                                     if custom_subcategory:
                                         course_name = custom_subcategory
-                            
+
                             # 如果没有metadata，回退到从文件名解析
                             if course_name == "General":
                                 filename = content.get('filename', '')
                                 course_match = re.search(r'\d{8}_\d{6}_([A-Z]+\d+)_LEC_', filename)
                                 if course_match:
                                     course_name = course_match.group(1)  # 例如 CS101, PHYS101
-                            
+
                             if course_name not in organized['lectures']:
                                 organized['lectures'][course_name] = []
-                            
+
                             organized['lectures'][course_name].append({
                                 'title': content.get('title', 'Untitled'),
                                 'url': content.get('url', '#'),
                                 'date': content.get('date', ''),
                                 'filename': filename
                             })
-                        
+
                         elif content_type == 'youtube':
                             # YouTube视频按系列组织 (如果需要的话)
                             series_name = "YouTube Videos"  # 默认系列名
                             if series_name not in organized['videos']:
                                 organized['videos'][series_name] = []
-                            
+
                             organized['videos'][series_name].append({
                                 'title': content.get('title', 'Untitled'),
                                 'url': content.get('url', '#'),
                                 'date': content.get('date', ''),
                                 'filename': content.get('filename', '')
                             })
-                    
+
                     # 对每个课程内的内容按日期排序 (最新在前)
                     for course_name, lectures in organized['lectures'].items():
                         lectures.sort(key=lambda x: x.get('date', ''), reverse=True)
-                    
+
                     for series_name, videos in organized['videos'].items():
                         videos.sort(key=lambda x: x.get('date', ''), reverse=True)
-                    
+
                     return organized
-                
+
                 # 生成组织化的内容结构
                 organized_content = organize_content_by_type(all_content)
-                
+
                 # 计算内容统计
                 content_counts = {
                     'lecture': len([c for c in all_content if c.get('content_type') == 'lecture']),
@@ -1298,16 +775,16 @@ def create_app(config=None):
                     'public': len([c for c in all_content if not c.get('is_private', True)]),
                     'private': len([c for c in all_content if c.get('is_private', True)])
                 }
-                
+
                 total_content = len(all_content)
-                
+
                 # 获取GitHub Pages URL
                 github_pages_url = "https://sleepycat233.github.io/Project_Bach"  # 默认值
                 if config_manager and hasattr(config_manager, 'config'):
                     github_pages_url = config_manager.config.get('github', {}).get('website', {}).get('pages_url', github_pages_url)
-                
+
                 # 使用新的私有页面模板，传入合并的内容数据
-                return render_template('web_app/private_index.html', 
+                return render_template('web_app/private_index.html',
                                      title="🔒 Private Content Hub",
                                      site_title="Project Bach",
                                      description="私人内容区域 - 浏览所有内容，支持公私筛选",
@@ -1322,7 +799,7 @@ def create_app(config=None):
                                      },
                                      github_pages_url=github_pages_url,  # 传入GitHub Pages URL
                                      is_private=True)
-            
+
             # 安全检查：防止目录穿越攻击
             safe_path = private_root / filepath
             try:
@@ -1332,13 +809,13 @@ def create_app(config=None):
                     return "Access denied", 403
             except:
                 return "Invalid path", 400
-            
+
             # 检查文件是否存在
             if not safe_path.exists():
-                return render_template('web_app/error.html', 
+                return render_template('web_app/error.html',
                                      error_code=404,
                                      error_message=f"Private content not found: {filepath}"), 404
-            
+
             # 如果是目录，查找index.html
             if safe_path.is_dir():
                 index_file = safe_path / 'index.html'
@@ -1350,7 +827,7 @@ def create_app(config=None):
                     for item in safe_path.iterdir():
                         if item.is_file() and item.suffix in ['.html', '.md']:
                             files.append(item.name)
-                    
+
                     dir_listing = f'''
                     <html>
                     <head><title>Private Directory: {filepath}</title></head>
@@ -1364,7 +841,7 @@ def create_app(config=None):
                     </html>
                     '''
                     return dir_listing
-            
+
             # 读取并返回文件内容
             if safe_path.suffix == '.html':
                 content = safe_path.read_text(encoding='utf-8')
@@ -1386,34 +863,34 @@ def create_app(config=None):
                 return html_content
             else:
                 return "Unsupported file type", 400
-                
+
         except Exception as e:
             logger.error(f"Private content access error: {e}")
             return render_template('web_app/error.html',
                                  error_code=500,
                                  error_message="Failed to access private content"), 500
-    
+
     # 错误处理
     @app.errorhandler(404)
     def not_found_error(error):
-        return render_template('web_app/error.html', 
+        return render_template('web_app/error.html',
                              error_code=404,
                              error_message="Page not found"), 404
-    
+
     @app.errorhandler(500)
     def internal_error(error):
         return render_template('web_app/error.html',
                              error_code=500,
                              error_message="Internal server error"), 500
-    
+
     @app.errorhandler(413)
     def too_large_error(error):
         return jsonify({'error': 'File too large'}), 413
-    
+
     @app.errorhandler(429)
     def ratelimit_handler(e):
         return jsonify({'error': 'Rate limit exceeded'}), 429
-    
+
     # 添加模板过滤器
     @app.template_filter('format_date')
     def format_date(date_string, format_str=None):
@@ -1424,7 +901,7 @@ def create_app(config=None):
             return str(date_string)
         except:
             return "Unknown"
-    
+
     @app.template_filter('file_size')
     def format_file_size(size_bytes):
         """格式化文件大小"""
@@ -1439,7 +916,7 @@ def create_app(config=None):
                 return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
         except:
             return "Unknown"
-    
+
     @app.template_filter('truncate_words')
     def truncate_words(text, max_words=30):
         """截断文本到指定单词数"""
@@ -1452,7 +929,7 @@ def create_app(config=None):
             return ' '.join(words[:max_words]) + '...'
         except:
             return str(text)[:100] + '...' if len(str(text)) > 100 else str(text)
-    
+
     return app
 
 
@@ -1460,7 +937,7 @@ def allowed_file(filename, allowed_extensions):
     """检查文件扩展名是否允许"""
     if not filename:
         return False
-    
+
     file_ext = Path(filename).suffix.lower()
     return file_ext in allowed_extensions
 
@@ -1469,11 +946,11 @@ def is_valid_youtube_url(url):
     """验证YouTube URL格式"""
     youtube_domains = [
         'www.youtube.com',
-        'youtube.com', 
+        'youtube.com',
         'youtu.be',
         'm.youtube.com'
     ]
-    
+
     try:
         from urllib.parse import urlparse
         parsed = urlparse(url)
