@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from .transcription import TranscriptionService
+from .mlx_transcription import MLXTranscriptionService as TranscriptionService
 from .anonymization import NameAnonymizer
 from .ai_generation import AIContentGenerator
+from .speaker_diarization import SpeakerDiarization
 from ..storage.transcript_storage import TranscriptStorage
 from ..storage.result_storage import ResultStorage
 from ..publishing.git_publisher import GitPublisher
@@ -37,6 +38,7 @@ class AudioProcessor:
         self.transcription_service: Optional[TranscriptionService] = None
         self.anonymization_service: Optional[NameAnonymizer] = None
         self.ai_generation_service: Optional[AIContentGenerator] = None
+        self.speaker_diarization_service: Optional[SpeakerDiarization] = None
         self.transcript_storage: Optional[TranscriptStorage] = None
         self.result_storage: Optional[ResultStorage] = None
         
@@ -75,6 +77,15 @@ class AudioProcessor:
         """
         self.ai_generation_service = service
         self.logger.debug("AI生成服务已设置")
+    
+    def set_speaker_diarization_service(self, service: SpeakerDiarization):
+        """设置说话人分离服务
+        
+        Args:
+            service: 说话人分离服务实例
+        """
+        self.speaker_diarization_service = service
+        self.logger.debug("说话人分离服务已设置")
     
     def set_storage_services(self, transcript_storage: TranscriptStorage, result_storage: ResultStorage):
         """设置存储服务
@@ -135,20 +146,58 @@ class AudioProcessor:
             
             # 提取模型选择参数
             custom_model = metadata.get('whisper_model') if metadata else None
-            custom_model_prefix = metadata.get('model_prefix') if metadata else None
             
             transcript = self.transcription_service.transcribe_audio(
                 audio_path, 
                 prompt=prompt, 
                 language_preference=audio_language,
-                custom_model=custom_model,
-                custom_model_prefix=custom_model_prefix
+                custom_model=custom_model
             )
             if not transcript:
                 raise Exception("转录失败或结果为空")
             
             # 保存原始转录
             self.transcript_storage.save_raw_transcript(audio_path.stem, transcript, privacy_level)
+            
+            # 步骤1.5: 说话人分离（可选）
+            diarization_result = None
+            if self.speaker_diarization_service:
+                content_type = metadata.get('content_type') if metadata else None
+                subcategory = metadata.get('subcategory') if metadata else None
+                force_diarization = metadata.get('force_diarization', False) if metadata else False
+                
+                # 判断是否需要启用diarization
+                should_diarize = force_diarization
+                if not should_diarize and content_type:
+                    should_diarize = self.speaker_diarization_service.should_enable_diarization(
+                        content_type, subcategory
+                    )
+                
+                if should_diarize:
+                    self.logger.info("步骤1.5: 开始说话人分离")
+                    if processing_id:
+                        self.processing_service.update_status(processing_id, ProcessingStage.TRANSCRIBING, 30, "Analyzing speakers...")
+                    
+                    try:
+                        speaker_segments = self.speaker_diarization_service.diarize_audio(audio_path)
+                        
+                        if speaker_segments:
+                            diarization_result = {
+                                'has_diarization': True,
+                                'speaker_segments': speaker_segments,
+                                'speaker_statistics': self.speaker_diarization_service.get_speaker_statistics(speaker_segments),
+                                'content_type': content_type,
+                                'subcategory': subcategory
+                            }
+                            self.logger.info("说话人分离完成")
+                        else:
+                            self.logger.warning("说话人分离未检测到多个说话人")
+                    
+                    except Exception as e:
+                        self.logger.error(f"说话人分离处理失败: {e}")
+                        # 继续处理，不影响主流程
+                else:
+                    self.logger.info(f"跳过说话人分离: content_type={content_type}, subcategory={subcategory}")
             
             # 步骤2: 人名匿名化
             self.logger.info("步骤2: 开始人名匿名化")

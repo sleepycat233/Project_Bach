@@ -5,10 +5,12 @@
 """
 
 import logging
+import threading
 from typing import Dict, Any, Optional
 
 from ..utils.config import ConfigManager, LoggingSetup, DirectoryManager
-from .transcription import TranscriptionService
+from .mlx_transcription import MLXTranscriptionService
+from .speaker_diarization import SpeakerDiarization
 from .anonymization import NameAnonymizer
 from .ai_generation import AIContentGenerator
 from .audio_processor import AudioProcessor
@@ -50,18 +52,39 @@ class DependencyContainer:
         paths_config = self.config_manager.get_paths_config()
         DirectoryManager.setup_directories(paths_config)
     
-    def get_transcription_service(self) -> TranscriptionService:
-        """获取转录服务实例
+    def get_transcription_service(self) -> MLXTranscriptionService:
+        """获取转录服务实例（MLX Whisper）
         
         Returns:
-            转录服务实例
+            MLX转录服务实例
         """
         if 'transcription_service' not in self._services:
-            whisperkit_config = self.config_manager.get_whisperkit_config()
-            self._services['transcription_service'] = TranscriptionService(whisperkit_config)
-            self.logger.debug("创建转录服务实例")
+            self.logger.debug("创建MLX转录服务实例")
+            mlx_config = self.config_manager.get_mlx_whisper_config()
+            self._services['transcription_service'] = MLXTranscriptionService(mlx_config)
+            self.logger.debug("创建MLX转录服务实例")
+        else:
+            self.logger.debug("重用现有MLX转录服务实例")
         
         return self._services['transcription_service']
+    
+    def get_speaker_diarization_service(self) -> SpeakerDiarization:
+        """获取说话人分离服务实例
+        
+        Returns:
+            说话人分离服务实例
+        """
+        if 'speaker_diarization_service' not in self._services:
+            self.logger.debug("创建说话人分离服务实例")
+            diarization_config = self.config_manager.get_diarization_config()
+            huggingface_config = self.config_manager.get_huggingface_config()
+            self._services['speaker_diarization_service'] = SpeakerDiarization(diarization_config, huggingface_config)
+            self.logger.debug("创建说话人分离服务实例")
+        else:
+            self.logger.debug("重用现有说话人分离服务实例")
+        
+        return self._services['speaker_diarization_service']
+    
     
     def get_anonymization_service(self) -> NameAnonymizer:
         """获取匿名化服务实例
@@ -154,6 +177,7 @@ class DependencyContainer:
             processor.set_transcription_service(self.get_transcription_service())
             processor.set_anonymization_service(self.get_anonymization_service())
             processor.set_ai_generation_service(self.get_ai_generation_service())
+            processor.set_speaker_diarization_service(self.get_speaker_diarization_service())
             processor.set_storage_services(
                 self.get_transcript_storage(),
                 self.get_result_storage()
@@ -240,6 +264,15 @@ class DependencyContainer:
         except Exception as e:
             validation_results['audio_processor'] = False
             self.logger.error(f"音频处理器验证失败: {str(e)}")
+        
+        try:
+            self.get_speaker_diarization_service()
+            validation_results['speaker_diarization_service'] = True
+        except Exception as e:
+            validation_results['speaker_diarization_service'] = False
+            self.logger.error(f"说话人分离服务验证失败: {str(e)}")
+        
+        # DiarizationIntegrator已删除，集成逻辑移至AudioProcessor
         
         return validation_results
     

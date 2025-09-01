@@ -18,11 +18,15 @@ yt-dlp>=2025.8.20
 feedparser>=6.0.10
 python-magic>=0.4.27
 
+# Phase 10 MLX Whisper migration & Speaker Diarization
+mlx-whisper>=0.4.3
+pyannote-audio>=3.1.1
+
 # Testing
 pytest>=8.4.0
 pytest-flask>=1.3.0
 pytest-mock>=3.12.0
 
-# spaCy language models (需要单独安装)
-# python -m spacy download zh_core_web_sm
-# python -m spacy download en_core_web_sm
+# spaCy language models (通过URL自动安装)
+https://github.com/explosion/spacy-models/releases/download/zh_core_web_sm-3.8.0/zh_core_web_sm-3.8.0-py3-none-any.whl
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
