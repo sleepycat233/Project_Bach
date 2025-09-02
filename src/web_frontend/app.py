@@ -169,14 +169,14 @@ def create_app(config=None):
             if subcategory == 'other' and custom_subcategory:
                 subcategory = custom_subcategory
 
-            # 处理上传
+            # 处理上传 - 使用清晰的参数分离
             handler = app.config['AUDIO_HANDLER']
             result = handler.process_upload(
                 file=file,
-                content_type=content_type,
-                privacy_level=privacy_level,
-                metadata={
-                    'subcategory': subcategory,
+                content_type=content_type,        # 核心业务分类
+                subcategory=subcategory,          # 细分业务场景
+                privacy_level=privacy_level,      # 系统级配置
+                metadata={                        # 处理参数和用户输入
                     'audio_language': audio_language,
                     'description': request.form.get('description', ''),
                     'whisper_model': whisper_model

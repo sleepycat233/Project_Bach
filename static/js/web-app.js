@@ -218,7 +218,7 @@ class WebApp {
             const subcategorySelect = document.getElementById('subcategory-select');
             const subcategoryLabel = document.getElementById('subcategory-label');
             
-            if (contentTypeData?.subcategories?.length > 0) {
+            if (contentTypeData?.subcategories && Object.keys(contentTypeData.subcategories).length > 0) {
                 subcategoryContainer.style.display = 'block';
                 subcategoryLabel.textContent = contentType === 'lecture' ? 'Course Selection' : 'Subcategory';
                 
@@ -226,10 +226,11 @@ class WebApp {
                 subcategorySelect.innerHTML = '<option value="">Select a ' + 
                     (contentType === 'lecture' ? 'course' : 'subcategory') + '...</option>';
                 
-                contentTypeData.subcategories.forEach(sub => {
+                // 处理对象形式的subcategories
+                Object.entries(contentTypeData.subcategories).forEach(([key, subData]) => {
                     const option = document.createElement('option');
-                    option.value = sub;
-                    option.textContent = sub;
+                    option.value = key;
+                    option.textContent = subData.display_name || key;
                     subcategorySelect.appendChild(option);
                 });
                 

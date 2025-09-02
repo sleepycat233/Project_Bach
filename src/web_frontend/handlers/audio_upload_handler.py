@@ -66,14 +66,17 @@ class AudioUploadHandler:
             logger.warning(f"AudioUploadProcessor not available: {e}")
             self.upload_processor = None
     
-    def process_upload(self, file, content_type, privacy_level='public', metadata=None):
+    def process_upload(self, file, content_type: str, subcategory: str = None,
+                       privacy_level: str = 'private', metadata: dict = None):
         """
         处理文件上传
         
         Args:
             file: Werkzeug FileStorage对象
-            content_type: 内容类型 (lecture/podcast/youtube等)
-            metadata: 额外元数据
+            content_type: 内容类型 ('meeting', 'lecture'等) - 核心业务分类
+            subcategory: 子分类 ('client_call', 'standup'等) - 细分业务场景
+            privacy_level: 隐私级别 ('public', 'private') - 系统级配置
+            metadata: 处理元数据 (description, audio_language, whisper_model等)
             
         Returns:
             dict: 处理结果
@@ -83,14 +86,24 @@ class AudioUploadHandler:
         if not filename:
             filename = f"upload_{uuid.uuid4().hex[:8]}.mp3"
         
-        # 使用ProcessingTracker创建状态跟踪
-        tracker_metadata = {
-            'filename': filename,
+        # 构建完整的处理配置，合并核心参数和用户metadata
+        processing_config = {
+            # 核心业务参数
             'content_type': content_type,
-            'file_size': file.content_length or 0
+            'subcategory': subcategory,
+            'privacy_level': privacy_level,
+            
+            # 系统信息
+            'filename': filename,
+            'file_size': file.content_length or 0,
         }
+        
+        # 合并用户提供的metadata（处理参数和用户输入）
         if metadata:
-            tracker_metadata.update(metadata)
+            processing_config.update(metadata)
+        
+        # ProcessingTracker使用完整配置
+        tracker_metadata = processing_config.copy()
             
         with ProcessingTracker('audio', privacy_level, tracker_metadata) as tracker:
             try:
@@ -203,11 +216,12 @@ class AudioUploadHandler:
                 import threading
                 def background_process():
                     try:
-                        # 调用AudioProcessor的process_audio_file方法，传递完整metadata和processing_id
+                        # 调用AudioProcessor，传递完整的处理配置
+                        # processing_config已经包含了所有必要信息
                         success = audio_processor.process_audio_file(
                             str(target_file),
                             privacy_level=privacy_level,
-                            metadata=metadata,
+                            metadata=processing_config,  # 传递完整配置
                             processing_id=tracker.processing_id
                         )
                         
