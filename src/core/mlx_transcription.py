@@ -8,7 +8,7 @@ MLX Whisper转录服务
 import logging
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 import os
 import gc
 
@@ -41,11 +41,7 @@ class MLXTranscriptionService:
         
         # 移除本地下载选项，统一使用HuggingFace标准缓存
         
-        # 转录参数
-        transcription_config = mlx_config.get('transcription', {})
-        self.word_timestamps = transcription_config.get('word_timestamps', True)
-        self.language_detection = transcription_config.get('language_detection', 'auto')
-        self.supported_languages = transcription_config.get('supported_languages', ['en', 'zh'])
+        # 移除固定转录参数配置，改为动态传递
         
         # 构建默认模型仓库路径
         self.model_repo = self._get_model_repo_by_name(self.default_model)
@@ -53,7 +49,6 @@ class MLXTranscriptionService:
         self.logger.info("MLX Whisper服务初始化完成")
         self.logger.debug(f"默认模型: {self.default_model}")
         self.logger.debug(f"模型仓库: {self.model_repo}")
-        self.logger.debug(f"词级时间戳: {self.word_timestamps}")
         
     def _get_model_repo_by_name(self, model_name: str) -> str:
         """根据模型名称获取仓库路径
@@ -109,7 +104,8 @@ class MLXTranscriptionService:
         
     def transcribe_audio(self, audio_path: Path, prompt: str = None, 
                         language_preference: str = 'english', 
-                        custom_model: str = None) -> str:
+                        custom_model: str = None,
+                        word_timestamps: bool = False) -> Union[str, Dict[str, Any]]:
         """转录音频文件
         
         Args:
@@ -117,9 +113,11 @@ class MLXTranscriptionService:
             prompt: Whisper系统提示词，用于提高特定术语识别准确性
             language_preference: 语言偏好 ('english' 或 'multilingual')
             custom_model: 自定义模型名称 (如'large-v3', 'medium') 或完整仓库地址
+            word_timestamps: 是否启用词级时间戳（diarization需要时为True）
             
         Returns:
-            转录文本
+            str: 转录文本 (当word_timestamps=False时)
+            Dict[str, Any]: 包含text, chunks, segments的完整结果 (当word_timestamps=True时)
             
         Raises:
             Exception: 转录失败
@@ -147,7 +145,7 @@ class MLXTranscriptionService:
             # 准备转录参数
             transcribe_kwargs = {
                 'path_or_hf_repo': model_path_or_repo,
-                'word_timestamps': self.word_timestamps
+                'word_timestamps': word_timestamps
             }
             
             # 设置语言参数
@@ -172,6 +170,19 @@ class MLXTranscriptionService:
             transcribe_time = time.time() - start_time
             self.logger.info(f"转录完成，耗时: {transcribe_time:.2f}秒")
             
+            # 调试：打印result结构
+            if word_timestamps:
+                self.logger.debug(f"MLX Whisper result keys: {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")
+                if isinstance(result, dict) and 'segments' in result:
+                    self.logger.debug(f"Segments count: {len(result['segments'])}")
+                    if result['segments']:
+                        first_segment = result['segments'][0]
+                        self.logger.debug(f"First segment keys: {list(first_segment.keys()) if isinstance(first_segment, dict) else 'not a dict'}")
+                        if 'words' in first_segment:
+                            self.logger.debug(f"First segment has {len(first_segment['words'])} words")
+                        else:
+                            self.logger.debug("First segment has no 'words' key")
+            
             # 提取转录文本
             transcribed_text = result.get('text', '')
             if not transcribed_text.strip():
@@ -184,12 +195,28 @@ class MLXTranscriptionService:
                 self.logger.info(f"转录生成了 {segment_count} 个语音段落")
             
             # 清理内存（MLX模型可能占用较多显存）
-            if hasattr(result, 'segments'):
-                # 不需要segments时可以删除以节省内存
-                if self.word_timestamps:
-                    self.logger.debug("保留词级时间戳信息")
+            if result and 'segments' in result:
+                if word_timestamps:
+                    self.logger.debug("返回包含词级时间戳的完整结果")
+                    
+                    # 从segments.words构建chunks (MLX Whisper没有chunks字段)
+                    chunks = []
+                    for segment in result.get('segments', []):
+                        if 'words' in segment:
+                            for word in segment['words']:
+                                chunks.append({
+                                    'text': word['word'].strip(),
+                                    'timestamp': [float(word['start']), float(word['end'])]
+                                })
+                    
+                    # 返回完整结果供diarization使用
+                    return {
+                        'text': transcribed_text.strip(),
+                        'chunks': chunks,
+                        'segments': result.get('segments', [])  # 保持完整原始数据
+                    }
                 else:
-                    self.logger.debug("清理segments信息以节省内存")
+                    self.logger.debug("清理segments信息以节省内存，只返回文本")
             
             return transcribed_text.strip()
             
@@ -260,7 +287,6 @@ class MLXTranscriptionService:
         return {
             'model_repo': self.model_repo,
             'current_model': model_repo,
-            'word_timestamps': self.word_timestamps,
             'mlx_whisper_available': mlx_whisper is not None
         }
 

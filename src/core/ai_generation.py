@@ -39,9 +39,9 @@ class AIContentGenerator:
             api_key = api_config.get('openrouter', {}).get('key', '')
             if api_key and api_key != 'YOUR_API_KEY_HERE':
                 # 获取限流配置
-                rate_limit_config = api_config.get('openrouter', {}).get('rate_limits')
+                rate_limit_tier = api_config.get('openrouter', {}).get('rate_limit_tier', 'free')
                 self.client, self.rate_limiter = create_rate_limited_client(
-                    raw_client, api_key, rate_limit_config
+                    raw_client, api_key, rate_limit_tier
                 )
                 self.logger.info("AI生成服务已启用限流保护")
             else:

@@ -114,13 +114,43 @@ class AudioProcessor:
         """
         self.git_publisher = publisher
     
+    def _clean_transcription_for_output(self, transcription_result):
+        """清理转录结果，只保留输出需要的字段"""
+        if not isinstance(transcription_result, dict):
+            return transcription_result
+        
+        import copy
+        cleaned = copy.deepcopy(transcription_result)
+        
+        # 清理segments中不必要的字段
+        if 'segments' in cleaned and isinstance(cleaned['segments'], list):
+            cleaned_segments = []
+            for segment in cleaned['segments']:
+                if isinstance(segment, dict):
+                    # 只保留核心字段
+                    cleaned_segment = {
+                        'text': segment.get('text', ''),
+                        'start': segment.get('start', 0),
+                        'end': segment.get('end', 0)
+                    }
+                    # 保留words字段用于分析
+                    if 'words' in segment:
+                        cleaned_segment['words'] = segment['words']
+                    
+                    cleaned_segments.append(cleaned_segment)
+            
+            cleaned['segments'] = cleaned_segments
+        
+        return cleaned
+    
     def process_audio_file(self, audio_path: str, privacy_level: str = 'public', metadata: Dict[str, Any] = None, processing_id: str = None) -> bool:
         """处理单个音频文件的完整流程
         
         Args:
             audio_path: 音频文件路径
             privacy_level: 隐私级别 ('public' 或 'private')
-            metadata: 处理元数据，包含description(Whisper prompt)和audio_language
+            metadata: 处理元数据，包含content_type、subcategory、description(Whisper prompt)和audio_language
+            processing_id: 处理ID (可选)
             
         Returns:
             处理是否成功
@@ -147,57 +177,85 @@ class AudioProcessor:
             # 提取模型选择参数
             custom_model = metadata.get('whisper_model') if metadata else None
             
-            transcript = self.transcription_service.transcribe_audio(
-                audio_path, 
-                prompt=prompt, 
-                language_preference=audio_language,
-                custom_model=custom_model
-            )
-            if not transcript:
-                raise Exception("转录失败或结果为空")
-            
-            # 保存原始转录
-            self.transcript_storage.save_raw_transcript(audio_path.stem, transcript, privacy_level)
-            
-            # 步骤1.5: 说话人分离（可选）
-            diarization_result = None
+            # 步骤0: 判断是否需要说话人分离（决定word_timestamps参数）
+            should_diarize = False
             if self.speaker_diarization_service:
                 content_type = metadata.get('content_type') if metadata else None
                 subcategory = metadata.get('subcategory') if metadata else None
                 force_diarization = metadata.get('force_diarization', False) if metadata else False
                 
                 # 判断是否需要启用diarization
+                self.logger.info(f"🔍 Diarization决策: content_type='{content_type}', subcategory='{subcategory}', force_diarization={force_diarization}")
+                
                 should_diarize = force_diarization
                 if not should_diarize and content_type:
                     should_diarize = self.speaker_diarization_service.should_enable_diarization(
                         content_type, subcategory
                     )
+                    self.logger.info(f"🔍 should_enable_diarization('{content_type}', '{subcategory}') 返回: {should_diarize}")
                 
                 if should_diarize:
-                    self.logger.info("步骤1.5: 开始说话人分离")
-                    if processing_id:
-                        self.processing_service.update_status(processing_id, ProcessingStage.TRANSCRIBING, 30, "Analyzing speakers...")
-                    
-                    try:
-                        speaker_segments = self.speaker_diarization_service.diarize_audio(audio_path)
-                        
-                        if speaker_segments:
-                            diarization_result = {
-                                'has_diarization': True,
-                                'speaker_segments': speaker_segments,
-                                'speaker_statistics': self.speaker_diarization_service.get_speaker_statistics(speaker_segments),
-                                'content_type': content_type,
-                                'subcategory': subcategory
-                            }
-                            self.logger.info("说话人分离完成")
-                        else:
-                            self.logger.warning("说话人分离未检测到多个说话人")
-                    
-                    except Exception as e:
-                        self.logger.error(f"说话人分离处理失败: {e}")
-                        # 继续处理，不影响主流程
+                    self.logger.info("检测到需要说话人分离，启用词级时间戳")
                 else:
-                    self.logger.info(f"跳过说话人分离: content_type={content_type}, subcategory={subcategory}")
+                    self.logger.info("无需说话人分离，关闭词级时间戳以优化性能")
+            
+            transcription_result = self.transcription_service.transcribe_audio(
+                audio_path, 
+                prompt=prompt, 
+                language_preference=audio_language,
+                custom_model=custom_model,
+                word_timestamps=should_diarize
+            )
+            if not transcription_result:
+                raise Exception("转录失败或结果为空")
+            
+            # 从转录结果中提取文本
+            transcript = transcription_result.get('text', '') if isinstance(transcription_result, dict) else transcription_result
+            
+            # 保存原始转录
+            self.transcript_storage.save_raw_transcript(audio_path.stem, transcript, privacy_level)
+            
+            # 步骤1.5: 说话人分离（可选）
+            diarization_result = None
+            if self.speaker_diarization_service and should_diarize:
+                self.logger.info("步骤1.5: 开始说话人分离")
+                if processing_id:
+                    self.processing_service.update_status(processing_id, ProcessingStage.TRANSCRIBING, 30, "Analyzing speakers...")
+                    
+                try:
+                    speaker_segments = self.speaker_diarization_service.diarize_audio(audio_path)
+                    
+                    if speaker_segments:
+                        content_type = metadata.get('content_type') if metadata else None
+                        subcategory = metadata.get('subcategory') if metadata else None
+                        
+                        # 合并转录结果与说话人信息
+                        self.logger.info("步骤1.6: 合并转录与说话人信息")
+                        try:
+                            merged_transcription = self.speaker_diarization_service.merge_with_transcription(
+                                transcription_result,  # 包含chunks的完整转录结果
+                                speaker_segments,
+                                group_by_speaker=True  # 按说话人分组模式
+                            )
+                        except Exception as merge_error:
+                            self.logger.error(f"转录合并失败: {merge_error}")
+                            merged_transcription = None
+                        
+                        diarization_result = {
+                            'has_diarization': True,
+                            'speaker_segments': speaker_segments,
+                            'merged_transcription': merged_transcription,  # 添加合并结果
+                            'speaker_statistics': self.speaker_diarization_service.get_speaker_statistics(speaker_segments),
+                            'content_type': content_type,
+                            'subcategory': subcategory
+                        }
+                        self.logger.info(f"说话人分离完成: {len(merged_transcription)} 个发言段落")
+                    else:
+                        self.logger.warning("说话人分离未检测到多个说话人")
+                
+                except Exception as e:
+                    self.logger.error(f"说话人分离处理失败: {e}")
+                    # 继续处理，不影响主流程
             
             # 步骤2: 人名匿名化
             self.logger.info("步骤2: 开始人名匿名化")
@@ -226,12 +284,25 @@ class AudioProcessor:
                 'processed_time': datetime.now().isoformat(),
                 'anonymized_transcript': anonymized_text,  # 添加匿名化转录文本
                 'anonymization_mapping': mapping,
-                'privacy_level': privacy_level
+                'privacy_level': privacy_level,
+                'transcription_result': self._clean_transcription_for_output(transcription_result),  # 清理后的转录结果
             }
             
             # 保存上传时的metadata（包含课程信息）
             if metadata:
                 results['upload_metadata'] = metadata
+            
+            # 添加说话人分离结果（如果存在）
+            if 'diarization_result' in locals():
+                results['diarization_result'] = diarization_result
+                self.logger.info("已添加说话人分离结果到输出")
+                
+                # 重要：如果有diarization，使用合并后的转录结果作为主要输出
+                if (diarization_result and 
+                    'merged_transcription' in diarization_result and 
+                    diarization_result['merged_transcription'] is not None):
+                    results['transcription_with_speakers'] = diarization_result['merged_transcription']
+                    self.logger.info("已添加按说话人分组的转录结果")
             
             # 按隐私级别保存结果
             self.result_storage.save_markdown_result(audio_path.stem, results, privacy_level=privacy_level)
@@ -376,7 +447,11 @@ class AudioProcessor:
                         return False
                     
                     self.logger.info("使用Whisper转录音频")
-                    transcript_text = self.transcription_service.transcribe_audio(Path(audio_file_path))
+                    # YouTube处理默认不启用word_timestamps（无diarization需求）
+                    transcript_text = self.transcription_service.transcribe_audio(
+                        Path(audio_file_path),
+                        word_timestamps=False
+                    )
                     
                     if transcript_text and transcript_text.strip():
                         self.logger.info(f"Whisper转录完成: {len(transcript_text)}字符")

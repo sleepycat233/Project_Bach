@@ -78,8 +78,13 @@ class DependencyContainer:
             self.logger.debug("创建说话人分离服务实例")
             diarization_config = self.config_manager.get_diarization_config()
             huggingface_config = self.config_manager.get_huggingface_config()
-            self._services['speaker_diarization_service'] = SpeakerDiarization(diarization_config, huggingface_config)
-            self.logger.debug("创建说话人分离服务实例")
+            content_classification_config = self.config_manager.get_content_classification_config()
+            self._services['speaker_diarization_service'] = SpeakerDiarization(
+                diarization_config, 
+                huggingface_config, 
+                content_classification_config
+            )
+            self.logger.debug("说话人分离服务实例创建完成")
         else:
             self.logger.debug("重用现有说话人分离服务实例")
         
@@ -106,7 +111,11 @@ class DependencyContainer:
             AI生成服务实例
         """
         if 'ai_generation_service' not in self._services:
-            api_config = self.config_manager.get_api_config()
+            # 构建扁平化后的API配置
+            api_config = {
+                'openrouter': self.config_manager.get_openrouter_config(),
+                'huggingface': self.config_manager.get_huggingface_config()
+            }
             self._services['ai_generation_service'] = AIContentGenerator(api_config)
             self.logger.debug("创建AI生成服务实例")
         

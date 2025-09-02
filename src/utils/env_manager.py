@@ -262,7 +262,7 @@ LOG_LEVEL=INFO
         """
         try:
             # 检查关键配置项
-            api_key = config.get('api', {}).get('openrouter', {}).get('key')
+            api_key = config.get('openrouter', {}).get('key')
             if not api_key or api_key.startswith('${'):
                 self.logger.warning("OpenRouter API密钥未正确配置")
                 return False
@@ -294,7 +294,7 @@ LOG_LEVEL=INFO
         
         # 需要隐藏的字段
         sensitive_fields = [
-            ['api', 'openrouter', 'key'],
+            ['openrouter', 'key'],
             ['network', 'tailscale', 'auth_key'],
             ['network', 'secure_file_server', 'auth_token'],
             ['github', 'token']
@@ -336,7 +336,7 @@ def setup_project_environment(project_root: Optional[str] = None) -> Optional[Di
     if config:
         logging.info("项目环境设置完成")
     else:
-        logging.error("项目环境设置失败")
+        logging.warning("项目环境设置失败")
     
     return config
 

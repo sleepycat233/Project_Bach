@@ -7,9 +7,17 @@ Speaker Diarization服务
 
 import logging
 import os
+import warnings
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 import numpy as np
+
+# 抑制torchaudio兼容性警告
+warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio")
+warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio.*")
+warnings.filterwarnings("ignore", message=".*torchaudio.*deprecated.*")
+warnings.filterwarnings("ignore", message=".*TorchCodec.*")
+warnings.filterwarnings("ignore", message=".*AudioMetaData.*deprecated.*")
 
 try:
     from pyannote.audio import Pipeline
@@ -22,18 +30,20 @@ except ImportError:
 class SpeakerDiarization:
     """说话人分离服务"""
     
-    def __init__(self, diarization_config: Dict[str, Any], huggingface_config: Dict[str, Any]):
+    def __init__(self, diarization_config: Dict[str, Any], huggingface_config: Dict[str, Any], content_classification_config: Dict[str, Any] = None):
         """初始化说话人分离服务
         
         Args:
             diarization_config: 说话人分离配置字典
-            huggingface_config: HuggingFace配置字典
+            huggingface_config: HuggingFace配置字典  
+            content_classification_config: 内容分类配置字典（包含diarization设置）
         """
         if Pipeline is None:
             raise ImportError("pyannote.audio未安装。请运行: pip install pyannote-audio")
             
         self.config = diarization_config
         self.hf_config = huggingface_config
+        self.content_classification_config = content_classification_config or {}
         self.logger = logging.getLogger('project_bach.speaker_diarization')
         self._pipeline = None  # 延迟加载
         
@@ -41,10 +51,9 @@ class SpeakerDiarization:
         self.provider = diarization_config.get('provider', 'pyannote')
         self.max_speakers = diarization_config.get('max_speakers', 6)
         self.min_segment_duration = diarization_config.get('min_segment_duration', 1.0)
-        self.model_path = Path(diarization_config.get('model_path', './models/diarization'))
         
-        # 内容类型默认设置
-        self.content_type_defaults = diarization_config.get('content_type_defaults', {})
+        # 从content_classification配置中获取content_types
+        self.content_types = self.content_classification_config.get('content_types', {})
         
         # 输出格式配置
         self.output_format = diarization_config.get('output_format', {
@@ -53,7 +62,7 @@ class SpeakerDiarization:
             'include_confidence': False
         })
         
-        self.logger.info(f"Speaker Diarization服务初始化完成")
+        self.logger.info(f"Speaker Diarization服务初始化完成 (HuggingFace缓存)")
         self.logger.info(f"提供商: {self.provider}")
         self.logger.info(f"最大说话人数: {self.max_speakers}")
         self.logger.info(f"最小段落时长: {self.min_segment_duration}秒")
@@ -63,32 +72,26 @@ class SpeakerDiarization:
         
         Args:
             content_type: 内容类型 (lecture, meeting等)
-            subcategory: 子分类 (cs, seminar, standup等)
+            subcategory: 子分类 (CS101, Seminar, standup等)
             
         Returns:
             是否应该启用diarization
         """
-        defaults = self.content_type_defaults
+        if content_type not in self.content_types:
+            return False
+            
+        content_type_config = self.content_types[content_type]
         
         # 检查子分类设置
         if subcategory:
-            subcategory_key = f"{content_type}_subcategories"
-            if subcategory_key in defaults:
-                subcategory_defaults = defaults[subcategory_key]
-                if subcategory in subcategory_defaults:
-                    result = subcategory_defaults[subcategory]
-                    self.logger.debug(f"使用子分类设置 {content_type}/{subcategory}: {result}")
-                    return result
+            subcategories = content_type_config.get('subcategories', {})
+            if subcategory in subcategories and isinstance(subcategories[subcategory], dict):
+                subcategory_config = subcategories[subcategory]
+                if 'diarization' in subcategory_config:
+                    return subcategory_config['diarization']
         
         # 使用主分类默认设置
-        if content_type in defaults:
-            result = defaults[content_type]
-            self.logger.debug(f"使用主分类设置 {content_type}: {result}")
-            return result
-        
-        # 未知类型默认不启用
-        self.logger.debug(f"未知内容类型 {content_type}，默认不启用diarization")
-        return False
+        return content_type_config.get('diarization_default', False)
     
     def diarize_audio(self, audio_path: Path, **kwargs) -> List[Dict[str, Any]]:
         """执行说话人分离
@@ -118,9 +121,12 @@ class SpeakerDiarization:
             # 获取或初始化pipeline
             pipeline = self._get_pipeline()
             
+            # 检查并转换音频格式（pyannote只支持WAV等格式）
+            audio_for_diarization = self._prepare_audio_for_diarization(audio_path)
+            
             # 执行diarization
             self.logger.info("正在执行说话人分离...")
-            diarization_result = pipeline(str(audio_path))
+            diarization_result = pipeline(str(audio_for_diarization))
             
             # 转换结果格式
             speaker_segments = []
@@ -143,6 +149,15 @@ class SpeakerDiarization:
             error_msg = f"Speaker diarization失败: {str(e)}"
             self.logger.error(error_msg)
             raise Exception(error_msg)
+        finally:
+            # 清理临时音频文件
+            if 'audio_for_diarization' in locals() and audio_for_diarization != audio_path:
+                try:
+                    if audio_for_diarization.exists():
+                        audio_for_diarization.unlink()
+                        self.logger.debug(f"清理临时音频文件: {audio_for_diarization}")
+                except Exception as cleanup_error:
+                    self.logger.warning(f"清理临时文件失败: {cleanup_error}")
     
     def merge_with_transcription(self, transcription: Dict[str, Any], 
                                 speaker_segments: List[Dict[str, Any]], 
@@ -311,6 +326,22 @@ class SpeakerDiarization:
                 # 设置最大说话人数
                 self._pipeline.max_speakers = self.max_speakers
                 
+                # 设置计算设备 (MPS优先用于Apple Silicon，然后CUDA，最后CPU)
+                if torch is not None:
+                    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                        device = torch.device("mps")  # Apple Silicon GPU
+                        self._pipeline.to(device)
+                        self.logger.info("pyannote pipeline已转移到MPS (Apple Silicon GPU)")
+                    elif torch.cuda.is_available():
+                        device = torch.device("cuda")
+                        self._pipeline.to(device)
+                        self.logger.info("pyannote pipeline已转移到CUDA GPU")
+                    else:
+                        device = torch.device("cpu")
+                        self.logger.info("pyannote pipeline使用CPU")
+                else:
+                    self.logger.warning("PyTorch未安装，pipeline可能无法正常工作")
+                
                 self.logger.info("pyannote.audio pipeline初始化成功")
                 
             except Exception as e:
@@ -372,6 +403,71 @@ class SpeakerDiarization:
             'speaker_ratios': {k: round(v, 3) for k, v in speaker_ratios.items()},
             'total_segments': len(speaker_segments)
         }
+    
+    def _prepare_audio_for_diarization(self, audio_path: Path) -> Path:
+        """为pyannote diarization准备音频文件格式
+        
+        Args:
+            audio_path: 原始音频文件路径
+            
+        Returns:
+            适合diarization的音频文件路径（WAV格式）
+        """
+        # 检查文件扩展名
+        file_extension = audio_path.suffix.lower()
+        supported_formats = ['.wav', '.flac', '.aiff']
+        
+        if file_extension in supported_formats:
+            # 已经是支持的格式，直接返回
+            self.logger.debug(f"音频格式 {file_extension} 已支持，无需转换")
+            return audio_path
+        
+        # 需要转换为WAV格式
+        import subprocess
+        import tempfile
+        
+        # 创建临时WAV文件
+        temp_wav = audio_path.parent / f"{audio_path.stem}_temp_for_diarization.wav"
+        
+        self.logger.info(f"转换音频格式 {file_extension} -> .wav 用于diarization")
+        
+        try:
+            # 使用ffmpeg转换音频格式
+            cmd = [
+                'ffmpeg', '-i', str(audio_path),
+                '-ar', '16000',  # 16kHz采样率
+                '-ac', '1',      # 单声道
+                '-y',            # 覆盖输出文件
+                str(temp_wav)
+            ]
+            
+            result = subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True, 
+                timeout=60
+            )
+            
+            if result.returncode != 0:
+                raise Exception(f"ffmpeg转换失败: {result.stderr}")
+            
+            if not temp_wav.exists():
+                raise Exception("转换后的WAV文件未生成")
+                
+            file_size_mb = temp_wav.stat().st_size / (1024 * 1024)
+            self.logger.info(f"音频转换成功: {temp_wav.name} ({file_size_mb:.1f}MB)")
+            
+            return temp_wav
+            
+        except subprocess.TimeoutExpired:
+            raise Exception("音频转换超时")
+        except FileNotFoundError:
+            raise Exception("ffmpeg未安装。请安装: brew install ffmpeg")
+        except Exception as e:
+            # 清理失败的临时文件
+            if temp_wav.exists():
+                temp_wav.unlink()
+            raise Exception(f"音频格式转换失败: {str(e)}")
     
     def cleanup(self):
         """清理资源"""
