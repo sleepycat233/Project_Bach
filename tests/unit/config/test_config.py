@@ -26,15 +26,17 @@ class TestConfigManager(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
         self.config_path = os.path.join(self.test_dir, 'test_config.yaml')
         self.valid_config = {
-            'api': {
-                'openrouter': {
-                    'key': 'test-api-key',
-                    'base_url': 'https://openrouter.ai/api/v1',
-                    'models': {
-                        'summary': 'deepseek/deepseek-chat',
-                        'mindmap': 'openai/gpt-4o-mini'
-                    }
-                }
+            'openrouter': {
+                'key': 'test-api-key',
+                'base_url': 'https://openrouter.ai/api/v1',
+                'models': {
+                    'summary': 'deepseek/deepseek-chat',
+                    'mindmap': 'openai/gpt-4o-mini'
+                },
+                'rate_limit_tier': 'free'
+            },
+            'huggingface': {
+                'token': 'test-hf-token'
             },
             'paths': {
                 'watch_folder': os.path.join(self.test_dir, 'watch_folder'),
@@ -104,12 +106,19 @@ class TestConfigManager(unittest.TestCase):
         self.assertIn('配置文件缺少必要项', str(context.exception))
     
     @patch('utils.env_manager.setup_project_environment')
-    def test_get_api_config(self, mock_setup_env):
-        """测试获取API配置"""
+    def test_get_flattened_api_config(self, mock_setup_env):
+        """测试获取扁平化后的API配置"""
         mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
-        api_config = manager.get_api_config()
-        self.assertEqual(api_config, self.valid_config['api'])
+        
+        # 测试各个API服务配置的单独获取
+        openrouter_config = manager.get_openrouter_config()
+        huggingface_config = manager.get_huggingface_config()
+        
+        # 验证配置结构正确
+        self.assertIn('key', openrouter_config)
+        self.assertIn('models', openrouter_config)
+        self.assertIn('token', huggingface_config)
     
     @patch('utils.env_manager.setup_project_environment')
     def test_get_openrouter_config(self, mock_setup_env):
@@ -117,7 +126,7 @@ class TestConfigManager(unittest.TestCase):
         mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
         openrouter_config = manager.get_openrouter_config()
-        self.assertEqual(openrouter_config, self.valid_config['api']['openrouter'])
+        self.assertEqual(openrouter_config, self.valid_config['openrouter'])
     
     @patch('utils.env_manager.setup_project_environment')
     def test_get_paths_config(self, mock_setup_env):
@@ -128,24 +137,24 @@ class TestConfigManager(unittest.TestCase):
         self.assertEqual(paths_config, self.valid_config['paths'])
     
     @patch('utils.env_manager.setup_project_environment')
-    def test_get_whisperkit_config(self, mock_setup_env):
-        """测试获取WhisperKit配置"""
+    def test_get_mlx_whisper_config(self, mock_setup_env):
+        """测试获取MLX Whisper配置"""
         mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
-        whisperkit_config = manager.get_whisperkit_config()
-        self.assertEqual(whisperkit_config, self.valid_config['whisperkit'])
+        mlx_config = manager.get_mlx_whisper_config()
+        self.assertEqual(mlx_config, self.valid_config.get('mlx_whisper', {}))
     
     def test_update_config(self):
         """测试更新配置项"""
         manager = ConfigManager(self.config_path)
-        manager.update_config('api.openrouter.key', 'new-api-key')
+        manager.update_config('openrouter.key', 'new-api-key')
         self.assertEqual(manager.get_openrouter_config()['key'], 'new-api-key')
     
     def test_update_nested_config(self):
         """测试更新嵌套配置项"""
         manager = ConfigManager(self.config_path)
-        manager.update_config('whisperkit.model', 'large-v3')
-        self.assertEqual(manager.get_whisperkit_config()['model'], 'large-v3')
+        manager.update_config('mlx_whisper.default_model', 'whisper-large-v3-mlx')
+        self.assertEqual(manager.get_mlx_whisper_config()['default_model'], 'whisper-large-v3-mlx')
     
     def test_save_config(self):
         """测试保存配置"""

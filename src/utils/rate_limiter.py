@@ -16,44 +16,30 @@ import json
 class RateLimiter:
     """API限流器"""
     
-    def __init__(self, api_key: str, rate_limit_config: Optional[Dict] = None):
+    def __init__(self, api_key: str, rate_limit_tier: str = "free"):
         """初始化限流器
         
         Args:
             api_key: OpenRouter API密钥
-            rate_limit_config: 限流配置字典，如果为None则使用默认配置
+            rate_limit_tier: 限流级别 ("free" 或 "paid")
         """
         self.api_key = api_key
+        self.rate_limit_tier = rate_limit_tier
         self.logger = logging.getLogger('project_bach.rate_limiter')
         
-        # 从配置加载限制设置
-        if rate_limit_config:
-            self.limits = {
-                'free_models': rate_limit_config.get('free_tier', {
-                    'requests_per_10s': 10,
-                    'requests_per_minute': 60,
-                    'daily_credit_limit': 5
-                }),
-                'paid_models': rate_limit_config.get('paid_tier', {
-                    'requests_per_10s': 10,
-                    'requests_per_minute': 60,
-                    'credit_to_requests_ratio': 100
-                })
+        # OpenRouter限制设置 (硬编码，由服务商决定)
+        self.limits = {
+            'free_models': {
+                'requests_per_10s': 10,     # 每10秒10个请求
+                'requests_per_minute': 60,  # 每分钟60个请求  
+                'daily_credit_limit': 5,    # 免费层每日5个credits
+            },
+            'paid_models': {
+                'requests_per_10s': 10,     # 付费账户10秒限制相同
+                'requests_per_minute': 60,  # 每分钟限制相同
+                'credit_to_requests_ratio': 100,  # 每个credit允许100个请求/天
             }
-        else:
-            # 默认配置（向后兼容）
-            self.limits = {
-                'free_models': {
-                    'requests_per_10s': 10,  # 实际限制：每10秒10个请求
-                    'requests_per_minute': 60,  # 理论最大：6 * 10 = 60/分钟
-                    'daily_credit_limit': 5,  # 免费层每日5个credits
-                },
-                'paid_models': {
-                    'requests_per_10s': 10,  # 付费账户10秒限制相同
-                    'requests_per_minute': 60,  # 每分钟限制相同
-                    'credit_to_requests_ratio': 100,  # 每个credit允许100个请求/天
-                }
-            }
+        }
         
         # 请求跟踪
         self.request_history: Dict[str, list] = {}
@@ -371,16 +357,16 @@ class RateLimitedAPIClient:
             raise
 
 
-def create_rate_limited_client(original_client, api_key: str, rate_limit_config: Optional[Dict] = None):
+def create_rate_limited_client(original_client, api_key: str, rate_limit_tier: str = "free"):
     """创建带限流的API客户端
     
     Args:
         original_client: 原始API客户端
         api_key: API密钥
-        rate_limit_config: 限流配置字典
+        rate_limit_tier: 限流级别 ("free" 或 "paid")
         
     Returns:
         (带限流的API客户端, 限流器实例)
     """
-    rate_limiter = RateLimiter(api_key, rate_limit_config)
+    rate_limiter = RateLimiter(api_key, rate_limit_tier)
     return RateLimitedAPIClient(original_client, rate_limiter), rate_limiter

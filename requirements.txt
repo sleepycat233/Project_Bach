@@ -21,6 +21,15 @@ python-magic>=0.4.27
 # Phase 10 MLX Whisper migration & Speaker Diarization
 mlx-whisper>=0.4.3
 pyannote-audio>=3.1.1
+numpy>=1.24.0
+torch>=2.0.0
+
+# Phase 5 Template and content processing
+Jinja2>=3.1.0
+Markdown>=3.5.0
+
+# Hugging Face integration
+huggingface_hub>=0.20.0
 
 # Testing
 pytest>=8.4.0

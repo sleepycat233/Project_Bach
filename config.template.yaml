@@ -1,28 +1,23 @@
-api:
-  openrouter:
-    key: "${OPENROUTER_API_KEY}"  # 从环境变量读取
-    base_url: "https://openrouter.ai/api/v1"
+# OpenRouter API配置 (用于AI内容生成)
+openrouter:
+  key: "${OPENROUTER_API_KEY}"  # 从环境变量读取
+  base_url: "https://openrouter.ai/api/v1"
+  models:
+    summary: "google/gemma-3n-e4b-it:free"  # Google免费快速模型
+    mindmap: "google/gemma-3n-e4b-it:free"  # Google免费快速模型
+    # 备选免费快速模型：
+    # "opengvlab/internvl3-2b:free"      # 最快 (379.88 t/s)
+    # "google/gemini-2.5-flash-preview"  # 快速 (140.85 t/s)
+    # "qwen/qwen3-30b-a3b:free"          # 中等 (83.19 t/s)
 
-  # HuggingFace API配置 (用于Speaker Diarization)
-  huggingface:
-    token: "${HUGGINGFACE_TOKEN}"  # 从环境变量读取
+  # Rate limiting tier选择 (具体限制在代码中定义)
+  rate_limit_tier: "paid"  # 选项: "free" 或 "paid"
+  # Free tier: 10 req/10s, 60 req/min, 5 credits/day
+  # Paid tier: 10 req/10s, 60 req/min, 按credit计费
 
-    models:
-      summary: "google/gemma-3n-e2b-it:free"  # Google免费快速模型
-      mindmap: "google/gemma-3n-e2b-it:free"  # Google免费快速模型
-      # 备选免费快速模型：
-      # "opengvlab/internvl3-2b:free"      # 最快 (379.88 t/s)
-      # "google/gemini-2.5-flash-preview"  # 快速 (140.85 t/s)
-      # "qwen/qwen3-30b-a3b:free"          # 中等 (83.19 t/s)
-    rate_limits:
-      free_tier:
-        requests_per_10s: 10      # 每10秒最多10个请求
-        requests_per_minute: 60   # 每分钟最多60个请求
-        daily_credit_limit: 5     # 免费层每日5个credits
-      paid_tier:
-        requests_per_10s: 10      # 付费账户10秒限制相同
-        requests_per_minute: 60   # 每分钟限制相同
-        credit_to_requests_ratio: 100  # 每个credit允许100个请求/天
+# HuggingFace API配置 (用于Speaker Diarization)
+huggingface:
+  token: "${HUGGINGFACE_TOKEN}"  # 从环境变量读取
 
 paths:
   data_folder: "./data"  # 数据存储目录 (转录文本、日志等)
@@ -46,32 +41,11 @@ mlx_whisper:
     - "mlx-community/whisper-large-v3-mlx"
     - "mlx-community/whisper-large-v3-turbo"
 
-  # 统一使用HuggingFace缓存，不支持本地下载（更好的跨项目共享）
-
-  # 转录参数配置
-  transcription:
-    word_timestamps: true                         # 词级时间戳(原生支持)
-    language_detection: "auto"                    # 自动语言检测
-    supported_languages: ["en", "zh", "ja", "ko", "de", "fr", "es", "it", "pt", "ru"]
-
 # Speaker Diarization配置
 diarization:
-  provider: "pyannote"   # 使用pyannote-audio
+  provider: "pyannote"   # 使用pyannote-audio，从HuggingFace缓存加载
   max_speakers: 6
   min_segment_duration: 1.0
-  model_path: "./models/diarization"            # 说话人分离模型目录
-
-  # 基于content type和subcategory的diarization配置
-  content_type_defaults:
-    # 主分类默认设置
-    lecture: false       # 讲座通常单人，默认不启用
-    meeting: true        # 会议多人对话，默认启用
-
-    # Lecture子分类配置 - 用户可自定义
-    lecture_subcategories:
-      CS101: false          # CS课程，单人讲授
-      seminar: true      # 研讨会，可能有讨论环节
-      workshop: true     # 工作坊，可能有互动
 
   # 输出格式配置
   output_format:
@@ -86,10 +60,17 @@ content_classification:
     lecture:      # 🎓 学术讲座
       icon: "🎓"
       display_name: "Academic Lecture"
-      subcategories:  # 课程子分类
-        - "PHYS101"
-        - "CS101"
-        - "Seminar"
+      diarization_default: false  # 讲座通常单人，默认不启用
+      subcategories:
+        CS101:
+          display_name: "CS101-Computer Science Course"
+          diarization: false  # CS课程，单人讲授
+        PHYS101:
+          display_name: "PHYS101-Physics Course"
+          diarization: false  # 物理课程，单人讲授
+        Seminar:
+          display_name: "Academic Seminar"
+          diarization: true   # 研讨会，可能有讨论环节
       recommendations:
         english:
           - "whisper-base-mlx"
@@ -99,12 +80,21 @@ content_classification:
 
     meeting:      # 🏢 会议录音
       icon: "🏢"
-      display_name: "Meeting Recording (Limited support, requires ElevenLabs speaker diarization)"
-      subcategories:  # 会议子分类
-        - "team_meeting"
-        - "project_review"
-        - "client_call"
-        - "standup"
+      display_name: "Meeting Recording"
+      diarization_default: true   # 会议多人对话，默认启用
+      subcategories:
+        team_meeting:
+          display_name: "Team Meeting"
+          diarization: true   # 团队会议，多人参与
+        project_review:
+          display_name: "Project Review"
+          diarization: true   # 评审会议，多人讨论
+        client_call:
+          display_name: "Client Call"
+          diarization: true   # 客户电话，双人对话
+        standup:
+          display_name: "Daily Standup"
+          diarization: true   # 站会，多人参与
       recommendations:
         english:
           - "whisper-base-mlx"                     # MLX英文处理
@@ -335,33 +325,3 @@ youtube:
     subtitle_fallback_to_transcription: true             # 无字幕时回退到音频转录
     quick_metadata_timeout: 8                            # 快速元数据获取超时(秒)
     extract_comments: false      # 提取评论(耗时)
-
-# RSS处理器配置
-rss:
-  # 订阅管理
-  subscriptions:
-    max_subscriptions: 50        # 最大订阅数
-    default_refresh_interval: 3600  # 默认刷新间隔(秒)
-    auto_refresh: true           # 自动刷新
-    storage_file: "./data/rss_subscriptions.json"  # 订阅存储文件
-
-  # 内容处理
-  processing:
-    max_articles_per_feed: 20    # 每个feed最大文章数
-    content_length_min: 500      # 最小内容长度
-    content_length_max: 50000    # 最大内容长度
-    enable_summarization: true   # 启用AI摘要
-    preserve_html: false         # 保留HTML格式
-
-  # 过滤配置
-  filtering:
-    exclude_duplicates: true     # 排除重复文章
-    exclude_old_articles: true   # 排除旧文章
-    max_age_days: 30            # 最大文章年龄(天)
-    spam_detection: true         # 垃圾检测
-
-  # 网络配置
-  network:
-    timeout: 30                  # 请求超时(秒)
-    max_retries: 3              # 最大重试次数
-    user_agent: "Project Bach RSS Reader 1.0"

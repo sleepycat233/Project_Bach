@@ -80,7 +80,7 @@ class ConfigManager:
         Raises:
             ValueError: 缺少必要的配置项
         """
-        required_keys = ['api', 'paths', 'spacy', 'logging']
+        required_keys = ['openrouter', 'paths', 'spacy', 'logging']
         missing_keys = []
         
         for key in required_keys:
@@ -90,9 +90,8 @@ class ConfigManager:
         if missing_keys:
             raise ValueError(f"配置文件缺少必要项: {', '.join(missing_keys)}")
         
-        # 验证API配置
-        api_config = config.get('api', {})
-        openrouter_config = api_config.get('openrouter', {})
+        # 验证OpenRouter配置
+        openrouter_config = config.get('openrouter', {})
         if not openrouter_config.get('key') or not openrouter_config.get('base_url'):
             raise ValueError("OpenRouter API配置不完整，需要key和base_url")
         
@@ -122,19 +121,9 @@ class ConfigManager:
             
         # OpenRouter API Key
         if 'OPENROUTER_API_KEY' in os.environ:
-            if 'api' not in self.config:
-                self.config['api'] = {}
-            if 'openrouter' not in self.config['api']:
-                self.config['api']['openrouter'] = {}
-            self.config['api']['openrouter']['key'] = os.environ['OPENROUTER_API_KEY']
-    
-    def get_api_config(self) -> Dict[str, Any]:
-        """获取API配置
-        
-        Returns:
-            API配置字典
-        """
-        return self.config.get('api', {})
+            if 'openrouter' not in self.config:
+                self.config['openrouter'] = {}
+            self.config['openrouter']['key'] = os.environ['OPENROUTER_API_KEY']
     
     def get_openrouter_config(self) -> Dict[str, Any]:
         """获取OpenRouter API配置
@@ -142,7 +131,7 @@ class ConfigManager:
         Returns:
             OpenRouter配置字典
         """
-        return self.get_api_config().get('openrouter', {})
+        return self.config.get('openrouter', {})
     
     def get_paths_config(self) -> Dict[str, str]:
         """获取路径配置
@@ -160,13 +149,29 @@ class ConfigManager:
         """
         return self.config.get('spacy', {})
     
-    def get_whisperkit_config(self) -> Dict[str, Any]:
-        """获取WhisperKit配置
+    def get_mlx_whisper_config(self) -> Dict[str, Any]:
+        """获取MLX Whisper配置
         
         Returns:
-            WhisperKit配置字典
+            MLX Whisper配置字典
         """
-        return self.config.get('whisperkit', {})
+        return self.config.get('mlx_whisper', {})
+    
+    def get_diarization_config(self) -> Dict[str, Any]:
+        """获取说话人分离配置
+        
+        Returns:
+            Diarization配置字典
+        """
+        return self.config.get('diarization', {})
+    
+    def get_huggingface_config(self) -> Dict[str, Any]:
+        """获取HuggingFace配置
+        
+        Returns:
+            HuggingFace配置字典
+        """
+        return self.config.get('huggingface', {})
     
     def get_logging_config(self) -> Dict[str, Any]:
         """获取日志配置
