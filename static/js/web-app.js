@@ -68,15 +68,13 @@ class WebApp {
         // 模型选择器 - Audio标签页
         this.components.modelSelector = new ModelSelector({
             languageSelectId: 'languageSelect',
-            modelSelectId: 'modelSelect',
-            modelInfoId: 'modelInfoContent'
+            modelSelectId: 'modelSelect'
         });
 
         // 模型选择器 - YouTube标签页
         this.components.youtubeModelSelector = new ModelSelector({
             languageSelectId: 'youtubeLanguageSelect',
-            modelSelectId: 'youtubeModelSelect',
-            modelInfoId: 'youtubeModelInfoContent'
+            modelSelectId: 'youtubeModelSelect'
         });
 
         // 状态跟踪器
@@ -112,8 +110,6 @@ class WebApp {
         this.components.modelSelector.onModelChanged(() => {
             const selectedModel = this.components.modelSelector.getSelectedModel();
             console.log('Model changed:', selectedModel);
-            
-            this.updateProcessingOptions(selectedModel);
         });
 
         // 状态更新
@@ -349,13 +345,6 @@ class WebApp {
         }
     }
 
-    updateProcessingOptions(model) {
-        // 根据选择的模型更新处理选项
-        const processingOptions = document.getElementById('processing-options');
-        if (processingOptions && model) {
-            // 显示模型相关的选项
-        }
-    }
 
     async loadInitialData() {
         // 加载初始数据
