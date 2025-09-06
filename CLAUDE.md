@@ -103,6 +103,117 @@ for speaker_segment in speaker_segments:  # 按speaker segments顺序遍历
 
 基于Phase 10的成功完成，项目现在具备了完整的现代化音频处理能力。
 
+#### **Phase 7: 前端Post-Processing选择器 - 灵活化后处理流程**
+
+**需求背景**: 当前所有后处理步骤(NER匿名化、摘要生成、思维导图)都是hardcoded，用户无法根据需要选择性启用
+
+**核心后处理步骤**:
+1. **NER + 匿名化**: 识别和匿名化人名等敏感信息
+2. **摘要生成**: AI生成内容摘要  
+3. **思维导图生成**: AI生成结构化思维导图
+
+**技术实现方案**:
+
+##### **前端UI设计**
+```html
+<!-- Post-Processing Options -->
+<div class="form-group">
+    <label class="form-label">🔧 Post-Processing Options</label>
+    
+    <div class="post-processing-options">
+        <label class="checkbox-item">
+            <input type="checkbox" name="enable_anonymization" checked>
+            <span>🕵️ Name Anonymization (NER)</span>
+            <small>Detect and anonymize personal names in transcription</small>
+        </label>
+        
+        <label class="checkbox-item">
+            <input type="checkbox" name="enable_summary" checked>
+            <span>📝 AI Summary Generation</span>
+            <small>Generate content summary using AI</small>
+        </label>
+        
+        <label class="checkbox-item">
+            <input type="checkbox" name="enable_mindmap" checked>  
+            <span>🧠 Mindmap Generation</span>
+            <small>Create structured mindmap from content</small>
+        </label>
+    </div>
+</div>
+```
+
+##### **后端架构重构**
+```python
+# 扩展metadata结构
+metadata = {
+    # 现有字段...
+    'post_processing': {
+        'enable_anonymization': True,  # 用户选择
+        'enable_summary': True,
+        'enable_mindmap': True
+    }
+}
+
+# AudioProcessor流程控制优化
+class AudioProcessor:
+    def process_audio_file(self, audio_path, metadata=None):
+        # 1. 转录 (必需)
+        transcript = self.transcribe_audio(...)
+        
+        # 2. 条件化后处理
+        post_config = metadata.get('post_processing', {})
+        
+        if post_config.get('enable_anonymization', True):
+            anonymized_text = self.anonymizer.anonymize(transcript)
+        else:
+            anonymized_text = transcript  # 跳过匿名化
+            
+        if post_config.get('enable_summary', True):
+            summary = self.ai_generator.generate_summary(anonymized_text)
+        else:
+            summary = None  # 跳过摘要生成
+            
+        if post_config.get('enable_mindmap', True):
+            mindmap = self.ai_generator.generate_mindmap(anonymized_text)
+        else:
+            mindmap = None  # 跳过思维导图
+```
+
+##### **配置系统扩展**
+```yaml
+# config.yaml
+post_processing:
+  defaults:
+    enable_anonymization: true    # 默认启用匿名化
+    enable_summary: true         # 默认启用摘要
+    enable_mindmap: true         # 默认启用思维导图
+  
+  # 基于content type的智能默认值
+  content_type_defaults:
+    lecture:
+      enable_anonymization: false  # 讲座通常无敏感信息
+      enable_summary: true
+      enable_mindmap: true
+    meeting:
+      enable_anonymization: true   # 会议可能包含人名
+      enable_summary: true  
+      enable_mindmap: false        # 会议不适合mindmap
+```
+
+**完成标准**:
+- ✅ 前端UI支持三个post-processing选项的独立启用/禁用
+- ✅ 后端AudioProcessor根据用户选择条件化执行各步骤
+- ✅ 配置系统支持基于content type的智能默认值
+- ✅ API性能优化：跳过不需要的AI调用可节省时间和费用
+- ✅ 向后兼容：现有API调用保持默认行为
+- ✅ 结果存储适配：支持部分后处理结果的存储格式
+
+**用户价值**:
+- **成本控制**: 可选择性跳过昂贵的AI生成步骤
+- **处理速度**: 减少不需要的后处理可提升整体速度
+- **使用灵活性**: 根据不同场景选择合适的后处理组合
+- **隐私控制**: 可选择跳过匿名化用于个人使用场景
+
 #### 📋 技术架构设计
 ```python
 # 新的MLX Whisper服务架构 - 解耦设计
@@ -317,6 +428,7 @@ for speaker_segment in speaker_segments:
 - 🔴 **Phase 11**: Speaker Diarization时间戳对齐算法优化 (详见上方技术方案)
 
 #### 📋 中等优先级 - 功能完善
+- 📋 **Phase 7: 前端Post-Processing选择器** - 用户可选择性启用/禁用后处理步骤
 - 📋 **Phase 4 完善**: Tailscale网络集成 - ACL配置和SSL证书
 - 📋 **JavaScript客户端功能**: 分类筛选，搜索功能，统计仪表板
 - 📋 **高级Web功能**: 用户认证，会话管理，flask_limiter集成
