@@ -70,7 +70,7 @@ class TestMLXTranscriptionService(unittest.TestCase):
             language_preference='english'
         )
         
-        # 验证结果
+        # 验证结果 - 默认word_timestamps=False，返回纯文本
         self.assertEqual(result, 'This is a test transcription.')
         
         # 验证mlx_whisper.transcribe被正确调用
@@ -78,8 +78,63 @@ class TestMLXTranscriptionService(unittest.TestCase):
         call_args = mock_mlx_whisper.transcribe.call_args
         self.assertEqual(call_args[0][0], str(self.audio_path))  # 音频路径
         self.assertTrue('word_timestamps' in call_args[1])
-        self.assertTrue(call_args[1]['word_timestamps'])
+        self.assertFalse(call_args[1]['word_timestamps'])  # 默认为False
     
+    @patch('core.mlx_transcription.mlx_whisper')
+    def test_transcribe_audio_with_word_timestamps(self, mock_mlx_whisper):
+        """测试启用word_timestamps时返回包含chunks的字典格式"""
+        # 设置mock返回值 - 包含segments的完整结果
+        mock_result = {
+            'text': 'This is a test transcription.',
+            'segments': [
+                {
+                    'start': 0.0,
+                    'end': 3.0,
+                    'text': 'This is a test transcription.',
+                    'words': [
+                        {'start': 0.0, 'end': 0.5, 'word': 'This'},
+                        {'start': 0.5, 'end': 1.0, 'word': 'is'},
+                        {'start': 1.0, 'end': 1.5, 'word': 'a'},
+                        {'start': 1.5, 'end': 2.0, 'word': 'test'},
+                        {'start': 2.0, 'end': 3.0, 'word': 'transcription'}
+                    ]
+                }
+            ]
+        }
+        mock_mlx_whisper.transcribe.return_value = mock_result
+        
+        service = MLXTranscriptionService(self.mlx_config)
+        result = service.transcribe_audio(
+            audio_path=self.audio_path,
+            language_preference='english',
+            word_timestamps=True  # 启用word_timestamps
+        )
+        
+        # 验证结果 - 应该返回包含text和chunks的字典
+        self.assertIsInstance(result, dict)
+        self.assertIn('text', result)
+        self.assertIn('chunks', result)
+        self.assertEqual(result['text'], 'This is a test transcription.')
+        
+        # 验证chunks格式 - 应该直接使用segments，并添加timestamp字段
+        chunks = result['chunks']
+        self.assertEqual(len(chunks), 1)
+        first_chunk = chunks[0]
+        self.assertIn('text', first_chunk)
+        self.assertIn('timestamp', first_chunk)  # 新的timestamp字段
+        self.assertIn('start', first_chunk)      # 保留原始start字段
+        self.assertIn('end', first_chunk)        # 保留原始end字段
+        self.assertIn('words', first_chunk)      # 保留原始words字段
+        
+        # 验证timestamp格式
+        self.assertEqual(first_chunk['timestamp'], [0.0, 3.0])
+        self.assertEqual(first_chunk['text'], 'This is a test transcription.')
+        
+        # 验证mlx_whisper.transcribe被正确调用
+        mock_mlx_whisper.transcribe.assert_called_once()
+        call_args = mock_mlx_whisper.transcribe.call_args
+        self.assertTrue(call_args[1]['word_timestamps'])  # 应该传递True
+
     @patch('core.mlx_transcription.mlx_whisper')
     def test_transcribe_audio_with_model_repo(self, mock_mlx_whisper):
         """测试使用指定模型仓库转录"""
@@ -224,26 +279,19 @@ class TestMLXTranscriptionService(unittest.TestCase):
         self.assertFalse(call_args[1]['word_timestamps'])
     
     @patch('core.mlx_transcription.mlx_whisper')
-    def test_get_model_path_with_local_model(self, mock_mlx_whisper):
-        """测试使用本地模型路径"""
-        mock_result = {'text': 'Test with local model.'}
+    def test_get_model_path_huggingface_repo(self, mock_mlx_whisper):
+        """测试使用HuggingFace仓库模型（当前默认策略）"""
+        mock_result = {'text': 'Test with HuggingFace repo model.'}
         mock_mlx_whisper.transcribe.return_value = mock_result
-        
-        # 创建本地模型文件
-        local_model_path = Path(self.mlx_config['local_model_path'])
-        local_model_path.mkdir(parents=True, exist_ok=True)
-        
-        (local_model_path / 'weights.npz').write_text('fake model weights')
-        (local_model_path / 'config.json').write_text('{"fake": "config"}')
         
         service = MLXTranscriptionService(self.mlx_config)
         result = service.transcribe_audio(self.audio_path)
         
-        self.assertEqual(result, 'Test with local model.')
+        self.assertEqual(result, 'Test with HuggingFace repo model.')
         
-        # 验证使用了本地模型路径
+        # 验证使用了HuggingFace仓库地址（统一策略）
         call_args = mock_mlx_whisper.transcribe.call_args
-        self.assertEqual(call_args[1]['path_or_hf_repo'], str(Path(self.mlx_config['local_model_path'])))
+        self.assertEqual(call_args[1]['path_or_hf_repo'], self.mlx_config['model_repo'])
     
     def test_invalid_audio_path(self):
         """测试无效音频路径"""

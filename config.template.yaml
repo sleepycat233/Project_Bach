@@ -47,6 +47,16 @@ diarization:
   max_speakers: 6
   min_segment_duration: 1.0
 
+  # pyannote.audio pipeline参数配置 (严格参数，减少误检)
+  # 基于Phase 11调试结果优化的严格配置
+  pipeline_params:
+    segmentation:
+      min_duration_off: 1.0          # 最小静音时长(秒) - 更严格，减少短插话误检
+    clustering:
+      method: "centroid"             # 聚类方法
+      min_cluster_size: 20           # 最小聚类大小 - 更大值，减少虚假说话人
+      threshold: 0.9                 # 聚类阈值 - 更高值，降低敏感度
+
   # 输出格式配置
   output_format:
     group_by_speaker: true          # 默认按说话人分组，便于阅读

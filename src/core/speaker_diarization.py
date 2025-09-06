@@ -38,8 +38,7 @@ class SpeakerDiarization:
             huggingface_config: HuggingFace配置字典  
             content_classification_config: 内容分类配置字典（包含diarization设置）
         """
-        if Pipeline is None:
-            raise ImportError("pyannote.audio未安装。请运行: pip install pyannote-audio")
+        # 延迟检查Pipeline，只在实际使用时检查，这样单元测试可以mock
             
         self.config = diarization_config
         self.hf_config = huggingface_config
@@ -195,7 +194,12 @@ class SpeakerDiarization:
                                        speaker_segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """时间戳对齐算法 - 为ASR chunks分配说话人标签
         
-        基于HuggingFace ASRDiarizationPipeline的对齐算法实现
+        使用IoU (Intersection over Union) 算法进行精确匹配：
+        1. 遍历每个ASR chunk
+        2. 计算chunk与所有speaker segments的IoU值
+        3. 选择IoU值最高的speaker (IoU > threshold)
+        4. 如果无满足阈值的匹配，使用最大重叠作为fallback
+        5. 正确处理短插话场景，避免长segment过度抢夺chunks
         
         Args:
             chunks: ASR转录chunks
@@ -207,46 +211,111 @@ class SpeakerDiarization:
         if not chunks or not speaker_segments:
             return chunks
         
-        # 提取ASR chunk的结束时间戳
-        end_timestamps = np.array([chunk["timestamp"][1] for chunk in chunks])
-        
-        # 为每个说话人段落找到对应的ASR chunks
         aligned_chunks = []
-        current_chunk_idx = 0
+        iou_threshold = 0.4  # IoU阈值，可以根据需要调整
         
-        for speaker_segment in speaker_segments:
-            speaker = speaker_segment["speaker"]
-            segment_end = speaker_segment["end"]
+        for chunk in chunks:
+            chunk_start, chunk_end = chunk["timestamp"]
+            chunk_duration = chunk_end - chunk_start
             
-            # 使用numpy.argmin找到最接近的ASR时间戳
-            # 找到所有结束时间小于等于当前说话人段落结束时间的chunks
-            valid_indices = np.where(end_timestamps <= segment_end)[0]
+            best_speaker = None
+            best_iou = iou_threshold
             
-            if len(valid_indices) == 0:
-                continue  # 没有匹配的chunks
+            # 计算与所有speaker segments的IoU
+            for segment in speaker_segments:
+                segment_start, segment_end = segment["start"], segment["end"]
+                segment_duration = segment_end - segment_start
+                
+                # 计算交集
+                intersection_start = max(chunk_start, segment_start)
+                intersection_end = min(chunk_end, segment_end)
+                
+                if intersection_start < intersection_end:
+                    intersection = intersection_end - intersection_start
+                    # 计算并集
+                    union = chunk_duration + segment_duration - intersection
+                    # 计算IoU
+                    iou = intersection / union if union > 0 else 0
+                    
+                    if iou > best_iou:
+                        best_iou = iou
+                        best_speaker = segment['speaker']
             
-            # 找到最后一个有效的chunk索引
-            last_valid_idx = valid_indices[-1]
+            # 如果没有满足阈值的匹配，使用最大重叠作为fallback
+            if best_speaker is None:
+                best_speaker = self._find_max_overlap_speaker(chunk_start, chunk_end, speaker_segments)
+                self.logger.debug(f"Chunk ({chunk_start:.1f}-{chunk_end:.1f}s) IoU<{iou_threshold}, 使用最大重叠: {best_speaker}")
+            else:
+                self.logger.debug(f"Chunk ({chunk_start:.1f}-{chunk_end:.1f}s) 最佳IoU: {best_iou:.3f}, 选择: {best_speaker}")
             
-            # 将从current_chunk_idx到last_valid_idx的所有chunks分配给当前说话人
-            for i in range(current_chunk_idx, min(last_valid_idx + 1, len(chunks))):
-                chunk = chunks[i].copy()
-                chunk['speaker'] = speaker
-                aligned_chunks.append(chunk)
-            
-            # 更新下一个开始位置
-            current_chunk_idx = last_valid_idx + 1
+            # 创建对齐后的chunk
+            aligned_chunk = chunk.copy()
+            aligned_chunk['speaker'] = best_speaker
+            aligned_chunks.append(aligned_chunk)
         
-        # 处理剩余的chunks（分配给最后一个说话人或标记为未知）
-        if current_chunk_idx < len(chunks):
-            last_speaker = speaker_segments[-1]["speaker"] if speaker_segments else "Unknown"
-            for i in range(current_chunk_idx, len(chunks)):
-                chunk = chunks[i].copy()
-                chunk['speaker'] = last_speaker
-                aligned_chunks.append(chunk)
-        
-        self.logger.debug(f"时间戳对齐完成: {len(chunks)} chunks -> {len(aligned_chunks)} aligned chunks")
+        self.logger.debug(f"IoU时间戳对齐完成: {len(chunks)} chunks -> {len(aligned_chunks)} aligned chunks")
         return aligned_chunks
+    
+    def _find_max_overlap_speaker(self, chunk_start: float, chunk_end: float, 
+                                 speaker_segments: List[Dict[str, Any]]) -> str:
+        """找到与chunk重叠最多的speaker (IoU算法的fallback)
+        
+        Args:
+            chunk_start: chunk开始时间
+            chunk_end: chunk结束时间
+            speaker_segments: 说话人段落列表
+            
+        Returns:
+            重叠最多的speaker标识
+        """
+        max_overlap = 0
+        best_speaker = "Unknown"
+        
+        for segment in speaker_segments:
+            segment_start, segment_end = segment["start"], segment["end"]
+            
+            # 计算重叠时长
+            overlap_start = max(chunk_start, segment_start)
+            overlap_end = min(chunk_end, segment_end)
+            
+            if overlap_start < overlap_end:
+                overlap = overlap_end - overlap_start
+                if overlap > max_overlap:
+                    max_overlap = overlap
+                    best_speaker = segment['speaker']
+        
+        # 如果仍然没有重叠，使用最近的speaker
+        if best_speaker == "Unknown":
+            best_speaker = self._find_nearest_speaker(chunk_start, chunk_end, speaker_segments)
+        
+        return best_speaker
+    
+    def _find_nearest_speaker(self, chunk_start: float, chunk_end: float, 
+                            speaker_segments: List[Dict[str, Any]]) -> str:
+        """找到最近的speaker segment
+        
+        Args:
+            chunk_start: chunk开始时间
+            chunk_end: chunk结束时间
+            speaker_segments: 说话人段落列表
+            
+        Returns:
+            最近的speaker标识
+        """
+        chunk_center = (chunk_start + chunk_end) / 2
+        
+        min_distance = float('inf')
+        nearest_speaker = "Unknown"
+        
+        for segment in speaker_segments:
+            segment_center = (segment['start'] + segment['end']) / 2
+            distance = abs(chunk_center - segment_center)
+            
+            if distance < min_distance:
+                min_distance = distance
+                nearest_speaker = segment['speaker']
+        
+        return nearest_speaker
     
     def _group_by_speaker_mode(self, aligned_chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """按说话人分组模式 - 合并同一说话人的连续chunks
@@ -314,6 +383,10 @@ class SpeakerDiarization:
             pyannote Pipeline实例
         """
         if self._pipeline is None:
+            # 检查Pipeline是否可用
+            if Pipeline is None:
+                raise ImportError("pyannote.audio未安装。请运行: pip install pyannote-audio")
+                
             self.logger.info("初始化pyannote.audio pipeline...")
             
             try:
@@ -325,6 +398,23 @@ class SpeakerDiarization:
                 
                 # 设置最大说话人数
                 self._pipeline.max_speakers = self.max_speakers
+                
+                # 配置pipeline参数以减少误检
+                # 根据debug结果，参数应该嵌套在segmentation和clustering下
+                pipeline_params = self.config.get('pipeline_params', {
+                    "segmentation": {
+                        "min_duration_off": 0.5,        # 最小静音时长(秒)
+                    },
+                    "clustering": {
+                        "method": "centroid",            # 聚类方法
+                        "min_cluster_size": 15,          # 最小聚类大小 - 减少虚假说话人
+                        "threshold": 0.8,                # 聚类阈值 - 降低敏感度
+                    }
+                })
+                
+                # 应用配置参数
+                self._pipeline.instantiate(pipeline_params)
+                self.logger.info(f"Pipeline参数配置: {pipeline_params}")
                 
                 # 设置计算设备 (MPS优先用于Apple Silicon，然后CUDA，最后CPU)
                 if torch is not None:

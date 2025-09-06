@@ -27,8 +27,7 @@ class MLXTranscriptionService:
         Args:
             mlx_config: MLX Whisper配置字典
         """
-        if mlx_whisper is None:
-            raise ImportError("mlx-whisper未安装。请运行: pip install mlx-whisper")
+        # 延迟检查mlx_whisper，只在实际使用时检查，这样单元测试可以mock
             
         self.config = mlx_config
         self.logger = logging.getLogger('project_bach.mlx_transcription')
@@ -117,7 +116,7 @@ class MLXTranscriptionService:
             
         Returns:
             str: 转录文本 (当word_timestamps=False时)
-            Dict[str, Any]: 包含text, chunks, segments的完整结果 (当word_timestamps=True时)
+            Dict[str, Any]: 包含text和chunks的完整结果 (当word_timestamps=True时)
             
         Raises:
             Exception: 转录失败
@@ -160,6 +159,10 @@ class MLXTranscriptionService:
             self.logger.info(f"使用模型: {model_path_or_repo}")
             self.logger.info(f"语言偏好: {language_preference}")
             
+            # 检查mlx_whisper是否可用
+            if mlx_whisper is None:
+                raise ImportError("mlx-whisper未安装。请运行: pip install mlx-whisper")
+            
             # 记录开始时间
             start_time = time.time()
             
@@ -194,29 +197,28 @@ class MLXTranscriptionService:
                 segment_count = len(result['segments'])
                 self.logger.info(f"转录生成了 {segment_count} 个语音段落")
             
-            # 清理内存（MLX模型可能占用较多显存）
-            if result and 'segments' in result:
-                if word_timestamps:
-                    self.logger.debug("返回包含词级时间戳的完整结果")
-                    
-                    # 从segments.words构建chunks (MLX Whisper没有chunks字段)
-                    chunks = []
-                    for segment in result.get('segments', []):
-                        if 'words' in segment:
-                            for word in segment['words']:
-                                chunks.append({
-                                    'text': word['word'].strip(),
-                                    'timestamp': [float(word['start']), float(word['end'])]
-                                })
-                    
-                    # 返回完整结果供diarization使用
-                    return {
-                        'text': transcribed_text.strip(),
-                        'chunks': chunks,
-                        'segments': result.get('segments', [])  # 保持完整原始数据
-                    }
-                else:
-                    self.logger.debug("清理segments信息以节省内存，只返回文本")
+            # 构建输出结果
+            if word_timestamps and isinstance(result, dict) and 'segments' in result:
+                self.logger.debug("返回包含时间戳的完整结果")
+                
+                # ✅ 直接使用segments作为chunks，只需要添加timestamp字段
+                # 避免不必要的数组重建，segments本身就包含所需的所有信息
+                segments = result.get('segments', [])
+                
+                # 为每个segment添加timestamp字段以兼容现有代码
+                for segment in segments:
+                    if 'start' in segment and 'end' in segment:
+                        segment['timestamp'] = [float(segment['start']), float(segment['end'])]
+                
+                self.logger.debug(f"使用 {len(segments)} 个segments作为chunks")
+                
+                # 返回完整结果供diarization使用
+                return {
+                    'text': transcribed_text.strip(),
+                    'chunks': segments  # 直接使用segments作为chunks，包含timestamp字段
+                }
+            else:
+                self.logger.debug("返回纯文本结果")
             
             return transcribed_text.strip()
             

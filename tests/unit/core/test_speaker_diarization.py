@@ -29,22 +29,6 @@ class TestSpeakerDiarization(unittest.TestCase):
             'max_speakers': 6,
             'min_segment_duration': 1.0,
             'model_path': f'{self.test_dir}/models/diarization',
-            'content_type_defaults': {
-                'lecture': False,
-                'meeting': True,
-                'lecture_subcategories': {
-                    'cs': False,
-                    'seminar': True,
-                    'workshop': True
-                },
-                'meeting_subcategories': {
-                    'standup': True,
-                    'review': True,
-                    'planning': True,
-                    'interview': True,
-                    'oneonone': False
-                }
-            },
             'output_format': {
                 'group_by_speaker': True,
                 'timestamp_precision': 1,
@@ -54,6 +38,46 @@ class TestSpeakerDiarization(unittest.TestCase):
         
         self.huggingface_config = {
             'token': 'fake_hf_token'
+        }
+        
+        # 添加content_classification配置，匹配实际的配置结构
+        self.content_classification_config = {
+            'content_types': {
+                'lecture': {
+                    'diarization_default': False,
+                    'subcategories': {
+                        'cs': {
+                            'diarization': False
+                        },
+                        'seminar': {
+                            'diarization': True
+                        },
+                        'workshop': {
+                            'diarization': True
+                        }
+                    }
+                },
+                'meeting': {
+                    'diarization_default': True,
+                    'subcategories': {
+                        'standup': {
+                            'diarization': True
+                        },
+                        'review': {
+                            'diarization': True
+                        },
+                        'planning': {
+                            'diarization': True
+                        },
+                        'interview': {
+                            'diarization': True
+                        },
+                        'oneonone': {
+                            'diarization': False
+                        }
+                    }
+                }
+            }
         }
         
         # 创建测试音频文件
@@ -69,7 +93,7 @@ class TestSpeakerDiarization(unittest.TestCase):
     
     def test_should_enable_diarization_lecture_default(self):
         """测试讲座类型默认不启用diarization"""
-        service = SpeakerDiarization(self.diarization_config, self.huggingface_config)
+        service = SpeakerDiarization(self.diarization_config, self.huggingface_config, self.content_classification_config)
         
         result = service.should_enable_diarization('lecture', None)
         self.assertFalse(result)
@@ -82,7 +106,7 @@ class TestSpeakerDiarization(unittest.TestCase):
     
     def test_should_enable_diarization_meeting_default(self):
         """测试会议类型默认启用diarization"""
-        service = SpeakerDiarization(self.diarization_config, self.huggingface_config)
+        service = SpeakerDiarization(self.diarization_config, self.huggingface_config, self.content_classification_config)
         
         result = service.should_enable_diarization('meeting', None)
         self.assertTrue(result)
@@ -95,17 +119,21 @@ class TestSpeakerDiarization(unittest.TestCase):
     
     def test_should_enable_diarization_unknown_type(self):
         """测试未知内容类型默认行为"""
-        service = SpeakerDiarization(self.diarization_config, self.huggingface_config)
+        service = SpeakerDiarization(self.diarization_config, self.huggingface_config, self.content_classification_config)
         
         result = service.should_enable_diarization('unknown', None)
         self.assertFalse(result)  # 默认不启用
     
     @patch('core.speaker_diarization.Pipeline')
-    @patch('os.environ')
-    def test_diarize_audio_success(self, mock_environ, mock_pipeline_class):
+    @patch('os.environ.get')
+    @patch.object(SpeakerDiarization, '_prepare_audio_for_diarization')
+    def test_diarize_audio_success(self, mock_prepare_audio, mock_environ_get, mock_pipeline_class):
         """测试成功的说话人分离"""
-        # 设置环境变量
-        mock_environ.get.return_value = 'fake_hf_token'
+        # 只mock特定的环境变量获取，而不是整个os.environ
+        mock_environ_get.return_value = 'fake_hf_token'
+        
+        # Mock音频转换，直接返回原始路径（跳过ffmpeg转换）
+        mock_prepare_audio.return_value = self.audio_path
         
         # 模拟pyannote pipeline
         mock_pipeline = MagicMock()
