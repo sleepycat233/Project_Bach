@@ -17,8 +17,8 @@ from werkzeug.exceptions import RequestEntityTooLarge
 import logging
 
 # 导入处理器和服务
-from .handlers.audio_upload_handler import AudioUploadHandler
-from .handlers.youtube_handler import YouTubeHandler
+from .audio_upload_handler import AudioUploadHandler
+from .youtube_handler import YouTubeHandler
 from ..core.processing_service import get_processing_service
 from ..utils.config import ConfigManager
 

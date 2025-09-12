@@ -8,7 +8,7 @@ YouTube URL处理器
 import uuid
 import logging
 from urllib.parse import urlparse, parse_qs
-from ...core.processing_service import ProcessingTracker, ProcessingStage
+from ..core.processing_service import ProcessingTracker, ProcessingStage
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class YouTubeHandler:
         """初始化YouTubeProcessor"""
         try:
             if self.config_manager:
-                from ..processors.youtube_processor import YouTubeProcessor
+                from .youtube_processor import YouTubeProcessor
                 self.youtube_processor = YouTubeProcessor(self.config_manager)
             else:
                 logger.warning("No config manager provided, using simulation mode")

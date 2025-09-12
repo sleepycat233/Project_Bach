@@ -10,7 +10,7 @@ import uuid
 import logging
 from pathlib import Path
 from werkzeug.utils import secure_filename
-from ...core.processing_service import ProcessingTracker, ProcessingStage
+from ..core.processing_service import ProcessingTracker, ProcessingStage
 
 logger = logging.getLogger(__name__)
 
@@ -142,8 +142,8 @@ class AudioUploadHandler:
                     }
                 
                 # 调用真正的AudioProcessor进行完整处理
-                from ...core.dependency_container import DependencyContainer
-                from ...core.processing_service import get_processing_service
+                from ..core.dependency_container import DependencyContainer
+                from ..core.processing_service import get_processing_service
                 
                 # 获取完整的音频处理器
                 container = DependencyContainer(self.config_manager)
