@@ -300,7 +300,6 @@ class AudioProcessor:
                     self.logger.info("已添加按说话人分组的转录结果")
 
             # 按隐私级别保存结果
-            self.result_storage.save_markdown_result(audio_path.stem, results, privacy_level=privacy_level)
             self.result_storage.save_json_result(audio_path.stem, results, privacy_level=privacy_level)
             self.result_storage.save_html_result(audio_path.stem, results, privacy_level=privacy_level)
 
@@ -511,9 +510,19 @@ class AudioProcessor:
                     'anonymized_transcript': anonymized_text,  # 添加匿名化转录文本
                     'anonymization_mapping': mapping
                 }
+                
+                # 添加upload_metadata（包含用户提交的信息）
+                upload_metadata = youtube_result.get('upload_metadata', {})
+                if upload_metadata:
+                    result_data['upload_metadata'] = upload_metadata
 
-                # 保存HTML格式的YouTube处理结果
+                # 保存HTML和JSON格式的YouTube处理结果
                 self.result_storage.save_html_result(
+                    filename=f"youtube_{video_id}",
+                    results=result_data,
+                    privacy_level=privacy_level
+                )
+                self.result_storage.save_json_result(
                     filename=f"youtube_{video_id}",
                     results=result_data,
                     privacy_level=privacy_level

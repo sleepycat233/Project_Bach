@@ -99,6 +99,15 @@ class YouTubeHandler:
                             if result.get('success'):
                                 tracker.update_stage(ProcessingStage.AI_GENERATING, 50, "YouTube content extracted, starting AI content generation")
                                 
+                                # 添加upload_metadata到result中，供AudioProcessor使用
+                                if metadata:
+                                    result['upload_metadata'] = metadata
+                                    # 确保content_type包含在metadata中
+                                    result['upload_metadata']['content_type'] = content_type
+                                else:
+                                    # 即使没有metadata，也要设置基本的upload_metadata
+                                    result['upload_metadata'] = {'content_type': content_type}
+                                
                                 # 集成AudioProcessor进行AI内容生成
                                 from ...core.dependency_container import DependencyContainer
                                 container = DependencyContainer(self.config_manager)

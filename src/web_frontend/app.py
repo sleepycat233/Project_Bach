@@ -10,6 +10,7 @@ Phase 6 Flask Web应用 - 主应用文件
 """
 
 import os
+import json
 import ipaddress
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from werkzeug.utils import secure_filename
@@ -581,66 +582,77 @@ def create_app(config=None):
                         if html_file.name == 'index.html':
                             continue
 
-                        # 解析文件名获取信息
+                        # 获取基础文件信息
                         filename = html_file.name
-
-                        # 解析日期 (格式: 20250824_034746_...)
-                        date_match = re.match(r'(\d{8})_(\d{6})_', filename)
-                        if date_match:
-                            date_str = date_match.group(1)
-                            time_str = date_match.group(2)
-                            try:
-                                parsed_date = datetime.strptime(f"{date_str}_{time_str}", "%Y%m%d_%H%M%S")
-                                formatted_date = parsed_date.strftime("%Y-%m-%d %H:%M")
-                            except:
-                                formatted_date = "Unknown"
-                        else:
-                            formatted_date = "Unknown"
-
-                        # 生成显示标题和确定内容类型
-                        content_type = 'others'
-                        if 'youtube' in filename:
-                            title = filename.replace('youtube_', '').replace('_result.html', '').replace('_', ' ')
-                            content_type = 'youtube'
-                            youtube_count += 1
-                        elif 'LEC' in filename:
-                            # 提取讲座标题
-                            title_match = re.search(r'LEC_(.+?)_result\.html', filename)
-                            if title_match:
-                                title = title_match.group(1).replace('_', ' ')
-                            else:
-                                title = filename.replace('_result.html', '').replace('_', ' ')
-                            content_type = 'lecture'
-                            lecture_count += 1
-                        else:
-                            title = filename.replace('_result.html', '').replace('_', ' ')
-                            lecture_count += 1
-                            content_type = 'lecture'  # 默认为lecture类型
-
-                        # 尝试从HTML文件中提取摘要
-                        summary = "Content summary"
-                        try:
-                            content = html_file.read_text(encoding='utf-8')
-                            # 查找第一个段落内容
-                            summary_match = re.search(r'<p[^>]*>(.*?)</p>', content, re.DOTALL)
-                            if summary_match:
-                                summary_text = re.sub(r'<[^>]+>', '', summary_match.group(1))
-                                summary = summary_text.strip()[:150] + "..." if len(summary_text) > 150 else summary_text.strip()
-                        except:
-                            pass
-
-                        # 尝试从对应的JSON文件读取upload_metadata
+                        
+                        # 优先从JSON文件读取所有metadata
                         json_filename = filename.replace('_result.html', '_result.json')
                         json_file = html_file.parent / json_filename
+                        
+                        # 默认值
+                        title = filename.replace('_result.html', '').replace('_', ' ')
+                        content_type = 'others'
+                        summary = "Content summary"
                         upload_metadata = {}
+                        formatted_date = html_file.stat().st_mtime
+                        formatted_date = datetime.fromtimestamp(formatted_date).strftime("%Y-%m-%d %H:%M")
 
                         if json_file.exists():
                             try:
                                 with open(json_file, 'r', encoding='utf-8') as f:
                                     json_data = json.load(f)
+                                    
+                                    # 从JSON获取所有信息
                                     upload_metadata = json_data.get('upload_metadata', {})
+                                    content_type = json_data.get('content_type') or upload_metadata.get('content_type', 'others')
+                                    
+                                    # 获取标题
+                                    if content_type == 'youtube':
+                                        title = json_data.get('title') or json_data.get('video_metadata', {}).get('title', title)
+                                    else:
+                                        title = json_data.get('title', title)
+                                    
+                                    # 获取摘要
+                                    summary = json_data.get('summary', summary)[:150] + "..." if len(json_data.get('summary', '')) > 150 else json_data.get('summary', summary)
+                                    
+                                    # 获取处理时间
+                                    processed_time = json_data.get('processed_time')
+                                    if processed_time:
+                                        try:
+                                            parsed_date = datetime.fromisoformat(processed_time.replace('Z', '+00:00'))
+                                            formatted_date = parsed_date.strftime("%Y-%m-%d %H:%M")
+                                        except:
+                                            pass  # 使用文件时间作为fallback
+                                            
                             except Exception as e:
                                 logger.warning(f"Failed to read JSON metadata from {json_filename}: {e}")
+                                # JSON读取失败时，尝试从HTML文件提取基本信息
+                                try:
+                                    content = html_file.read_text(encoding='utf-8')
+                                    # 查找第一个段落内容作为摘要
+                                    summary_match = re.search(r'<p[^>]*>(.*?)</p>', content, re.DOTALL)
+                                    if summary_match:
+                                        summary_text = re.sub(r'<[^>]+>', '', summary_match.group(1))
+                                        summary = summary_text.strip()[:150] + "..." if len(summary_text) > 150 else summary_text.strip()
+                                except:
+                                    pass
+                        else:
+                            # 没有JSON文件时，从HTML文件提取基本信息
+                            try:
+                                content = html_file.read_text(encoding='utf-8')
+                                # 查找第一个段落内容作为摘要
+                                summary_match = re.search(r'<p[^>]*>(.*?)</p>', content, re.DOTALL)
+                                if summary_match:
+                                    summary_text = re.sub(r'<[^>]+>', '', summary_match.group(1))
+                                    summary = summary_text.strip()[:150] + "..." if len(summary_text) > 150 else summary_text.strip()
+                            except:
+                                pass
+
+                        # 更新计数器
+                        if content_type == 'youtube':
+                            youtube_count += 1
+                        elif content_type == 'lecture':
+                            lecture_count += 1
 
                         content_files.append({
                             'filename': filename,
