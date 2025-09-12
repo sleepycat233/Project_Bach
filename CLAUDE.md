@@ -62,21 +62,63 @@
 - **灵活配置**: 基于subcategory的diarization默认配置
 - **生产就绪**: 完整错误处理和日志记录
 
-### 🔴 **下一步开发重点**
+### ✅ **代码清理与架构重构完成**
 
-#### **Phase 7: 前端Post-Processing选择器 - 灵活化后处理流程**
+**已完成的清理工作**:
+- ✅ **配置与密钥分离**: API keys完全迁移到环境变量，配置文件无敏感信息
+- ✅ **冗余代码删除**: 移除~1500行重复/未使用代码
+  - 删除重复的Web前端ProcessingService类 (419行)
+  - 删除未使用的RSS handler和content_classifier (~978行)
+  - 删除GitHub deployment monitor等冗余功能
+- ✅ **环境变量架构**: 纯Python实现.env加载，零依赖
+- ✅ **配置文件重构**: config.yaml已加入版本控制，移除config.template.yaml
 
-**需求背景**: 当前所有后处理步骤(NER匿名化、摘要生成、思维导图)都是hardcoded，用户无法根据需要选择性启用
+**架构优化成果**:
+- **配置管理简化**: config.yaml直接版本控制，环境变量独立管理
+- **依赖减少**: 移除不必要的python-dotenv依赖
+- **安全提升**: 敏感信息完全从配置文件分离
 
-**核心后处理步骤**:
+### 🔴 **当前开发任务 - Phase 7: 前端用户体验优化**
+
+**Phase 7已进入开发阶段**: 前端Post-Processing选择器 + 多文件上传支持
+
+### 📋 **后续开发重点**
+
+#### **Phase 7: 前端用户体验优化 - Post-Processing选择器 + 多文件上传**
+
+**需求背景**: 
+1. **成本控制**: 当前所有后处理步骤(NER匿名化、摘要生成、思维导图)都是hardcoded，用户无法根据需要选择性启用
+2. **批量处理**: 当前前端只支持单文件上传，用户处理多个音频文件时需要逐个上传，体验不佳
+
+**核心功能要求**:
+
+##### **A. Post-Processing选择器**:
 1. **NER + 匿名化**: 识别和匿名化人名等敏感信息
 2. **摘要生成**: AI生成内容摘要  
 3. **思维导图生成**: AI生成结构化思维导图
+
+##### **B. 多文件上传支持**:
+1. **批量文件选择**: 支持一次选择多个音频文件
+2. **并发上传**: 支持多文件同时上传（可配置并发数）
+3. **上传进度显示**: 每个文件独立的上传进度条
+4. **批量分类设置**: 为所有上传文件统一设置content type和subcategory
+5. **错误处理**: 单个文件失败不影响其他文件上传
 
 **技术实现方案**:
 
 ##### **前端UI设计**
 ```html
+<!-- 多文件上传区域 -->
+<div class="multi-upload-zone">
+    <input type="file" id="multiFileInput" multiple accept=".mp3,.wav,.m4a,.mp4,.flac,.aac,.ogg">
+    <div class="upload-area">
+        <div class="upload-placeholder">
+            <span>📁 拖拽多个文件到此处或点击选择</span>
+            <small>支持 .mp3, .wav, .m4a, .mp4, .flac, .aac, .ogg</small>
+        </div>
+    </div>
+</div>
+
 <!-- Post-Processing Options -->
 <div class="form-group">
     <label class="form-label">🔧 Post-Processing Options</label>
@@ -101,19 +143,68 @@
         </label>
     </div>
 </div>
+
+<!-- 文件列表和进度 -->
+<div class="file-list">
+    <div class="file-item">
+        <div class="file-info">
+            <span class="file-name">audio1.mp3</span>
+            <span class="file-size">2.3MB</span>
+        </div>
+        <div class="upload-progress">
+            <div class="progress-bar" style="width: 45%"></div>
+            <span class="progress-text">45%</span>
+        </div>
+    </div>
+</div>
 ```
 
 ##### **后端架构重构**
 ```python
-# 扩展metadata结构
-metadata = {
-    # 现有字段...
-    'post_processing': {
-        'enable_anonymization': True,  # 用户选择
-        'enable_summary': True,
-        'enable_mindmap': True
-    }
-}
+# 批量上传endpoint
+@app.route('/api/upload/batch', methods=['POST'])
+def batch_upload():
+    files = request.files.getlist('files')
+    content_type = request.form.get('content_type', 'meeting')
+    subcategory = request.form.get('subcategory', '')
+    
+    # Post-processing选项
+    enable_anonymization = request.form.get('enable_anonymization', 'true') == 'true'
+    enable_summary = request.form.get('enable_summary', 'true') == 'true'
+    enable_mindmap = request.form.get('enable_mindmap', 'true') == 'true'
+    
+    results = []
+    for file in files:
+        try:
+            metadata = {
+                'content_type': content_type,
+                'subcategory': subcategory,
+                'post_processing': {
+                    'enable_anonymization': enable_anonymization,
+                    'enable_summary': enable_summary,
+                    'enable_mindmap': enable_mindmap
+                }
+            }
+            
+            # 异步处理每个文件
+            task_id = process_file_async(file, metadata)
+            results.append({
+                'filename': file.filename,
+                'task_id': task_id,
+                'status': 'queued'
+            })
+        except Exception as e:
+            results.append({
+                'filename': file.filename,
+                'error': str(e),
+                'status': 'failed'
+            })
+    
+    return jsonify({
+        'total_files': len(files),
+        'successful': len([r for r in results if 'task_id' in r]),
+        'results': results
+    })
 
 # AudioProcessor流程控制优化
 class AudioProcessor:

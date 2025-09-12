@@ -55,6 +55,7 @@ def create_app(config=None):
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     # 初始化配置管理器
+    config_manager = None
     try:
         if config:
             # 使用提供的配置创建配置管理器
@@ -76,8 +77,13 @@ def create_app(config=None):
     app.config['SIMPLE_RATE_LIMIT'] = True
 
     # 初始化处理服务
-    app.config['AUDIO_HANDLER'] = AudioUploadHandler(config_manager)
-    app.config['YOUTUBE_HANDLER'] = YouTubeHandler(config_manager)
+    if config_manager:
+        app.config['AUDIO_HANDLER'] = AudioUploadHandler(config_manager)
+        app.config['YOUTUBE_HANDLER'] = YouTubeHandler(config_manager)
+    else:
+        logger.error("配置管理器加载失败，无法初始化处理服务")
+        app.config['AUDIO_HANDLER'] = None
+        app.config['YOUTUBE_HANDLER'] = None
     app.config['PROCESSING_SERVICE'] = get_processing_service()
 
     # Tailscale安全中间件
