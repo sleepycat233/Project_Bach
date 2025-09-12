@@ -92,8 +92,12 @@ class ConfigManager:
         
         # 验证OpenRouter配置
         openrouter_config = config.get('openrouter', {})
-        if not openrouter_config.get('key') or not openrouter_config.get('base_url'):
-            raise ValueError("OpenRouter API配置不完整，需要key和base_url")
+        if not openrouter_config.get('base_url'):
+            raise ValueError("OpenRouter API配置不完整，需要base_url")
+        
+        # 验证环境变量中的API key
+        if not os.environ.get('OPENROUTER_API_KEY'):
+            raise ValueError("缺少OPENROUTER_API_KEY环境变量")
         
         # 验证路径配置
         paths_config = config.get('paths', {})

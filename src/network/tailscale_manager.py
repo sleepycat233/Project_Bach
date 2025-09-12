@@ -8,6 +8,7 @@ import subprocess
 import json
 import logging
 import time
+import os
 from typing import Dict, Any, List, Optional
 
 
@@ -117,12 +118,12 @@ class TailscaleManager:
             self.logger.error("Tailscale未安装，无法连接")
             return False
         
-        auth_key = self.config.get('auth_key')
+        auth_key = os.environ.get('TAILSCALE_AUTH_KEY')
         machine_name = self.config.get('machine_name', 'project-bach')
         timeout = self.config.get('timeout', 30)
         
         if not auth_key:
-            self.logger.error("缺少auth_key配置，无法登录")
+            self.logger.error("缺少TAILSCALE_AUTH_KEY环境变量，无法登录")
             return False
         
         try:
@@ -265,13 +266,13 @@ class TailscaleManager:
             self.logger.error("配置为空")
             return False
         
-        auth_key = self.config.get('auth_key', '')
+        auth_key = os.environ.get('TAILSCALE_AUTH_KEY', '')
         if not auth_key:
-            self.logger.error("缺少auth_key配置")
+            self.logger.error("缺少TAILSCALE_AUTH_KEY环境变量")
             return False
         
         if not auth_key.startswith('tskey-'):
-            self.logger.error("auth_key格式无效，应以'tskey-'开头")
+            self.logger.error("TAILSCALE_AUTH_KEY格式无效，应以'tskey-'开头")
             return False
         
         machine_name = self.config.get('machine_name', '')

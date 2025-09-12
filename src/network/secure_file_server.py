@@ -194,9 +194,9 @@ class SecureFileServer:
         self.host = self.config.get('host', '0.0.0.0')
         self.port = self.config.get('port', 8080)
         self.allowed_dirs = self.config.get('allowed_dirs', [])
-        self.auth_token = self.config.get('auth_token')
+        self.auth_token = os.environ.get('SECURE_FILE_SERVER_TOKEN')
         
-        # 生成认证token（如果没有提供）
+        # 生成认证token（如果环境变量未提供）
         if not self.auth_token:
             self.auth_token = self._generate_auth_token()
             self.logger.info(f"Generated auth token: {self.auth_token}")

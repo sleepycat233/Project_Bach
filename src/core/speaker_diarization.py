@@ -390,10 +390,11 @@ class SpeakerDiarization:
             self.logger.info("初始化pyannote.audio pipeline...")
             
             try:
-                # 使用预训练的speaker diarization pipeline
+                # 使用预训练的speaker diarization pipeline  
+                auth_token = os.environ.get('HUGGINGFACE_TOKEN')
                 self._pipeline = Pipeline.from_pretrained(
                     "pyannote/speaker-diarization-3.1",
-                    use_auth_token=self.hf_config.get('token')
+                    use_auth_token=auth_token
                 )
                 
                 # 设置最大说话人数
@@ -443,18 +444,12 @@ class SpeakerDiarization:
     
     def _setup_huggingface_token(self):
         """设置HuggingFace认证token"""
-        hf_token = self.hf_config.get('token')
-        if hf_token:
-            os.environ['HUGGINGFACE_HUB_TOKEN'] = hf_token
-            self.logger.debug("HuggingFace token已设置")
+        env_token = os.environ.get('HUGGINGFACE_TOKEN')
+        if env_token:
+            os.environ['HUGGINGFACE_HUB_TOKEN'] = env_token
+            self.logger.debug("使用环境变量中的HuggingFace token")
         else:
-            # 尝试从环境变量获取
-            env_token = os.environ.get('HUGGINGFACE_TOKEN')
-            if env_token:
-                os.environ['HUGGINGFACE_HUB_TOKEN'] = env_token
-                self.logger.debug("使用环境变量中的HuggingFace token")
-            else:
-                self.logger.warning("未找到HuggingFace token，可能影响模型下载")
+            self.logger.warning("未找到HUGGINGFACE_TOKEN环境变量，可能影响模型下载")
     
     def get_speaker_statistics(self, speaker_segments: List[Dict[str, Any]]) -> Dict[str, Any]:
         """获取说话人统计信息

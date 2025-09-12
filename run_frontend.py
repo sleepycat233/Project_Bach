@@ -5,7 +5,22 @@
 """
 
 import sys
+import os
 from pathlib import Path
+
+# 手动加载.env文件
+def load_env_file():
+    """手动加载.env文件中的环境变量"""
+    env_file = Path('.env')
+    if env_file.exists():
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip().strip('"').strip("'")
+
+load_env_file()
 
 # 添加项目路径
 project_root = Path(__file__).parent

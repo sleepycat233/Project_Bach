@@ -4,6 +4,7 @@ AI内容生成模块
 负责通过OpenRouter API生成摘要和思维导图
 """
 
+import os
 import requests
 import logging
 from typing import Dict, Any, Optional
@@ -36,7 +37,7 @@ class AIContentGenerator:
         
         # 如果启用限流，包装客户端
         if enable_rate_limiting:
-            api_key = api_config.get('openrouter', {}).get('key', '')
+            api_key = os.environ.get('OPENROUTER_API_KEY', '')
             if api_key and api_key != 'YOUR_API_KEY_HERE':
                 # 获取限流配置
                 rate_limit_tier = api_config.get('openrouter', {}).get('rate_limit_tier', 'free')
@@ -197,9 +198,12 @@ class OpenRouterClient:
         self.logger = logging.getLogger('project_bach.openrouter')
         self.session = requests.Session()
         
+        # 从环境变量获取API密钥
+        api_key = os.environ.get('OPENROUTER_API_KEY', '')
+        
         # 设置默认headers
         self.session.headers.update({
-            "Authorization": f"Bearer {config.get('key', '')}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         })
         
