@@ -223,63 +223,6 @@ class TestAPIIntegrationSimple(unittest.TestCase):
         self.assertGreater(len(workflow_steps), 5, "Should complete multiple workflow steps")
 
 
-class TestDeploymentMonitorIntegration(unittest.TestCase):
-    """部署监控集成测试"""
-    
-    def test_github_deployment_monitor_initialization(self):
-        """测试GitHub部署监控器初始化"""
-        try:
-            from src.web_frontend.services.github_deployment_monitor import GitHubDeploymentMonitor
-            
-            # 测试配置
-            test_config = {
-                'github': {
-                    'username': 'sleepycat233',
-                    'repo_name': 'Project_Bach'
-                }
-            }
-            
-            monitor = GitHubDeploymentMonitor(test_config)
-            self.assertIsNotNone(monitor)
-            
-            print("✅ GitHubDeploymentMonitor initialization successful")
-            
-        except ImportError as e:
-            self.skipTest(f"Cannot import GitHubDeploymentMonitor: {e}")
-    
-    @patch('src.web_frontend.services.github_deployment_monitor.requests')
-    def test_deployment_status_check_integration(self, mock_requests):
-        """测试部署状态检查集成"""
-        try:
-            from src.web_frontend.services.github_deployment_monitor import GitHubDeploymentMonitor
-            
-            # Mock成功响应
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = []
-            mock_requests.get.return_value = mock_response
-            
-            test_config = {
-                'github': {
-                    'username': 'sleepycat233',
-                    'repo_name': 'Project_Bach'
-                }
-            }
-            
-            monitor = GitHubDeploymentMonitor(test_config)
-            result = monitor.check_pages_deployment_status()
-            
-            # 验证返回结构
-            self.assertIsInstance(result, dict)
-            self.assertIn('deployed', result)
-            self.assertIn('status', result)
-            self.assertIn('method', result)
-            
-            print("✅ Deployment status check integration successful")
-            
-        except ImportError as e:
-            self.skipTest(f"Cannot import GitHubDeploymentMonitor: {e}")
-
 
 if __name__ == '__main__':
     # 运行测试
@@ -298,9 +241,6 @@ if __name__ == '__main__':
     test_suite.addTest(TestAPIIntegrationSimple('test_model_configuration_consistency'))
     test_suite.addTest(TestAPIIntegrationSimple('test_integration_workflow_simulation'))
     
-    # 添加部署监控测试
-    test_suite.addTest(TestDeploymentMonitorIntegration('test_github_deployment_monitor_initialization'))
-    test_suite.addTest(TestDeploymentMonitorIntegration('test_deployment_status_check_integration'))
     
     # 运行测试
     runner = unittest.TextTestRunner(verbosity=2)

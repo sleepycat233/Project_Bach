@@ -270,26 +270,8 @@ FLASK_SECRET_KEY=test-secret-key
             assert data['api_method'] == 'github_rest_api'
             assert 'sleepycat233/Project_Bach' in data['repository']
             
-            # 2. 测试部署监控服务集成
-            from src.web_frontend.services.github_deployment_monitor import GitHubDeploymentMonitor
-            
-            config = {
-                'github': {
-                    'username': 'sleepycat233',
-                    'repo_name': 'Project_Bach'
-                }
-            }
-            
-            # Reset mock for monitor test
-            mock_get.reset_mock()
-            mock_get.side_effect = [deployments_response, status_response]
-            
-            monitor = GitHubDeploymentMonitor(config)
-            result = monitor.check_pages_deployment_status()
-            
-            assert 'deployed' in result
-            assert 'status' in result
-            assert 'method' in result
+            # 2. GitHub deployment monitor removed - simplified API test only
+            print("✅ GitHub deployment monitor removed - API integration verified")
             
             print("✅ GitHub Pages deployment status integration test passed")
             return True

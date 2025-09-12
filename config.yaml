@@ -1,0 +1,235 @@
+# OpenRouter API配置 (用于AI内容生成)
+# API key 通过环境变量 OPENROUTER_API_KEY 提供
+openrouter:
+  base_url: "https://openrouter.ai/api/v1"
+  models:
+    summary: "google/gemma-3n-e4b-it:free"  # Google免费快速模型
+    mindmap: "google/gemma-3n-e4b-it:free"  # Google免费快速模型
+    # 备选免费快速模型：
+    # "opengvlab/internvl3-2b:free"      # 最快 (379.88 t/s)
+    # "google/gemini-2.5-flash-preview"  # 快速 (140.85 t/s)
+    # "qwen/qwen3-30b-a3b:free"          # 中等 (83.19 t/s)
+
+  rate_limit_tier: "paid"  # 选项: "free" 或 "paid"
+  # Free tier: 10 req/10s, 60 req/min, 5 credits/day
+  # Paid tier: 10 req/10s, 60 req/min, 按credit计费
+
+# HuggingFace API配置 (用于Speaker Diarization)
+# Token 通过环境变量 HUGGINGFACE_TOKEN 提供
+
+paths:
+  data_folder: "./data"  # 数据存储目录 (转录文本、日志等)
+  watch_folder: "./data/uploads"  # 音频文件监控目录 - 直接监控上传目录
+  output_folder: "./data/output"  # 处理结果输出目录
+
+spacy:
+  model: "zh_core_web_sm"
+
+# Phase 10: MLX Whisper配置 (替代WhisperKit)
+mlx_whisper:
+  # 默认模型配置 - 使用标准MLX命名
+  default_model: "whisper-tiny-mlx"  # 默认使用的模型
+
+  # 可用模型列表（统一使用标准MLX命名）
+  available_models:
+    - "mlx-community/whisper-tiny-mlx"
+    - "mlx-community/whisper-base-mlx"
+    - "mlx-community/whisper-small-mlx"
+    - "mlx-community/whisper-medium-mlx"
+    - "mlx-community/whisper-large-v3-mlx"
+    - "mlx-community/whisper-large-v3-turbo"
+
+# Speaker Diarization配置
+diarization:
+  provider: "pyannote"   # 使用pyannote-audio，从HuggingFace缓存加载
+  max_speakers: 6
+  min_segment_duration: 1.0
+
+  # pyannote.audio pipeline参数配置 (严格参数，减少误检)
+  # 基于Phase 11调试结果优化的严格配置
+  pipeline_params:
+    segmentation:
+      min_duration_off: 1.0          # 最小静音时长(秒) - 更严格，减少短插话误检
+    clustering:
+      method: "centroid"             # 聚类方法
+      min_cluster_size: 20           # 最小聚类大小 - 更大值，减少虚假说话人
+      threshold: 0.9                 # 聚类阈值 - 更高值，降低敏感度
+
+  # 输出格式配置
+  output_format:
+    group_by_speaker: true          # 默认按说话人分组，便于阅读
+    timestamp_precision: 1          # 时间戳精度(小数位数)
+    include_confidence: false       # 是否包含置信度信息
+
+
+# Phase 6: 多媒体内容分类与Web界面配置
+content_classification:
+  # 支持的内容类型定义
+  content_types:
+    lecture:      # 🎓 学术讲座
+      icon: "🎓"
+      display_name: "Academic Lecture"
+      diarization_default: false  # 讲座通常单人，默认不启用
+      subcategories:
+        CS101:
+          display_name: "CS101-Computer Science Course"
+          diarization: false  # CS课程，单人讲授
+        PHYS101:
+          display_name: "PHYS101-Physics Course"
+          diarization: false  # 物理课程，单人讲授
+        Seminar:
+          display_name: "Academic Seminar"
+          diarization: true   # 研讨会，可能有讨论环节
+      recommendations:
+        english:
+          - "whisper-base-mlx"
+          - "whisper-small-mlx"  # 英文快速模型
+        multilingual:
+          - "whisper-large-v3-mlx"         # 多语言高精度
+
+    meeting:      # 🏢 会议录音
+      icon: "🏢"
+      display_name: "Meeting Recording"
+      diarization_default: true   # 会议多人对话，默认启用
+      subcategories:
+        team_meeting:
+          display_name: "Team Meeting"
+          diarization: true   # 团队会议，多人参与
+        project_review:
+          display_name: "Project Review"
+          diarization: true   # 评审会议，多人讨论
+        client_call:
+          display_name: "Client Call"
+          diarization: true   # 客户电话，双人对话
+        standup:
+          display_name: "Daily Standup"
+          diarization: true   # 站会，多人参与
+      recommendations:
+        english:
+          - "whisper-base-mlx"                     # MLX英文处理
+        multilingual:
+          - "whisper-large-v3-mlx"                 # MLX多语言处理
+
+# 系统配置
+system:
+  debug: false  # 调试模式开关
+
+logging:
+  level: "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "./data/logs/app.log"
+  console: true  # 是否在控制台输出日志
+
+# Phase 4: 网络集成配置
+# Tailscale认证密钥通过环境变量 TAILSCALE_AUTH_KEY 提供
+network:
+  tailscale:
+    machine_name: "project-bach"  # 机器名称
+    network_name: "project-bach-network"  # 网络名称
+    auto_connect: true  # 自动连接
+    timeout: 30  # 连接超时时间（秒）
+
+  file_transfer:
+    remote_base_path: "/Users/remote/project_bach/watch_folder"  # 远程监控文件夹路径
+    local_base_path: "./watch_folder"  # 本地监控文件夹路径
+    chunk_size: 8192  # 文件传输块大小（字节）
+    timeout: 60  # 传输超时时间（秒）
+    retry_attempts: 3  # 重试次数
+    verify_integrity: true  # 是否验证文件完整性
+    max_file_size: 104857600  # 最大文件大小限制（100MB）
+
+  security:
+    allowed_networks: ["100.64.0.0/10"]  # Tailscale CGNAT范围
+    blocked_ips: []  # 阻止的IP地址列表
+    require_encryption: true  # 是否要求加密连接
+    max_connection_attempts: 3  # 最大连接尝试次数
+    connection_timeout: 10  # 连接超时时间（秒）
+    max_connections_per_minute: 60  # 每分钟最大连接数
+    connection_window_seconds: 60  # 连接频率统计窗口（秒）
+
+  monitoring:
+    check_interval: 30  # 网络状态检查间隔（秒）
+    timeout: 5  # ping超时时间（秒）
+    max_retries: 3  # 最大重试次数
+    target_hosts: []  # 监控目标主机列表，启动时自动发现Tailscale节点
+    alert_on_disconnect: true  # 连接断开时是否告警
+
+  # 安全文件服务器配置
+  # 认证token通过环境变量 SECURE_FILE_SERVER_TOKEN 提供
+  secure_file_server:
+    enabled: true  # 是否启用安全文件服务器
+    host: "0.0.0.0"  # 监听地址，0.0.0.0表示所有接口
+    port: 8080  # 服务端口
+    allowed_dirs:  # 只允许访问这些目录
+      - "./watch_folder"
+      - "./output"
+    enable_upload: true  # 是否允许文件上传
+    enable_download: true  # 是否允许文件下载
+
+
+
+# Phase 6: Web前端配置
+web_frontend:
+  # Flask应用配置
+  # Flask密钥通过环境变量 FLASK_SECRET_KEY 提供
+  app:
+    host: "0.0.0.0"              # 监听地址 (Tailscale网络内)
+    port: 8080                   # 服务端口
+    debug: false                 # 调试模式
+
+  # 文件上传配置
+  upload:
+    max_file_size: 104857600     # 100MB
+    allowed_extensions: [".mp3", ".wav", ".m4a", ".mp4", ".flac", ".aac", ".ogg"]
+    upload_folder: "./uploads"   # 上传目录，也是文件监控目录
+    temp_folder: "./temp"
+    auto_cleanup: true           # 自动清理临时文件
+    cleanup_interval: 3600       # 清理间隔(秒)
+    # 文件组织配置
+    organize_by_category: true   # 启用按分类组织文件
+    create_subcategory_folders: true  # 为subcategory创建子文件夹
+
+  # 安全配置
+  security:
+    tailscale_only: true         # 仅允许Tailscale网络访问
+    rate_limit_per_minute: 60    # 每分钟请求限制
+    rate_limit_per_hour: 1000    # 每小时请求限制
+    enable_csrf: true            # 启用CSRF保护
+    session_timeout: 3600        # 会话超时(秒)
+
+  # UI配置
+  ui:
+    theme: "dark"                # 默认主题
+    language: "zh-CN"            # 默认语言
+    show_progress: true          # 显示处理进度
+    auto_refresh_interval: 5     # 状态自动刷新间隔(秒)
+    max_concurrent_uploads: 3    # 最大并发上传数
+
+# YouTube处理器配置
+youtube:
+  # yt-dlp配置
+  downloader:
+    max_duration: 7200           # 最大时长(秒) 2小时
+    min_duration: 60             # 最小时长(秒) 1分钟
+    preferred_quality: "best[height<=720]"  # 首选质量
+    extract_audio_only: true     # 仅提取音频
+    output_format: "mp3"         # 输出格式
+    output_dir: "./temp/youtube" # 输出目录
+    timeout: 600                 # 下载超时(秒)
+
+  # 内容验证
+  validation:
+    check_availability: true     # 检查视频可用性
+    validate_duration: true      # 验证时长
+    skip_private: true           # 跳过私有视频
+    skip_age_restricted: false   # 跳过年龄限制视频
+
+  # 元数据提取
+  metadata:
+    extract_thumbnail: true      # 提取缩略图
+    extract_description: true    # 提取描述
+    extract_tags: true           # 提取标签
+    # 字幕语言优先级设置
+    preferred_subtitle_languages: ["zh-CN", "zh", "en"]  # 优先检测的字幕语言
+    subtitle_fallback_to_transcription: true             # 无字幕时回退到音频转录
+    quick_metadata_timeout: 8                            # 快速元数据获取超时(秒)
+    extract_comments: false      # 提取评论(耗时)
