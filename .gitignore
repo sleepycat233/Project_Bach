@@ -60,8 +60,6 @@ tmp/
 secrets.yaml
 config.local.yaml
 config.production.yaml
-**/config.yaml
-!config.template.yaml
 
 # Test outputs
 test_output/
