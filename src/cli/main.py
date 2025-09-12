@@ -151,7 +151,7 @@ def run_batch_mode(container: DependencyContainer) -> bool:
     
     # 显示输出路径
     output_folder = config_manager.get_paths_config()['output_folder']
-    log_file = config_manager.get_logging_config()['file']
+    log_file = config_manager.config.get("logging", {}).get("file", "app.log")
     print(f"结果保存在: {output_folder}")
     print(f"日志文件: {log_file}")
     
@@ -222,7 +222,7 @@ def validate_config_file(config_path: str) -> bool:
         config_manager = ConfigManager(config_path)
         
         # 检查API密钥配置
-        openrouter_config = config_manager.get_openrouter_config()
+        openrouter_config = config_manager.config.get("openrouter", {})
         api_key = openrouter_config.get('key', '')
         
         if api_key == 'YOUR_API_KEY_HERE' or not api_key:

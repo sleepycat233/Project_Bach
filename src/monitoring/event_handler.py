@@ -13,18 +13,19 @@ from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileMovedE
 class AudioFileHandler(FileSystemEventHandler):
     """音频文件事件处理器"""
     
-    def __init__(self, file_callback: Callable[[str], None]):
+    def __init__(self, file_callback: Callable[[str], None], supported_formats: Set[str] = None):
         """初始化音频文件事件处理器
         
         Args:
             file_callback: 处理新文件的回调函数
+            supported_formats: 支持的音频格式集合，如果为None则使用默认格式
         """
         super().__init__()
         self.file_callback = file_callback
         self.logger = logging.getLogger('project_bach.audio_handler')
         
-        # 支持的音频格式
-        self.supported_formats: Set[str] = {
+        # 支持的音频格式 - 从参数传入或使用默认值
+        self.supported_formats: Set[str] = supported_formats or {
             '.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg', '.mp4'
         }
         

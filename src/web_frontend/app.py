@@ -11,7 +11,6 @@ Phase 6 Flask Web应用 - 主应用文件
 
 import os
 import ipaddress
-from pathlib import Path
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -38,21 +37,12 @@ def create_app(config=None):
     # 默认配置
     app.config.update({
         'SECRET_KEY': os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production'),
-        'MAX_CONTENT_LENGTH': 500 * 1024 * 1024,  # 500MB
-        'UPLOAD_FOLDER': '/tmp/project_bach_data_uploads',
-        'ALLOWED_EXTENSIONS': {'.mp3', '.wav', '.m4a', '.mp4', '.flac', '.aac', '.ogg'},
-        'TAILSCALE_NETWORK': '100.64.0.0/10',
-        'RATE_LIMIT_PER_MINUTE': 60,
-        'WTF_CSRF_ENABLED': True
+        'TAILSCALE_NETWORK': '100.64.0.0/10'
     })
 
     # 应用测试配置
     if config:
         app.config.update(config)
-
-    # 创建上传目录
-    upload_dir = Path(app.config['UPLOAD_FOLDER'])
-    upload_dir.mkdir(parents=True, exist_ok=True)
 
     # 初始化配置管理器
     config_manager = None
@@ -69,12 +59,17 @@ def create_app(config=None):
             # 使用默认配置管理器
             config_manager = ConfigManager()
         app.config['CONFIG_MANAGER'] = config_manager
+        
+        # 从配置读取文件大小限制 - ConfigManager负责提供默认值
+        upload_config = config_manager.get_nested_config('web_frontend', 'upload') or {}
+        max_file_size = upload_config.get('max_file_size') or (500 * 1024 * 1024)
+        app.config['MAX_CONTENT_LENGTH'] = max_file_size
+            
     except Exception as e:
         logger.warning(f"Failed to load config manager: {e}")
         app.config['CONFIG_MANAGER'] = None
+        app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
 
-    # 简单的请求频率限制（生产环境需要flask_limiter）
-    app.config['SIMPLE_RATE_LIMIT'] = True
 
     # 初始化处理服务
     if config_manager:
@@ -155,8 +150,9 @@ def create_app(config=None):
             if not content_type:
                 return jsonify({'error': 'content_type is required'}), 400
 
-            # 验证文件类型
-            if not allowed_file(file.filename, app.config['ALLOWED_EXTENSIONS']):
+            # 验证文件类型 - 使用AudioUploadHandler的格式检查
+            handler = app.config['AUDIO_HANDLER']
+            if handler and not handler.is_supported_format(file.filename):
                 return jsonify({'error': 'Invalid file type'}), 400
 
             # 获取隐私级别
@@ -939,13 +935,6 @@ def create_app(config=None):
     return app
 
 
-def allowed_file(filename, allowed_extensions):
-    """检查文件扩展名是否允许"""
-    if not filename:
-        return False
-
-    file_ext = Path(filename).suffix.lower()
-    return file_ext in allowed_extensions
 
 
 def is_valid_youtube_url(url):

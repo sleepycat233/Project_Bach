@@ -44,7 +44,7 @@ class DependencyContainer:
         Returns:
             配置好的logger实例
         """
-        logging_config = self.config_manager.get_logging_config()
+        logging_config = self.config_manager.config.get('logging', {})
         return LoggingSetup.setup_logging(logging_config)
     
     def _setup_directories(self):
@@ -60,7 +60,7 @@ class DependencyContainer:
         """
         if 'transcription_service' not in self._services:
             self.logger.debug("创建MLX转录服务实例")
-            mlx_config = self.config_manager.get_mlx_whisper_config()
+            mlx_config = self.config_manager.config.get("mlx_whisper", {})
             self._services['transcription_service'] = MLXTranscriptionService(mlx_config)
             self.logger.debug("创建MLX转录服务实例")
         else:
@@ -76,9 +76,9 @@ class DependencyContainer:
         """
         if 'speaker_diarization_service' not in self._services:
             self.logger.debug("创建说话人分离服务实例")
-            diarization_config = self.config_manager.get_diarization_config()
-            huggingface_config = self.config_manager.get_huggingface_config()
-            content_classification_config = self.config_manager.get_content_classification_config()
+            diarization_config = self.config_manager.config.get("diarization", {})
+            huggingface_config = self.config_manager.config.get("huggingface", {})
+            content_classification_config = self.config_manager.config.get("content_classification", {})
             self._services['speaker_diarization_service'] = SpeakerDiarization(
                 diarization_config, 
                 huggingface_config, 
@@ -98,7 +98,7 @@ class DependencyContainer:
             匿名化服务实例
         """
         if 'anonymization_service' not in self._services:
-            spacy_config = self.config_manager.get_spacy_config()
+            spacy_config = self.config_manager.config.get("spacy", {})
             self._services['anonymization_service'] = NameAnonymizer(spacy_config)
             self.logger.debug("创建匿名化服务实例")
         
@@ -113,8 +113,8 @@ class DependencyContainer:
         if 'ai_generation_service' not in self._services:
             # 构建扁平化后的API配置
             api_config = {
-                'openrouter': self.config_manager.get_openrouter_config(),
-                'huggingface': self.config_manager.get_huggingface_config()
+                'openrouter': self.config_manager.config.get("openrouter", {}),
+                'huggingface': self.config_manager.config.get("huggingface", {})
             }
             self._services['ai_generation_service'] = AIContentGenerator(api_config)
             self.logger.debug("创建AI生成服务实例")
@@ -162,10 +162,15 @@ class DependencyContainer:
             # 获取音频处理器实例
             audio_processor = self.get_audio_processor()
             
-            # 创建文件监控器，传入处理回调
+            # 从配置获取支持的音频格式
+            supported_formats_list = self.config_manager.get_nested_config('audio', 'supported_formats')
+            supported_formats = set(supported_formats_list) if supported_formats_list else None
+            
+            # 创建文件监控器，传入处理回调和支持的格式
             self._services['file_monitor'] = FileMonitor(
                 watch_folder=watch_folder,
-                file_processor_callback=audio_processor.process_audio_file
+                file_processor_callback=audio_processor.process_audio_file,
+                supported_formats=supported_formats
             )
             self.logger.debug("创建文件监控器实例")
         
@@ -211,9 +216,14 @@ class DependencyContainer:
             paths_config = self.config_manager.get_paths_config()
             watch_folder = paths_config.get('watch_folder', './watch_folder')
             
+            # 从配置获取支持的音频格式
+            supported_formats_list = self.config_manager.get_nested_config('audio', 'supported_formats')
+            supported_formats = set(supported_formats_list) if supported_formats_list else None
+            
             file_monitor = FileMonitor(
                 watch_folder=watch_folder,
-                file_processor_callback=processor.process_audio_file
+                file_processor_callback=processor.process_audio_file,
+                supported_formats=supported_formats
             )
             self._services['file_monitor'] = file_monitor
         

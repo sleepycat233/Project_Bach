@@ -7,7 +7,7 @@
 import yaml
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import logging
 
 
@@ -80,7 +80,7 @@ class ConfigManager:
         Raises:
             ValueError: 缺少必要的配置项
         """
-        required_keys = ['openrouter', 'paths', 'spacy', 'logging']
+        required_keys = ['paths', 'logging']  # openrouter、spacy、audio等都是可选的
         missing_keys = []
         
         for key in required_keys:
@@ -90,14 +90,14 @@ class ConfigManager:
         if missing_keys:
             raise ValueError(f"配置文件缺少必要项: {', '.join(missing_keys)}")
         
-        # 验证OpenRouter配置
+        # 验证OpenRouter配置 (如果配置存在，则验证base_url)
         openrouter_config = config.get('openrouter', {})
-        if not openrouter_config.get('base_url'):
+        if openrouter_config and not openrouter_config.get('base_url'):
             raise ValueError("OpenRouter API配置不完整，需要base_url")
         
-        # 验证环境变量中的API key
-        if not os.environ.get('OPENROUTER_API_KEY'):
-            raise ValueError("缺少OPENROUTER_API_KEY环境变量")
+        # 环境变量中的API key是可选的
+        # 系统可以在没有OPENROUTER_API_KEY的情况下运行（仅转录功能）
+        # AI功能（摘要、思维导图）需要时才检查密钥
         
         # 验证路径配置
         paths_config = config.get('paths', {})
@@ -129,14 +129,7 @@ class ConfigManager:
                 self.config['openrouter'] = {}
             self.config['openrouter']['key'] = os.environ['OPENROUTER_API_KEY']
     
-    def get_openrouter_config(self) -> Dict[str, Any]:
-        """获取OpenRouter API配置
-        
-        Returns:
-            OpenRouter配置字典
-        """
-        return self.config.get('openrouter', {})
-    
+    # 保留使用频率最高的路径配置方法（8次使用）
     def get_paths_config(self) -> Dict[str, str]:
         """获取路径配置
         
@@ -145,103 +138,11 @@ class ConfigManager:
         """
         return self.config.get('paths', {})
     
-    def get_spacy_config(self) -> Dict[str, Any]:
-        """获取spaCy配置
-        
-        Returns:
-            spaCy配置字典
-        """
-        return self.config.get('spacy', {})
+    # 其他配置建议直接使用: 
+    # config_manager.config.get('openrouter', {}) 或 
+    # config_manager.get_nested_config('openrouter')
     
-    def get_mlx_whisper_config(self) -> Dict[str, Any]:
-        """获取MLX Whisper配置
-        
-        Returns:
-            MLX Whisper配置字典
-        """
-        return self.config.get('mlx_whisper', {})
     
-    def get_diarization_config(self) -> Dict[str, Any]:
-        """获取说话人分离配置
-        
-        Returns:
-            Diarization配置字典
-        """
-        return self.config.get('diarization', {})
-    
-    def get_huggingface_config(self) -> Dict[str, Any]:
-        """获取HuggingFace配置
-        
-        Returns:
-            HuggingFace配置字典
-        """
-        return self.config.get('huggingface', {})
-    
-    def get_logging_config(self) -> Dict[str, Any]:
-        """获取日志配置
-        
-        Returns:
-            日志配置字典
-        """
-        return self.config.get('logging', {})
-    
-    # Phase 6: 新增配置访问方法
-    
-    def get_content_classification_config(self) -> Dict[str, Any]:
-        """获取内容分类配置
-        
-        Returns:
-            内容分类配置字典
-        """
-        return self.config.get('content_classification', {})
-    
-    def get_content_types_config(self) -> Dict[str, Any]:
-        """获取支持的内容类型配置
-        
-        Returns:
-            内容类型配置字典
-        """
-        return self.get_content_classification_config().get('content_types', {})
-    
-    def get_classification_config(self) -> Dict[str, Any]:
-        """获取分类算法配置
-        
-        Returns:
-            分类算法配置字典
-        """
-        return self.get_content_classification_config().get('classification', {})
-    
-    def get_content_filter_config(self) -> Dict[str, Any]:
-        """获取内容过滤配置
-        
-        Returns:
-            内容过滤配置字典
-        """
-        return self.get_content_classification_config().get('content_filter', {})
-    
-    def get_web_frontend_config(self) -> Dict[str, Any]:
-        """获取Web前端配置
-        
-        Returns:
-            Web前端配置字典
-        """
-        return self.config.get('web_frontend', {})
-    
-    def get_youtube_config(self) -> Dict[str, Any]:
-        """获取YouTube处理器配置
-        
-        Returns:
-            YouTube配置字典
-        """
-        return self.config.get('youtube', {})
-    
-    def get_rss_config(self) -> Dict[str, Any]:
-        """获取RSS处理器配置
-        
-        Returns:
-            RSS配置字典
-        """
-        return self.config.get('rss', {})
     
     def get_nested_config(self, *keys) -> Any:
         """获取嵌套配置值
@@ -260,16 +161,6 @@ class ConfigManager:
                 return None
         return current
     
-    def has_config(self, *keys) -> bool:
-        """检查配置键是否存在
-        
-        Args:
-            *keys: 配置键路径
-            
-        Returns:
-            是否存在
-        """
-        return self.get_nested_config(*keys) is not None
     
     def get_full_config(self) -> Dict[str, Any]:
         """获取完整配置
@@ -279,35 +170,6 @@ class ConfigManager:
         """
         return self.config.copy()
     
-    def update_config(self, key_path: str, value: Any) -> None:
-        """更新配置项
-        
-        Args:
-            key_path: 配置项路径，支持点分隔符如'api.openrouter.key'
-            value: 新值
-        """
-        keys = key_path.split('.')
-        current = self.config
-        
-        # 导航到目标位置
-        for key in keys[:-1]:
-            if key not in current:
-                current[key] = {}
-            current = current[key]
-        
-        # 设置最终值
-        current[keys[-1]] = value
-    
-    def save_config(self, path: Optional[str] = None) -> None:
-        """保存配置到文件
-        
-        Args:
-            path: 保存路径，默认为原路径
-        """
-        save_path = path or self.config_path
-        
-        with open(save_path, 'w', encoding='utf-8') as f:
-            yaml.dump(self.config, f, default_flow_style=False, allow_unicode=True)
 
 
 class LoggingSetup:

@@ -1,21 +1,3 @@
-# OpenRouter API配置 (用于AI内容生成)
-# API key 通过环境变量 OPENROUTER_API_KEY 提供
-openrouter:
-  base_url: "https://openrouter.ai/api/v1"
-  models:
-    summary: "google/gemma-3n-e4b-it:free"  # Google免费快速模型
-    mindmap: "google/gemma-3n-e4b-it:free"  # Google免费快速模型
-    # 备选免费快速模型：
-    # "opengvlab/internvl3-2b:free"      # 最快 (379.88 t/s)
-    # "google/gemini-2.5-flash-preview"  # 快速 (140.85 t/s)
-    # "qwen/qwen3-30b-a3b:free"          # 中等 (83.19 t/s)
-
-  rate_limit_tier: "paid"  # 选项: "free" 或 "paid"
-  # Free tier: 10 req/10s, 60 req/min, 5 credits/day
-  # Paid tier: 10 req/10s, 60 req/min, 按credit计费
-
-# HuggingFace API配置 (用于Speaker Diarization)
-# Token 通过环境变量 HUGGINGFACE_TOKEN 提供
 
 paths:
   data_folder: "./data"  # 数据存储目录 (转录文本、日志等)
@@ -24,6 +6,29 @@ paths:
 
 spacy:
   model: "zh_core_web_sm"
+
+# 系统配置
+system:
+  debug: false  # 调试模式开关
+
+logging:
+  level: "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "./data/logs/app.log"
+  console: true  # 是否在控制台输出日志
+
+
+# OpenRouter API配置 (用于AI内容生成)
+# API key 通过环境变量 OPENROUTER_API_KEY 提供
+openrouter:
+  base_url: "https://openrouter.ai/api/v1"
+  models:
+    summary: "google/gemma-3n-e4b-it:free"  # Google免费快速模型
+    mindmap: "google/gemma-3n-e4b-it:free"  # Google免费快速模型
+    # 备选免费快速模型：
+
+  rate_limit_tier: "paid"  # 选项: "free" 或 "paid"
+  # Free tier: 10 req/10s, 60 req/min, 5 credits/day
+  # Paid tier: 10 req/10s, 60 req/min, 按credit计费
 
 # Phase 10: MLX Whisper配置 (替代WhisperKit)
 mlx_whisper:
@@ -110,14 +115,33 @@ content_classification:
         multilingual:
           - "whisper-large-v3-mlx"                 # MLX多语言处理
 
-# 系统配置
-system:
-  debug: false  # 调试模式开关
 
-logging:
-  level: "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
-  file: "./data/logs/app.log"
-  console: true  # 是否在控制台输出日志
+# Phase 6: Web前端配置
+web_frontend:
+  # Flask应用配置
+  # Flask密钥通过环境变量 FLASK_SECRET_KEY 提供
+  app:
+    host: "0.0.0.0"              # 监听地址 (Tailscale网络内)
+    port: 8080                   # 服务端口
+    debug: false                 # 调试模式
+
+  # 文件上传配置
+  upload:
+    max_file_size: 524288000     # 500MB (500 * 1024 * 1024)
+    supported_formats: [".mp3", ".wav", ".m4a", ".mp4", ".flac", ".aac", ".ogg", ".wma"]
+
+  # 安全配置
+  security:
+    tailscale_only: true         # 仅允许Tailscale网络访问
+    rate_limit_per_minute: 60    # 每分钟请求限制
+    rate_limit_per_hour: 1000    # 每小时请求限制
+    enable_csrf: true            # 启用CSRF保护
+    session_timeout: 3600        # 会话超时(秒)
+
+  # UI配置
+  ui:
+    theme: "dark"                # 默认主题
+    language: "zh-CN"            # 默认语言
 
 # Phase 4: 网络集成配置
 # Tailscale认证密钥通过环境变量 TAILSCALE_AUTH_KEY 提供
@@ -164,45 +188,6 @@ network:
       - "./output"
     enable_upload: true  # 是否允许文件上传
     enable_download: true  # 是否允许文件下载
-
-
-
-# Phase 6: Web前端配置
-web_frontend:
-  # Flask应用配置
-  # Flask密钥通过环境变量 FLASK_SECRET_KEY 提供
-  app:
-    host: "0.0.0.0"              # 监听地址 (Tailscale网络内)
-    port: 8080                   # 服务端口
-    debug: false                 # 调试模式
-
-  # 文件上传配置
-  upload:
-    max_file_size: 104857600     # 100MB
-    allowed_extensions: [".mp3", ".wav", ".m4a", ".mp4", ".flac", ".aac", ".ogg"]
-    upload_folder: "./uploads"   # 上传目录，也是文件监控目录
-    temp_folder: "./temp"
-    auto_cleanup: true           # 自动清理临时文件
-    cleanup_interval: 3600       # 清理间隔(秒)
-    # 文件组织配置
-    organize_by_category: true   # 启用按分类组织文件
-    create_subcategory_folders: true  # 为subcategory创建子文件夹
-
-  # 安全配置
-  security:
-    tailscale_only: true         # 仅允许Tailscale网络访问
-    rate_limit_per_minute: 60    # 每分钟请求限制
-    rate_limit_per_hour: 1000    # 每小时请求限制
-    enable_csrf: true            # 启用CSRF保护
-    session_timeout: 3600        # 会话超时(秒)
-
-  # UI配置
-  ui:
-    theme: "dark"                # 默认主题
-    language: "zh-CN"            # 默认语言
-    show_progress: true          # 显示处理进度
-    auto_refresh_interval: 5     # 状态自动刷新间隔(秒)
-    max_concurrent_uploads: 3    # 最大并发上传数
 
 # YouTube处理器配置
 youtube:

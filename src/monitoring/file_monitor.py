@@ -10,7 +10,7 @@ import threading
 import signal
 import logging
 from pathlib import Path
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, Dict, Any, Set
 from watchdog.observers import Observer
 
 from .event_handler import AudioFileHandler
@@ -23,13 +23,15 @@ class FileMonitor:
     def __init__(self, 
                  watch_folder: str, 
                  file_processor_callback: Callable[[str], bool],
-                 queue_max_size: int = 100):
+                 queue_max_size: int = 100,
+                 supported_formats: Set[str] = None):
         """初始化文件监控器
         
         Args:
             watch_folder: 监控的文件夹路径
             file_processor_callback: 文件处理回调函数，返回bool表示是否成功
             queue_max_size: 处理队列最大大小
+            supported_formats: 支持的音频格式集合
         """
         self.watch_folder = Path(watch_folder)
         self.file_processor_callback = file_processor_callback
@@ -41,7 +43,7 @@ class FileMonitor:
         # 初始化组件
         self.processing_queue = ProcessingQueue(queue_max_size)
         self.observer = Observer()
-        self.event_handler = AudioFileHandler(self._on_new_file)
+        self.event_handler = AudioFileHandler(self._on_new_file, supported_formats)
         
         # 状态管理
         self.is_running = False

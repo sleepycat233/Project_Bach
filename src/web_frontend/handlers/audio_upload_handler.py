@@ -2,7 +2,7 @@
 """
 音频上传处理器
 
-处理Web界面上传的音频文件，集成现有的AudioUploadProcessor
+处理Web界面上传的音频文件
 """
 
 import os
@@ -10,36 +10,7 @@ import uuid
 import logging
 from pathlib import Path
 from werkzeug.utils import secure_filename
-try:
-    from ...core.processing_service import ProcessingTracker, ProcessingStage
-except ImportError:
-    # Fallback for testing environment
-    try:
-        from core.processing_service import ProcessingTracker, ProcessingStage
-    except ImportError:
-        # Create mock classes for testing
-        class ProcessingTracker:
-            def __init__(self, type_name, privacy_level, metadata):
-                self.processing_id = "test_id"
-                self.metadata = metadata
-            
-            def __enter__(self):
-                return self
-            
-            def __exit__(self, exc_type, exc_val, exc_tb):
-                pass
-                
-            def update_stage(self, stage, progress, message):
-                pass
-                
-            def set_error(self, message):
-                pass
-                
-            def set_completed(self, result_url):
-                pass
-        
-        class ProcessingStage:
-            UPLOADED = "uploaded"
+from ...core.processing_service import ProcessingTracker, ProcessingStage
 
 logger = logging.getLogger(__name__)
 
@@ -49,22 +20,10 @@ class AudioUploadHandler:
     
     def __init__(self, config_manager=None):
         """初始化音频上传处理器"""
+        if config_manager is None:
+            raise ValueError("AudioUploadHandler requires a valid config_manager")
         self.config_manager = config_manager
-        self.upload_processor = None
-        self._init_processor()
     
-    def _init_processor(self):
-        """初始化AudioUploadProcessor"""
-        try:
-            if self.config_manager:
-                from ..processors.audio_upload_processor import AudioUploadProcessor
-                self.upload_processor = AudioUploadProcessor(self.config_manager)
-            else:
-                logger.warning("No config manager provided, using simulation mode")
-                self.upload_processor = None
-        except (ImportError, Exception) as e:
-            logger.warning(f"AudioUploadProcessor not available: {e}")
-            self.upload_processor = None
     
     def process_upload(self, file, content_type: str, subcategory: str = None,
                        privacy_level: str = 'private', metadata: dict = None):
@@ -109,8 +68,12 @@ class AudioUploadHandler:
             try:
                 tracker.update_stage(ProcessingStage.UPLOADED, 5, f"Uploading file: {filename}")
                 
-                # 直接保存到data/uploads目录的正确子目录，文件监控系统会自动处理
-                uploads_folder = Path("./data/uploads")
+                # 使用配置文件中的watch_folder作为上传目录，文件监控系统会自动处理
+                if self.config_manager:
+                    watch_folder = self.config_manager.get_nested_config('paths', 'watch_folder') or "./data/uploads"
+                else:
+                    watch_folder = "./data/uploads"  # fallback
+                uploads_folder = Path(watch_folder)
                 uploads_folder.mkdir(parents=True, exist_ok=True)
                 
                 # 文件组织逻辑：根据content_type和subcategory创建目录结构
@@ -165,41 +128,22 @@ class AudioUploadHandler:
                 file.save(str(target_file))
                 tracker.update_stage(ProcessingStage.UPLOADED, 15, f"File saved to organized directory: {target_file}")
                 
-                # 验证文件大小
+                # 验证文件大小 - 从配置读取限制
                 file_size = target_file.stat().st_size
-                if file_size > 500 * 1024 * 1024:  # 500MB限制
+                upload_config = self.config_manager.get_nested_config('web_frontend', 'upload') or {}
+                max_file_size = upload_config.get('max_file_size') or (500 * 1024 * 1024)
+                if file_size > max_file_size:
                     target_file.unlink()
-                    tracker.set_error('File size exceeds 500MB limit')
+                    max_size_mb = max_file_size // (1024 * 1024)
+                    tracker.set_error(f'File size exceeds {max_size_mb}MB limit')
                     return {
                         'status': 'error',
-                        'message': 'File size exceeds 500MB limit'
+                        'message': f'File size exceeds {max_size_mb}MB limit'
                     }
                 
                 # 调用真正的AudioProcessor进行完整处理
-                try:
-                    from ...core.dependency_container import DependencyContainer
-                    from ...core.processing_service import get_processing_service
-                except ImportError:
-                    try:
-                        from core.dependency_container import DependencyContainer
-                        from core.processing_service import get_processing_service
-                    except ImportError:
-                        # Mock for testing
-                        class DependencyContainer:
-                            def __init__(self, config_manager):
-                                pass
-                            def get_audio_processor(self):
-                                return MockAudioProcessor()
-                        def get_processing_service():
-                            return MockProcessingService()
-                
-                class MockAudioProcessor:
-                    def process_audio_file(self, file_path, **kwargs):
-                        return True
-                
-                class MockProcessingService:
-                    def add_log(self, processing_id, message, level):
-                        pass
+                from ...core.dependency_container import DependencyContainer
+                from ...core.processing_service import get_processing_service
                 
                 # 获取完整的音频处理器
                 container = DependencyContainer(self.config_manager)
@@ -297,13 +241,31 @@ class AudioUploadHandler:
         return True, None
     
     def get_supported_formats(self):
-        """获取支持的音频格式"""
-        return {
+        """获取支持的音频格式 - 从配置文件读取"""
+        upload_config = self.config_manager.get_nested_config('web_frontend', 'upload') or {}
+        supported_formats_list = upload_config.get('supported_formats') or ['.mp3', '.wav', '.m4a', '.mp4', '.flac', '.aac', '.ogg', '.wma']
+        
+        # 生成格式名称映射
+        format_names = {
             '.mp3': 'MP3 Audio',
             '.wav': 'WAV Audio', 
             '.m4a': 'M4A Audio',
             '.mp4': 'MP4 Audio',
             '.flac': 'FLAC Audio',
             '.aac': 'AAC Audio',
-            '.ogg': 'OGG Audio'
+            '.ogg': 'OGG Audio',
+            '.wma': 'WMA Audio'
         }
+        
+        return {fmt: format_names.get(fmt, f'{fmt.upper()} Audio') for fmt in supported_formats_list}
+    
+    def is_supported_format(self, filename):
+        """检查文件是否为支持的音频格式"""
+        if not filename:
+            return False
+        
+        file_ext = Path(filename).suffix.lower()
+        
+        # 复用get_supported_formats的逻辑，获取支持的格式列表
+        supported_formats = self.get_supported_formats()
+        return file_ext in supported_formats.keys()
