@@ -112,9 +112,9 @@ class TestConfigManager(unittest.TestCase):
         manager = ConfigManager(self.config_path)
         
         # 测试各个API服务配置的单独获取
-        openrouter_config = manager.get_openrouter_config()
-        huggingface_config = manager.get_huggingface_config()
-        
+        openrouter_config = manager.get_nested_config('openrouter')
+        huggingface_config = manager.get_nested_config('huggingface')
+
         # 验证配置结构正确
         self.assertIn('key', openrouter_config)
         self.assertIn('models', openrouter_config)
@@ -125,7 +125,7 @@ class TestConfigManager(unittest.TestCase):
         """测试获取OpenRouter配置"""
         mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
-        openrouter_config = manager.get_openrouter_config()
+        openrouter_config = manager.get_nested_config('openrouter')
         self.assertEqual(openrouter_config, self.valid_config['openrouter'])
     
     @patch('utils.env_manager.setup_project_environment')
@@ -138,31 +138,30 @@ class TestConfigManager(unittest.TestCase):
     
     @patch('utils.env_manager.setup_project_environment')
     def test_get_mlx_whisper_config(self, mock_setup_env):
-        """测试获取MLX Whisper配置"""
+        """测试获取MLX Whisper配置 - 测试不存在的配置项返回None"""
         mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
-        mlx_config = manager.get_mlx_whisper_config()
-        self.assertEqual(mlx_config, self.valid_config.get('mlx_whisper', {}))
+        mlx_config = manager.get_nested_config('mlx_whisper')
+        # 由于测试配置中没有mlx_whisper项，应该返回None
+        self.assertIsNone(mlx_config)
     
     def test_update_config(self):
-        """测试更新配置项"""
-        manager = ConfigManager(self.config_path)
-        manager.update_config('openrouter.key', 'new-api-key')
-        self.assertEqual(manager.get_openrouter_config()['key'], 'new-api-key')
+        """测试更新配置项 - 跳过，update_config方法已移除"""
+        # ConfigManager现在是只读的，不支持动态更新配置
+        # 所有配置更改应通过编辑config.yaml文件完成
+        self.skipTest("update_config method removed - ConfigManager is now read-only")
     
     def test_update_nested_config(self):
-        """测试更新嵌套配置项"""
-        manager = ConfigManager(self.config_path)
-        manager.update_config('mlx_whisper.default_model', 'whisper-large-v3-mlx')
-        self.assertEqual(manager.get_mlx_whisper_config()['default_model'], 'whisper-large-v3-mlx')
+        """测试更新嵌套配置项 - 跳过，update_config方法已移除"""
+        # ConfigManager现在是只读的，不支持动态更新配置
+        # 所有配置更改应通过编辑config.yaml文件完成
+        self.skipTest("update_config method removed - ConfigManager is now read-only")
     
     def test_save_config(self):
-        """测试保存配置"""
-        manager = ConfigManager(self.config_path)
-        manager.update_config('api.openrouter.key', 'updated-key')
-        
-        new_path = os.path.join(self.test_dir, 'saved_config.yaml')
-        manager.save_config(new_path)
+        """测试保存配置 - 跳过，save_config方法已移除"""
+        # ConfigManager现在是只读的，不支持保存配置
+        # 所有配置更改应通过编辑config.yaml文件完成
+        self.skipTest("save_config method removed - ConfigManager is now read-only")
         
         # 验证保存的配置
         with open(new_path, 'r', encoding='utf-8') as f:
@@ -327,6 +326,136 @@ class TestDirectoryManager(unittest.TestCase):
         
         # 只有非空路径应该被创建
         self.assertTrue(Path(paths_config['output_folder']).exists())
+
+
+class TestGitHubPagesURLGeneration(unittest.TestCase):
+    """测试GitHub Pages URL自动生成功能"""
+
+    def setUp(self):
+        """每个测试前的准备工作"""
+        self.test_dir = tempfile.mkdtemp()
+        self.config_path = os.path.join(self.test_dir, 'test_config.yaml')
+
+        # 创建包含GitHub配置的测试配置
+        self.test_config = {
+            'paths': {
+                'watch_folder': './watch',
+                'data_folder': './data',
+                'output_folder': './output'
+            },
+            'logging': {
+                'level': 'INFO',
+                'file': './app.log'
+            },
+            'github': {
+                'repo_name': 'Project_Bach',
+                'pages': {
+                    'enabled': True
+                }
+            }
+        }
+
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(self.test_config, f)
+
+        # 保存原始环境变量
+        self.original_env = os.environ.copy()
+
+    def tearDown(self):
+        """清理测试环境"""
+        # 恢复原始环境变量
+        os.environ.clear()
+        os.environ.update(self.original_env)
+
+        shutil.rmtree(self.test_dir)
+
+    @patch('utils.env_manager.setup_project_environment')
+    def test_github_pages_url_generation_with_username(self, mock_setup_env):
+        """测试有GitHub用户名时自动生成pages_url"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
+
+        # 设置环境变量
+        os.environ['GITHUB_USERNAME'] = 'testuser'
+
+        manager = ConfigManager(self.config_path)
+
+        # 验证自动生成的GitHub Pages URL
+        github_config = manager.get_nested_config('github')
+        self.assertEqual(github_config['username'], 'testuser')
+        self.assertEqual(github_config['pages_url'], 'https://testuser.github.io/Project_Bach')
+
+    @patch('utils.env_manager.setup_project_environment')
+    def test_github_pages_url_generation_with_custom_repo(self, mock_setup_env):
+        """测试自定义仓库名时的URL生成"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
+
+        # 修改配置中的仓库名
+        self.test_config['github']['repo_name'] = 'CustomRepo'
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(self.test_config, f)
+
+        # 设置环境变量
+        os.environ['GITHUB_USERNAME'] = 'customuser'
+
+        manager = ConfigManager(self.config_path)
+
+        # 验证使用自定义仓库名的URL
+        github_config = manager.get_nested_config('github')
+        self.assertEqual(github_config['pages_url'], 'https://customuser.github.io/CustomRepo')
+
+    @patch('utils.env_manager.setup_project_environment')
+    def test_github_pages_url_disabled(self, mock_setup_env):
+        """测试禁用GitHub Pages时不生成URL"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
+
+        # 禁用GitHub Pages
+        self.test_config['github']['pages']['enabled'] = False
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(self.test_config, f)
+
+        # 设置环境变量
+        os.environ['GITHUB_USERNAME'] = 'testuser'
+
+        manager = ConfigManager(self.config_path)
+
+        # 验证不生成pages_url
+        github_config = manager.get_nested_config('github')
+        self.assertEqual(github_config['username'], 'testuser')
+        self.assertIsNone(github_config.get('pages_url'))
+
+    @patch('utils.env_manager.setup_project_environment')
+    def test_github_pages_url_no_username(self, mock_setup_env):
+        """测试没有GitHub用户名时不生成pages_url"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
+
+        # 不设置GITHUB_USERNAME环境变量
+        manager = ConfigManager(self.config_path)
+
+        # 验证GitHub配置存在但没有pages_url
+        github_config = manager.get_nested_config('github')
+        self.assertIsNotNone(github_config)  # 配置文件中的基础配置仍然存在
+        self.assertEqual(github_config['repo_name'], 'Project_Bach')
+        self.assertNotIn('pages_url', github_config)  # 没有生成pages_url
+        self.assertNotIn('username', github_config)  # 没有username
+
+    @patch('utils.env_manager.setup_project_environment')
+    def test_github_pages_url_fallback_repo_name(self, mock_setup_env):
+        """测试配置中没有repo_name时使用默认值"""
+        mock_setup_env.side_effect = Exception("Force use direct loading")
+
+        # 删除配置中的repo_name
+        del self.test_config['github']['repo_name']
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(self.test_config, f)
+
+        # 设置环境变量
+        os.environ['GITHUB_USERNAME'] = 'fallbackuser'
+
+        manager = ConfigManager(self.config_path)
+
+        # 验证使用默认仓库名
+        github_config = manager.get_nested_config('github')
+        self.assertEqual(github_config['pages_url'], 'https://fallbackuser.github.io/Project_Bach')
 
 
 if __name__ == '__main__':

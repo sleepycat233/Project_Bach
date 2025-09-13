@@ -22,6 +22,7 @@ from .audio_upload_handler import AudioUploadHandler
 from .youtube_handler import YouTubeHandler
 from ..core.processing_service import get_processing_service
 from ..utils.config import ConfigManager
+from .helpers import get_config_value, create_api_response, scan_content_directory, organize_content_by_type, render_private_index, serve_private_file, get_content_types_config, validate_github_config
 
 logger = logging.getLogger(__name__)
 
@@ -116,14 +117,7 @@ def create_app(config=None):
         config_manager = app.config.get('CONFIG_MANAGER')
 
         # 获取内容类型配置
-        if config_manager:
-            content_types = config_manager.get_nested_config('content_classification', 'content_types') or {}
-        else:
-            content_types = {
-                'lecture': {'icon': '🎓', 'display_name': 'Academic Lecture'},
-                'meeting': {'icon': '🏢', 'display_name': 'Meeting Recording'},
-                'others': {'icon': '📄', 'display_name': 'Others'}
-            }
+        content_types = get_content_types_config(app)
 
         # 获取完整配置用于模板
         config_dict = config_manager.get_full_config() if config_manager else {}
@@ -159,18 +153,13 @@ def create_app(config=None):
             # 获取隐私级别
             privacy_level = request.form.get('privacy_level', 'public')
 
-            # 处理子分类信息
+            # 处理子分类信息 - 简化版本，只使用subcategory字段
             subcategory = request.form.get('subcategory', '')
-            custom_subcategory = request.form.get('custom_subcategory', '')
             audio_language = request.form.get('audio_language', 'english')
 
             # 处理MLX模型选择
             whisper_model = request.form.get('whisper_model', 'whisper-tiny')
             # MLX模型使用简单的模型名称，无需前缀
-
-            # 如果选择了other，使用自定义子分类名
-            if subcategory == 'other' and custom_subcategory:
-                subcategory = custom_subcategory
 
             # 处理上传 - 使用清晰的参数分离
             handler = app.config['AUDIO_HANDLER']
@@ -292,18 +281,44 @@ def create_app(config=None):
     def api_categories():
         """内容分类API"""
         try:
-            from ..utils.config import ConfigManager
-            config_manager = ConfigManager()
-            content_types = config_manager.get_nested_config('content_classification', 'content_types') or {}
-            return jsonify(content_types)
+            content_types = get_content_types_config(app)
+            return jsonify(create_api_response(success=True, data=content_types))
         except Exception as e:
             logger.error(f"Categories API error: {e}")
-            # 最基本的回退，确保网站能继续工作
-            basic_categories = {
-                'lecture': {'icon': '🎓', 'display_name': 'Academic Lecture'},
-                'others': {'icon': '📄', 'display_name': 'Others'}
+            return jsonify(create_api_response(success=False, error=str(e))), 500
+
+    @app.route('/api/config/github-status')
+    def api_github_config_status():
+        """检查GitHub配置状态API"""
+        try:
+            config_status = validate_github_config(app)
+            return jsonify(create_api_response(success=True, data=config_status))
+        except Exception as e:
+            logger.error(f"GitHub config status API error: {e}")
+            return jsonify(create_api_response(
+                success=False,
+                error=str(e),
+                data={'configured': False, 'message': f'Validation error: {str(e)}'}
+            )), 500
+
+    @app.route('/api/debug/config')
+    def api_debug_config():
+        """调试配置状态API"""
+        import os
+        try:
+            config_manager = app.config.get('CONFIG_MANAGER')
+            debug_info = {
+                'env_github_username': os.environ.get('GITHUB_USERNAME'),
+                'env_github_token_set': bool(os.environ.get('GITHUB_TOKEN')),
+                'config_github_username': get_config_value(app, 'github.username'),
+                'config_github_pages_url': get_config_value(app, 'github.pages_url'),
+                'config_manager_exists': config_manager is not None,
+                'full_github_config': config_manager.get_nested_config('github') if config_manager else None
             }
-            return jsonify(basic_categories)
+            return jsonify(create_api_response(success=True, data=debug_info))
+        except Exception as e:
+            logger.error(f"Debug config API error: {e}")
+            return jsonify(create_api_response(success=False, error=str(e))), 500
 
     @app.route('/api/results/recent')
     def api_recent_results():
@@ -403,7 +418,7 @@ def create_app(config=None):
         包含推荐标记、下载状态检查、按优先级排序等功能。
         """
         try:
-            from src.utils.config import ConfigManager
+            from ..utils.config import ConfigManager
 
             def _check_model_downloaded(repo_name):
                 """检查MLX模型是否已在HuggingFace缓存中下载"""
@@ -544,6 +559,85 @@ def create_app(config=None):
             logger.error(f"Smart models config API error: {e}")
             return jsonify({'error': 'Failed to get smart models configuration'}), 500
 
+
+    # PreferencesManager API路由 - Phase 7.2
+    @app.route('/api/preferences/subcategories/<content_type>')
+    def api_get_subcategories(content_type):
+        """获取指定content_type的subcategory列表API"""
+        try:
+            from ..utils.preferences_manager import PreferencesManager
+            
+            # 初始化PreferencesManager - 使用data目录
+            data_folder = app.config.get('CONFIG_MANAGER').get_paths_config().get('data_folder', './data')
+            prefs_file = os.path.join(data_folder, 'user_preferences.json')
+            preferences_manager = PreferencesManager(prefs_file)
+            
+            # 获取subcategory列表
+            subcategories = preferences_manager.get_subcategories_with_names(content_type)
+            
+            return jsonify({'data': subcategories})
+            
+        except Exception as e:
+            logger.error(f"Get subcategories API error: {e}")
+            return jsonify({'error': f'Failed to get subcategories: {str(e)}'}), 500
+
+    @app.route('/api/preferences/config/<content_type>')
+    @app.route('/api/preferences/config/<content_type>/<subcategory>')
+    def api_get_preferences_config(content_type, subcategory=None):
+        """获取有效配置API（支持继承机制）"""
+        try:
+            from ..utils.preferences_manager import PreferencesManager
+            
+            # 初始化PreferencesManager - 使用data目录
+            data_folder = app.config.get('CONFIG_MANAGER').get_paths_config().get('data_folder', './data')
+            prefs_file = os.path.join(data_folder, 'user_preferences.json')
+            preferences_manager = PreferencesManager(prefs_file)
+            
+            # 获取有效配置
+            config = preferences_manager.get_effective_config(content_type, subcategory)
+            
+            return jsonify({'data': config})
+            
+        except Exception as e:
+            logger.error(f"Get preferences config API error: {e}")
+            return jsonify({'error': f'Failed to get preferences config: {str(e)}'}), 500
+
+    @app.route('/api/preferences/subcategory', methods=['POST'])
+    def api_create_subcategory():
+        """创建新subcategory API"""
+        try:
+            from ..utils.preferences_manager import PreferencesManager
+            
+            # 获取请求数据
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Request data is required'}), 400
+                
+            content_type = data.get('content_type')
+            subcategory = data.get('subcategory')
+            display_name = data.get('display_name')
+            config = data.get('config', {})
+            
+            if not content_type or not subcategory or not display_name:
+                return jsonify({'error': 'content_type, subcategory and display_name are required'}), 400
+            
+            # 初始化PreferencesManager - 使用data目录
+            data_folder = app.config.get('CONFIG_MANAGER').get_paths_config().get('data_folder', './data')
+            prefs_file = os.path.join(data_folder, 'user_preferences.json')
+            preferences_manager = PreferencesManager(prefs_file)
+            
+            # 保存新subcategory配置
+            preferences_manager.save_config(content_type, subcategory, display_name, config)
+            
+            return jsonify({
+                'success': True,
+                'message': f'Subcategory "{display_name}" created successfully'
+            })
+            
+        except Exception as e:
+            logger.error(f"Create subcategory API error: {e}")
+            return jsonify({'error': f'Failed to create subcategory: {str(e)}'}), 500
+
     # Private内容访问路由
     @app.route('/private/')
     @app.route('/private/<path:filepath>')
@@ -551,138 +645,30 @@ def create_app(config=None):
         """访问私人内容"""
         try:
             from pathlib import Path
-            import os
-            import re
-            from datetime import datetime
 
             # 私人内容根目录
-            config_manager = app.config.get('CONFIG_MANAGER')
-            if config_manager and hasattr(config_manager, 'config'):
-                output_folder = config_manager.config.get('paths', {}).get('output_folder', './data/output')
-            else:
-                output_folder = './data/output'
+            output_folder = get_config_value(app, 'paths.output_folder', './data/output')
             private_root = Path(output_folder) / 'private'
 
             if not private_root.exists():
                 private_root.mkdir(parents=True, exist_ok=True)
 
             if filepath is None:
-                # 获取公有和私有内容
-                def scan_directory_for_content(directory_path, is_private=False):
-                    """扫描目录获取内容文件信息"""
-                    content_files = []
-                    if not directory_path.exists():
-                        return content_files, 0, 0
-
-                    lecture_count = 0
-                    youtube_count = 0
-
-                    for html_file in directory_path.glob('*.html'):
-                        # 跳过index.html
-                        if html_file.name == 'index.html':
-                            continue
-
-                        # 获取基础文件信息
-                        filename = html_file.name
-                        
-                        # 优先从JSON文件读取所有metadata
-                        json_filename = filename.replace('_result.html', '_result.json')
-                        json_file = html_file.parent / json_filename
-                        
-                        # 默认值
-                        title = filename.replace('_result.html', '').replace('_', ' ')
-                        content_type = 'others'
-                        summary = "Content summary"
-                        upload_metadata = {}
-                        formatted_date = html_file.stat().st_mtime
-                        formatted_date = datetime.fromtimestamp(formatted_date).strftime("%Y-%m-%d %H:%M")
-
-                        if json_file.exists():
-                            try:
-                                with open(json_file, 'r', encoding='utf-8') as f:
-                                    json_data = json.load(f)
-                                    
-                                    # 从JSON获取所有信息
-                                    upload_metadata = json_data.get('upload_metadata', {})
-                                    content_type = json_data.get('content_type') or upload_metadata.get('content_type', 'others')
-                                    
-                                    # 获取标题
-                                    if content_type == 'youtube':
-                                        title = json_data.get('title') or json_data.get('video_metadata', {}).get('title', title)
-                                    else:
-                                        title = json_data.get('title', title)
-                                    
-                                    # 获取摘要
-                                    summary = json_data.get('summary', summary)[:150] + "..." if len(json_data.get('summary', '')) > 150 else json_data.get('summary', summary)
-                                    
-                                    # 获取处理时间
-                                    processed_time = json_data.get('processed_time')
-                                    if processed_time:
-                                        try:
-                                            parsed_date = datetime.fromisoformat(processed_time.replace('Z', '+00:00'))
-                                            formatted_date = parsed_date.strftime("%Y-%m-%d %H:%M")
-                                        except:
-                                            pass  # 使用文件时间作为fallback
-                                            
-                            except Exception as e:
-                                logger.warning(f"Failed to read JSON metadata from {json_filename}: {e}")
-                                # JSON读取失败时，尝试从HTML文件提取基本信息
-                                try:
-                                    content = html_file.read_text(encoding='utf-8')
-                                    # 查找第一个段落内容作为摘要
-                                    summary_match = re.search(r'<p[^>]*>(.*?)</p>', content, re.DOTALL)
-                                    if summary_match:
-                                        summary_text = re.sub(r'<[^>]+>', '', summary_match.group(1))
-                                        summary = summary_text.strip()[:150] + "..." if len(summary_text) > 150 else summary_text.strip()
-                                except:
-                                    pass
-                        else:
-                            # 没有JSON文件时，从HTML文件提取基本信息
-                            try:
-                                content = html_file.read_text(encoding='utf-8')
-                                # 查找第一个段落内容作为摘要
-                                summary_match = re.search(r'<p[^>]*>(.*?)</p>', content, re.DOTALL)
-                                if summary_match:
-                                    summary_text = re.sub(r'<[^>]+>', '', summary_match.group(1))
-                                    summary = summary_text.strip()[:150] + "..." if len(summary_text) > 150 else summary_text.strip()
-                            except:
-                                pass
-
-                        # 更新计数器
-                        if content_type == 'youtube':
-                            youtube_count += 1
-                        elif content_type == 'lecture':
-                            lecture_count += 1
-
-                        content_files.append({
-                            'filename': filename,
-                            'title': title,
-                            'date': formatted_date,
-                            'size': html_file.stat().st_size,
-                            'content_type': content_type,
-                            'summary': summary,
-                            'is_private': is_private,
-                            'upload_metadata': upload_metadata
-                        })
-
-                    return content_files, lecture_count, youtube_count
-
+                # 获取配置管理器
+                config_manager = app.config.get('CONFIG_MANAGER')
+                
                 # 扫描私有内容
-                private_files, private_lecture_count, private_youtube_count = scan_directory_for_content(private_root, is_private=True)
+                private_files, private_counts = scan_content_directory(private_root, is_private=True, config_manager=config_manager)
 
                 # 扫描公有内容（output/public目录）
                 public_root = Path(output_folder) / 'public'
-                public_files, public_lecture_count, public_youtube_count = scan_directory_for_content(public_root, is_private=False)
+                public_files, public_counts = scan_content_directory(public_root, is_private=False, config_manager=config_manager)
 
                 # 合并所有内容
                 all_content_files = private_files + public_files
 
                 # 按日期倒序排列 (最新的在前)
                 all_content_files.sort(key=lambda x: x['date'], reverse=True)
-
-                # 统计计数
-                total_lecture_count = private_lecture_count + public_lecture_count
-                total_youtube_count = private_youtube_count + public_youtube_count
 
                 # 转换为模板期望的格式
                 all_content = []
@@ -691,9 +677,20 @@ def create_app(config=None):
                     if file_info['is_private']:
                         url = f"/private/{file_info['filename']}"
                     else:
-                        # 公有内容的GitHub Pages链接（如果可用）
-                        github_url = f"https://sleepycat233.github.io/Project_Bach/{file_info['filename']}"
-                        url = github_url
+                        # 公有内容的GitHub Pages链接（动态从配置读取）
+                        github_pages_url = get_config_value(app, 'github.pages_url')
+                        if github_pages_url:
+                            # 使用配置中的完整URL
+                            url = f"{github_pages_url.rstrip('/')}/{file_info['filename']}"
+                        else:
+                            # 从环境变量构建GitHub Pages URL
+                            github_username = get_config_value(app, 'github.username')
+                            if github_username:
+                                url = f"https://{github_username}.github.io/Project_Bach/{file_info['filename']}"
+                            else:
+                                # 如果没有GitHub配置，公开内容功能不可用
+                                logger.warning(f"没有GitHub配置，公开内容 {file_info['filename']} 无法生成有效链接")
+                                url = "#github-not-configured"
 
                     all_content.append({
                         'title': file_info['title'],
@@ -705,178 +702,18 @@ def create_app(config=None):
                         'summary': file_info['summary'],
                         'content_type': file_info['content_type'],
                         'is_private': file_info['is_private'],
-                        'filename': file_info['filename']
+                        'filename': file_info['filename'],
+                        'upload_metadata': file_info.get('upload_metadata', {})
                     })
 
-                # 生成organized_content数据结构
-                def organize_content_by_type(content_list):
-                    """将内容按类型和课程组织为树形结构"""
-                    organized = {
-                        'lectures': {},
-                        'videos': {},
-                        'articles': [],
-                        'podcasts': []
-                    }
-
-                    for content in content_list:
-                        content_type = content.get('content_type', 'others')
-
-                        if content_type == 'lecture':
-                            # 优先从upload_metadata中获取课程信息
-                            upload_metadata = content.get('upload_metadata', {})
-                            course_name = "General"  # 默认值
-
-                            # 尝试从upload_metadata中获取课程信息
-                            if upload_metadata:
-                                # 从subcategory中获取课程代码 (如CS101, PHYS101)
-                                subcategory = upload_metadata.get('subcategory', '')
-                                if subcategory and subcategory != 'other':
-                                    course_name = subcategory
-                                # 或者从custom_subcategory中获取
-                                elif subcategory == 'other':
-                                    custom_subcategory = upload_metadata.get('custom_subcategory', '')
-                                    if custom_subcategory:
-                                        course_name = custom_subcategory
-
-                            # 如果没有metadata，回退到从文件名解析
-                            if course_name == "General":
-                                filename = content.get('filename', '')
-                                course_match = re.search(r'\d{8}_\d{6}_([A-Z]+\d+)_LEC_', filename)
-                                if course_match:
-                                    course_name = course_match.group(1)  # 例如 CS101, PHYS101
-
-                            if course_name not in organized['lectures']:
-                                organized['lectures'][course_name] = []
-
-                            organized['lectures'][course_name].append({
-                                'title': content.get('title', 'Untitled'),
-                                'url': content.get('url', '#'),
-                                'date': content.get('date', ''),
-                                'filename': filename
-                            })
-
-                        elif content_type == 'youtube':
-                            # YouTube视频按系列组织 (如果需要的话)
-                            series_name = "YouTube Videos"  # 默认系列名
-                            if series_name not in organized['videos']:
-                                organized['videos'][series_name] = []
-
-                            organized['videos'][series_name].append({
-                                'title': content.get('title', 'Untitled'),
-                                'url': content.get('url', '#'),
-                                'date': content.get('date', ''),
-                                'filename': content.get('filename', '')
-                            })
-
-                    # 对每个课程内的内容按日期排序 (最新在前)
-                    for course_name, lectures in organized['lectures'].items():
-                        lectures.sort(key=lambda x: x.get('date', ''), reverse=True)
-
-                    for series_name, videos in organized['videos'].items():
-                        videos.sort(key=lambda x: x.get('date', ''), reverse=True)
-
-                    return organized
-
                 # 生成组织化的内容结构
-                organized_content = organize_content_by_type(all_content)
+                organized_content = organize_content_by_type(all_content, config_manager)
 
-                # 计算内容统计
-                content_counts = {
-                    'lecture': len([c for c in all_content if c.get('content_type') == 'lecture']),
-                    'youtube': len([c for c in all_content if c.get('content_type') == 'youtube']),
-                    'rss': len([c for c in all_content if c.get('content_type') == 'rss']),
-                    'podcast': len([c for c in all_content if c.get('content_type') == 'podcast']),
-                    'public': len([c for c in all_content if not c.get('is_private', True)]),
-                    'private': len([c for c in all_content if c.get('is_private', True)])
-                }
+                # 渲染私有内容首页
+                return render_private_index(app, all_content, organized_content)
 
-                total_content = len(all_content)
-
-                # 获取GitHub Pages URL
-                github_pages_url = "https://sleepycat233.github.io/Project_Bach"  # 默认值
-                if config_manager and hasattr(config_manager, 'config'):
-                    github_pages_url = config_manager.config.get('github', {}).get('website', {}).get('pages_url', github_pages_url)
-
-                # 使用新的私有页面模板，传入合并的内容数据
-                return render_template('web_app/private_index.html',
-                                     title="🔒 Private Content Hub",
-                                     site_title="Project Bach",
-                                     description="私人内容区域 - 浏览所有内容，支持公私筛选",
-                                     all_content=all_content,  # 传入合并的内容数据
-                                     organized_content=organized_content,  # 传入组织化的内容结构
-                                     content_counts=content_counts,
-                                     stats={
-                                         'total_processed': total_content,
-                                         'this_month': total_content,
-                                         'total_hours': '0h',
-                                         'success_rate': '100%'
-                                     },
-                                     github_pages_url=github_pages_url,  # 传入GitHub Pages URL
-                                     is_private=True)
-
-            # 安全检查：防止目录穿越攻击
-            safe_path = private_root / filepath
-            try:
-                safe_path = safe_path.resolve()
-                private_root_resolved = private_root.resolve()
-                if not str(safe_path).startswith(str(private_root_resolved)):
-                    return "Access denied", 403
-            except:
-                return "Invalid path", 400
-
-            # 检查文件是否存在
-            if not safe_path.exists():
-                return render_template('web_app/error.html',
-                                     error_code=404,
-                                     error_message=f"Private content not found: {filepath}"), 404
-
-            # 如果是目录，查找index.html
-            if safe_path.is_dir():
-                index_file = safe_path / 'index.html'
-                if index_file.exists():
-                    safe_path = index_file
-                else:
-                    # 生成目录列表
-                    files = []
-                    for item in safe_path.iterdir():
-                        if item.is_file() and item.suffix in ['.html', '.md']:
-                            files.append(item.name)
-
-                    dir_listing = f'''
-                    <html>
-                    <head><title>Private Directory: {filepath}</title></head>
-                    <body>
-                        <h1>🔒 Private Directory: {filepath}</h1>
-                        <ul>
-                            <li><a href="/private/">← Back to Private Root</a></li>
-                            {"".join(f'<li><a href="/private/{filepath}/{f}">{f}</a></li>' for f in files)}
-                        </ul>
-                    </body>
-                    </html>
-                    '''
-                    return dir_listing
-
-            # 读取并返回文件内容
-            if safe_path.suffix == '.html':
-                content = safe_path.read_text(encoding='utf-8')
-                return content
-            elif safe_path.suffix == '.md':
-                # 简单的Markdown渲染
-                content = safe_path.read_text(encoding='utf-8')
-                html_content = f'''
-                <html>
-                <head><title>Private Content</title></head>
-                <body>
-                    <pre style="white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    {content}
-                    </pre>
-                    <p><a href="/private/">← Back to Private Root</a></p>
-                </body>
-                </html>
-                '''
-                return html_content
-            else:
-                return "Unsupported file type", 400
+            # 使用辅助函数处理文件访问
+            return serve_private_file(private_root, filepath)
 
         except Exception as e:
             logger.error(f"Private content access error: {e}")

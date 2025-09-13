@@ -78,135 +78,204 @@
 - **依赖减少**: 移除不必要的python-dotenv依赖
 - **安全提升**: 敏感信息完全从配置文件分离
 
-### 🔴 **当前开发任务 - Phase 7: 前端用户体验优化**
+### 🔴 **当前开发任务 - Phase 7: 前端用户体验优化 (分阶段实施)**
 
-**Phase 7已进入开发阶段**: 前端Post-Processing选择器 + 多文件上传支持
+**Phase 7.1 进行中**: API重构和代码优化 (重构/private/路由，统一API响应)
+**Phase 7.2 待开发**: 实时进度API + Post-Processing选择器
 
 ### 📋 **后续开发重点**
 
-#### **Phase 7: 前端用户体验优化 - Post-Processing选择器 + 多文件上传**
+#### **Phase 7.1: API重构和代码优化**
+
+**需求背景**:
+1. **代码质量**: app.py中/private/路由300+行代码过长，影响可维护性
+2. **API一致性**: 缺少统一的响应格式，错误处理不一致
+3. **重复代码**: 配置管理器获取代码重复，需要提取辅助函数
+
+**核心功能要求**:
+
+##### **A. /private/路由重构**:
+1. **函数拆分**: 将300+行代码拆分为独立的辅助函数
+2. **模块化**: 内容扫描、组织、渲染分离
+3. **性能优化**: 减少重复的文件系统操作
+
+##### **B. API响应统一化**:
+1. **标准格式**: 统一JSON响应结构
+2. **错误处理**: 一致的错误码和消息格式
+3. **配置辅助**: 提取重复的配置获取逻辑
+
+#### **Phase 7.2: Post-Processing选择器 + 智能Subcategory管理**
 
 **需求背景**: 
 1. **成本控制**: 当前所有后处理步骤(NER匿名化、摘要生成、思维导图)都是hardcoded，用户无法根据需要选择性启用
-2. **批量处理**: 当前前端只支持单文件上传，用户处理多个音频文件时需要逐个上传，体验不佳
+2. **配置管理**: subcategory配置分散在config.yaml中，难以动态管理，用户无法灵活添加自定义类别
 
 **核心功能要求**:
 
 ##### **A. Post-Processing选择器**:
-1. **NER + 匿名化**: 识别和匿名化人名等敏感信息
-2. **摘要生成**: AI生成内容摘要  
-3. **思维导图生成**: AI生成结构化思维导图
+1. **NER + 匿名化**: 可选的敏感信息识别和匿名化
+2. **摘要生成**: 可选的AI内容摘要生成  
+3. **思维导图生成**: 可选的AI结构化思维导图
+4. **说话人分离**: 可选的多人对话识别
+5. **智能记忆**: 配置按content_type和subcategory自动保存和加载
 
-##### **B. 多文件上传支持**:
-1. **批量文件选择**: 支持一次选择多个音频文件
-2. **并发上传**: 支持多文件同时上传（可配置并发数）
-3. **上传进度显示**: 每个文件独立的上传进度条
-4. **批量分类设置**: 为所有上传文件统一设置content type和subcategory
-5. **错误处理**: 单个文件失败不影响其他文件上传
+##### **B. 智能Subcategory管理**:
+1. **极简配置**: config.yaml只定义基础content_type (lecture, meeting)
+2. **动态添加**: 用户可通过前端"Add new"直接创建subcategory
+3. **差异化存储**: user_preferences.json只保存与默认值不同的配置
+4. **继承机制**: 系统默认 → content_type默认 → subcategory覆盖
+5. **显示名称**: 支持友好的subcategory显示名称
 
-**技术实现方案**:
+**Phase 7.1 技术实现方案**:
 
-##### **前端UI设计**
+##### **A. /private/路由重构**
+```python
+# 原300+行函数拆分为：
+def _scan_content_directory(directory_path, is_private=False):
+    """扫描目录获取内容文件信息"""
+    # 文件扫描逻辑
+
+def _organize_content_by_type(content_list):
+    """将内容按类型和课程组织为树形结构"""
+    # 内容组织逻辑
+
+def _render_private_index(all_content, organized_content):
+    """渲染私有内容首页"""
+    # 模板渲染逻辑
+
+def _serve_private_file(filepath):
+    """提供私有文件访问"""
+    # 文件服务逻辑
+```
+
+##### **B. 统一API响应和配置助手**
+```python
+def get_config_value(app, key_path, default=None):
+    """统一配置获取助手"""
+    config_manager = app.config.get('CONFIG_MANAGER')
+    if config_manager:
+        return config_manager.get_nested_config(*key_path.split('.')) or default
+    return default
+
+def create_api_response(success=True, data=None, message=None, error=None):
+    """标准API响应格式"""
+    return {
+        'success': success,
+        'data': data,
+        'message': message,
+        'error': error,
+        'timestamp': datetime.now().isoformat()
+    }
+```
+
+**Phase 7.2 技术实现方案**:
+
+##### **A. 极简config.yaml结构**
+```yaml
+# 只保留基础content_type定义
+content_types:
+  lecture: "🎓 Academic Lecture"
+  meeting: "🏢 Meeting Recording"
+```
+
+##### **B. 智能用户偏好系统**
+```json
+// user_preferences.json - 差异化存储
+{
+  "lecture": {
+    "_defaults": {
+      "enable_anonymization": false,
+      "enable_summary": true,
+      "enable_mindmap": true,
+      "diarization": false
+    },
+    "CS101": {
+      "_display_name": "Computer Science 101",
+      "enable_anonymization": true  // 仅存储与defaults不同的部分
+    }
+  }
+}
+```
+
+##### **C. PreferencesManager核心类**
+```python
+class PreferencesManager:
+    def get_effective_config(self, content_type, subcategory):
+        """继承机制：系统默认 → content_type默认 → subcategory覆盖"""
+        
+    def save_config(self, content_type, subcategory, display_name, config):
+        """差异化存储：只保存与有效默认值不同的配置"""
+```
+
+##### **D. 前端"Add new"UI**
 ```html
-<!-- 多文件上传区域 -->
-<div class="multi-upload-zone">
-    <input type="file" id="multiFileInput" multiple accept=".mp3,.wav,.m4a,.mp4,.flac,.aac,.ogg">
-    <div class="upload-area">
-        <div class="upload-placeholder">
-            <span>📁 拖拽多个文件到此处或点击选择</span>
-            <small>支持 .mp3, .wav, .m4a, .mp4, .flac, .aac, .ogg</small>
-        </div>
-    </div>
-</div>
+<select name="subcategory">
+    <option value="CS101">Computer Science 101</option>
+    <option value="__new__">➕ Add new...</option>
+</select>
 
-<!-- Post-Processing Options -->
-<div class="form-group">
-    <label class="form-label">🔧 Post-Processing Options</label>
-    
-    <div class="post-processing-options">
-        <label class="checkbox-item">
-            <input type="checkbox" name="enable_anonymization" checked>
-            <span>🕵️ Name Anonymization (NER)</span>
-            <small>Detect and anonymize personal names in transcription</small>
-        </label>
-        
-        <label class="checkbox-item">
-            <input type="checkbox" name="enable_summary" checked>
-            <span>📝 AI Summary Generation</span>
-            <small>Generate content summary using AI</small>
-        </label>
-        
-        <label class="checkbox-item">
-            <input type="checkbox" name="enable_mindmap" checked>  
-            <span>🧠 Mindmap Generation</span>
-            <small>Create structured mindmap from content</small>
-        </label>
-    </div>
+<div class="post-processing-options">
+    <label><input type="checkbox" name="enable_anonymization">🕵️ Name Anonymization</label>
+    <label><input type="checkbox" name="enable_summary">📝 AI Summary</label>
+    <label><input type="checkbox" name="enable_mindmap">🧠 Mindmap</label>
+    <label><input type="checkbox" name="diarization">👥 Speaker Diarization</label>
 </div>
-
-<!-- 文件列表和进度 -->
-<div class="file-list">
-    <div class="file-item">
-        <div class="file-info">
-            <span class="file-name">audio1.mp3</span>
-            <span class="file-size">2.3MB</span>
-        </div>
-        <div class="upload-progress">
-            <div class="progress-bar" style="width: 45%"></div>
-            <span class="progress-text">45%</span>
-        </div>
+        </label>
     </div>
 </div>
 ```
 
-##### **后端架构重构**
-```python
-# 批量上传endpoint
-@app.route('/api/upload/batch', methods=['POST'])
-def batch_upload():
-    files = request.files.getlist('files')
-    content_type = request.form.get('content_type', 'meeting')
-    subcategory = request.form.get('subcategory', '')
+##### **B. 前端Transcript动态加载功能**
+```javascript
+// 增强dynamic-content-loader.js支持transcript显示
+class DynamicContentLoader {
+    async loadContent(url, title, type) {
+        // 1. 加载HTML内容 (现有功能)
+        const htmlContent = await this.fetchHTML(url);
+        
+        // 2. 同时加载JSON数据获取transcript
+        const jsonUrl = url.replace('_result.html', '_result.json');
+        const jsonData = await this.fetchJSON(jsonUrl);
+        
+        // 3. 在页面中添加transcript功能
+        this.renderContentWithTranscript(htmlContent, jsonData, title, type);
+    }
     
-    # Post-processing选项
-    enable_anonymization = request.form.get('enable_anonymization', 'true') == 'true'
-    enable_summary = request.form.get('enable_summary', 'true') == 'true'
-    enable_mindmap = request.form.get('enable_mindmap', 'true') == 'true'
+    renderContentWithTranscript(htmlContent, jsonData, title, type) {
+        // 渲染主要内容
+        this.renderLoadedContent(htmlContent, title, type);
+        
+        // 添加transcript section (如果存在且为public内容)
+        if (jsonData.anonymized_transcript && 
+            jsonData.metadata?.privacy_level === 'public') {
+            this.addTranscriptSection(jsonData.anonymized_transcript);
+        }
+    }
     
-    results = []
-    for file in files:
-        try:
-            metadata = {
-                'content_type': content_type,
-                'subcategory': subcategory,
-                'post_processing': {
-                    'enable_anonymization': enable_anonymization,
-                    'enable_summary': enable_summary,
-                    'enable_mindmap': enable_mindmap
-                }
-            }
-            
-            # 异步处理每个文件
-            task_id = process_file_async(file, metadata)
-            results.append({
-                'filename': file.filename,
-                'task_id': task_id,
-                'status': 'queued'
-            })
-        except Exception as e:
-            results.append({
-                'filename': file.filename,
-                'error': str(e),
-                'status': 'failed'
-            })
-    
-    return jsonify({
-        'total_files': len(files),
-        'successful': len([r for r in results if 'task_id' in r]),
-        'results': results
-    })
+    addTranscriptSection(transcript) {
+        // 创建可交互的transcript显示区域
+        // - 预览模式 (前500字符)
+        // - 展开/收起功能
+        // - 复制到剪贴板功能
+        // - 搜索高亮功能
+    }
+}
+```
 
-# AudioProcessor流程控制优化
+##### **C. 实时进度API和AudioProcessor增强**
+```python
+# 增强的ProcessingService
+class ProcessingService:
+    def update_substage(self, processing_id: str, substage: str, 
+                       progress: int = None, eta_seconds: int = None):
+        """更新子阶段进度和预计剩余时间"""
+        pass
+    
+    def cancel_processing(self, processing_id: str):
+        """取消处理任务"""
+        pass
+
+# 修改现有AudioProcessor支持post-processing选项
 class AudioProcessor:
     def process_audio_file(self, audio_path, metadata=None):
         # 1. 转录 (必需)
@@ -229,9 +298,25 @@ class AudioProcessor:
             mindmap = self.ai_generator.generate_mindmap(anonymized_text)
         else:
             mindmap = None  # 跳过思维导图
+
+# 修改现有上传端点支持post-processing选项
+@app.route('/upload/audio', methods=['POST'])
+def upload_audio():
+    # 获取post-processing选项
+    enable_anonymization = request.form.get('enable_anonymization', 'on') == 'on'
+    enable_summary = request.form.get('enable_summary', 'on') == 'on'
+    enable_mindmap = request.form.get('enable_mindmap', 'on') == 'on'
+    
+    metadata = {
+        'post_processing': {
+            'enable_anonymization': enable_anonymization,
+            'enable_summary': enable_summary,
+            'enable_mindmap': enable_mindmap
+        }
+    }
 ```
 
-##### **配置系统扩展**
+##### **C. 配置系统扩展**
 ```yaml
 # config.yaml
 post_processing:
@@ -252,19 +337,85 @@ post_processing:
       enable_mindmap: false        # 会议不适合mindmap
 ```
 
-**完成标准**:
-- ✅ 前端UI支持三个post-processing选项的独立启用/禁用
-- ✅ 后端AudioProcessor根据用户选择条件化执行各步骤
-- ✅ 配置系统支持基于content type的智能默认值
-- ✅ API性能优化：跳过不需要的AI调用可节省时间和费用
-- ✅ 向后兼容：现有API调用保持默认行为
-- ✅ 结果存储适配：支持部分后处理结果的存储格式
+**Phase 7完成标准**:
+
+**Phase 7.1完成标准**:
+- ✅ /private/路由重构为模块化函数
+- ✅ 统一API响应格式和错误处理
+- ✅ 提取配置管理重复代码
+- ✅ 代码可读性和维护性提升
+
+**Phase 7.2完成标准**:
+- ✅ 前端UI支持三个post-processing选项开关
+- ✅ AudioProcessor根据选项动态跳过步骤
+- ✅ 实时进度API显示子步骤和预计时间
+- ✅ 处理任务取消和重试功能
+- ✅ 配置系统智能默认值支持
+- ✅ 向后兼容现有API行为
+
+#### **Phase 7.3: Post-Processing配置依赖检查和前端智能提示**
+
+**需求背景**:
+1. **配置依赖复杂**: 4个post-processing功能依赖不同的配置和API
+2. **用户体验差**: 用户不知道哪些功能可用，选择后才发现失败
+3. **错误处理滞后**: 处理开始后才发现配置缺失，浪费时间
+
+**核心功能要求**:
+
+##### **A. 配置依赖映射**:
+1. **🕵️ Name Anonymization (NER)**: 依赖spaCy模型 `zh_core_web_sm`
+2. **📝 AI Summary Generation**: 依赖OpenRouter API Key + API可用性
+3. **🧠 Mindmap Generation**: 依赖OpenRouter API Key + API可用性
+4. **🎙️ Speaker Diarization**: 依赖HuggingFace Token + pyannote.audio访问权限
+
+##### **B. 后端API扩展**:
+```python
+@app.route('/api/config/dependencies')
+def api_config_dependencies():
+    """检查所有post-processing功能的配置依赖"""
+    dependencies = {
+        'ner': {
+            'available': check_spacy_model(),
+            'message': 'spaCy model zh_core_web_sm not installed' if not available else 'Ready'
+        },
+        'ai_summary': {
+            'available': check_openrouter_api(),
+            'message': 'OpenRouter API not configured or invalid' if not available else 'Ready'
+        },
+        'mindmap': {
+            'available': check_openrouter_api(),
+            'message': 'OpenRouter API not configured or invalid' if not available else 'Ready'
+        },
+        'diarization': {
+            'available': check_huggingface_token(),
+            'message': 'HuggingFace token not configured or invalid' if not available else 'Ready'
+        }
+    }
+```
+
+##### **C. 前端智能禁用逻辑**:
+```javascript
+async function checkPostProcessingDependencies() {
+    // 1. 调用API获取依赖状态
+    // 2. 对不可用功能：禁用checkbox + 透明度0.5 + tooltip提示
+    // 3. 添加警告标签如"⚠️ OpenRouter API missing"
+    // 4. 确保用户明确知道为什么某功能不可用
+}
+```
+
+**Phase 7.3完成标准**:
+- 📋 后端依赖检查API `/api/config/dependencies`
+- 📋 各功能的配置验证函数（spaCy、OpenRouter、HuggingFace）
+- 📋 前端页面加载时自动检查并禁用不可用选项
+- 📋 清晰的英文tooltip提示具体配置要求
+- 📋 优雅的视觉反馈（禁用状态、透明度、警告标签）
 
 **用户价值**:
-- **成本控制**: 可选择性跳过昂贵的AI生成步骤
-- **处理速度**: 减少不需要的后处理可提升整体速度
-- **使用灵活性**: 根据不同场景选择合适的后处理组合
-- **隐私控制**: 可选择跳过匿名化用于个人使用场景
+- **开发体验**: 代码更易维护，API更一致
+- **用户体验**: 精确进度显示，可控处理选项，智能功能可用性提示
+- **成本控制**: 选择性跳过AI生成步骤，避免配置错误浪费时间
+- **处理效率**: 减少不需要步骤提升速度，预防配置缺失导致的处理失败
+- **配置引导**: 通过tooltip明确告知用户需要配置什么来启用功能
 
 #### 📋 技术架构设计
 ```python
