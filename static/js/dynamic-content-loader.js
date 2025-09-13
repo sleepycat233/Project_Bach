@@ -1,7 +1,6 @@
 /**
  * Dynamic Content Loader
  * 动态内容加载功能 - 支持在侧栏点击内容时动态加载到中间区域
- * 支持直接加载和渲染Markdown文件
  */
 
 class DynamicContentLoader {
@@ -210,235 +209,18 @@ class DynamicContentLoader {
             </div>
         `;
         
-        // 将HTML URL转换为Markdown URL
-        const markdownUrl = url.replace('_result.html', '_result.md');
-        
-        // 通过AJAX加载Markdown内容
-        fetch(markdownUrl)
+        // 直接加载HTML内容
+        fetch(url)
             .then(response => {
                 if (!response.ok) {
-                    // 如果Markdown文件不存在，回退到HTML加载
-                    return fetch(url).then(htmlResponse => {
-                        if (!htmlResponse.ok) {
-                            throw new Error(`HTTP ${htmlResponse.status}: ${htmlResponse.statusText}`);
-                        }
-                        return { content: htmlResponse.text(), type: 'html' };
-                    });
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                return { content: response.text(), type: 'markdown' };
+                return response.text();
             })
-            .then(async result => {
-                const content = await result.content;
-                if (result.type === 'markdown') {
-                    this.renderMarkdownContent(content, title, type, markdownUrl);
-                } else {
-                    this.renderLoadedContent(content, title, type, url);
-                }
+            .then(content => {
+                this.renderLoadedContent(content, title, type, url);
             })
             .catch(error => this.renderErrorContent(error, title, url));
-    }
-
-    /**
-     * 渲染Markdown内容
-     * @param {string} markdown - Markdown内容
-     * @param {string} title - 内容标题
-     * @param {string} type - 内容类型
-     * @param {string} url - 原始URL
-     */
-    renderMarkdownContent(markdown, title, type, url) {
-        // 简单的Markdown到HTML转换
-        const html = this.parseMarkdown(markdown);
-        
-        const breadcrumbHtml = this.generateBreadcrumb(title);
-        
-        this.dynamicContent.innerHTML = `
-            <div class="content-header">
-                <div class="content-breadcrumb">
-                    ${breadcrumbHtml}
-                </div>
-                <div class="content-title-area">
-                    <h1>${this.escapeHtml(title)}</h1>
-                    <span class="content-type-badge badge-${type}">${type.charAt(0).toUpperCase() + type.slice(1)}</span>
-                </div>
-            </div>
-            <div class="loaded-content markdown-content">
-                ${html}
-            </div>
-        `;
-        
-        // 重新生成TOC
-        this.updateTOC();
-    }
-
-    /**
-     * 使用marked.js的专业Markdown解析器
-     * @param {string} markdown - Markdown文本
-     * @returns {string} HTML文本
-     */
-    parseMarkdown(markdown) {
-        // 确保marked库已加载
-        if (typeof marked === 'undefined') {
-            console.error('marked.js library not loaded, falling back to basic parsing');
-            return this.basicMarkdownParse(markdown);
-        }
-        
-        // 配置marked选项
-        marked.setOptions({
-            // 启用GitHub风格Markdown
-            gfm: true,
-            // 启用表格
-            tables: true,
-            // 启用换行符转换
-            breaks: false,
-            // 启用删除线
-            strikethrough: true,
-            // 启用任务列表
-            tasklists: true,
-            // 安全设置：过滤HTML
-            sanitize: false, // 我们手动处理
-            // 代码高亮准备
-            highlight: null,
-            // 链接在新窗口打开
-            renderer: this.getCustomRenderer()
-        });
-        
-        try {
-            // 预处理：清理不需要的内容
-            let cleanMarkdown = this.preprocessMarkdown(markdown);
-            
-            // 使用marked进行转换
-            let html = marked.parse(cleanMarkdown);
-            
-            // 后处理：应用自定义样式和清理
-            html = this.postprocessHTML(html);
-            
-            return html;
-        } catch (error) {
-            console.error('Markdown parsing error:', error);
-            return this.basicMarkdownParse(markdown);
-        }
-    }
-    
-    /**
-     * 获取自定义的marked渲染器
-     * @returns {Object} marked渲染器
-     */
-    getCustomRenderer() {
-        const renderer = new marked.Renderer();
-        
-        // 自定义链接渲染：在新窗口打开外部链接
-        renderer.link = function(href, title, text) {
-            const isExternal = href && (href.startsWith('http') || href.startsWith('//'));
-            const target = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
-            const titleAttr = title ? ` title="${title}"` : '';
-            return `<a href="${href}"${titleAttr}${target}>${text}</a>`;
-        };
-        
-        // 自定义表格渲染：添加CSS类
-        renderer.table = function(header, body) {
-            return `<table class="markdown-table">
-                <thead>${header}</thead>
-                <tbody>${body}</tbody>
-            </table>`;
-        };
-        
-        // 自定义代码块渲染：添加语言标识
-        renderer.code = function(code, language, escaped) {
-            // Debug logging
-            console.log('Code renderer called with:', {
-                code: typeof code === 'object' ? 'object' : code, 
-                language, 
-                escaped,
-                codeText: typeof code === 'object' ? code.text : code
-            });
-            
-            // Extract actual code text from marked.js token object or use as string
-            let codeText = '';
-            if (typeof code === 'object' && code !== null) {
-                codeText = code.text || code.raw || String(code);
-            } else {
-                codeText = String(code || '');
-            }
-            
-            const langClass = language ? ` class="language-${language}"` : '';
-            const langLabel = language ? `<span class="code-lang">${language}</span>` : '';
-            
-            // HTML转义（如果marked.js没有处理过）
-            const escapedCode = escaped ? codeText : codeText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            
-            const result = `<div class="code-block">
-                ${langLabel}
-                <pre><code${langClass}>${escapedCode}</code></pre>
-            </div>`;
-            
-            console.log('Code renderer returning first 100 chars:', result.substring(0, 100));
-            return result;
-        };
-        
-        return renderer;
-    }
-    
-    /**
-     * 预处理Markdown内容
-     * @param {string} markdown - 原始Markdown
-     * @returns {string} 清理后的Markdown
-     */
-    preprocessMarkdown(markdown) {
-        let cleaned = markdown;
-        
-        // 移除HTML标签（保留marked.js处理）
-        cleaned = cleaned.replace(/<title>.*?<\/title>/gi, '');
-        cleaned = cleaned.replace(/^\s*<[^>]+>\s*/gm, '');
-        
-        // 移除开头的分隔线
-        cleaned = cleaned.replace(/^---+\s*\n/m, '');
-        
-        // 清理开头空白
-        cleaned = cleaned.trim();
-        
-        return cleaned;
-    }
-    
-    /**
-     * 后处理HTML内容
-     * @param {string} html - marked生成的HTML
-     * @returns {string} 最终HTML
-     */
-    postprocessHTML(html) {
-        let processed = html;
-        
-        // 移除空的段落
-        processed = processed.replace(/<p>\s*<\/p>/g, '');
-        
-        // 确保表格有正确的CSS类（双重保险）
-        processed = processed.replace(/<table>/g, '<table class="markdown-table">');
-        
-        return processed;
-    }
-    
-    /**
-     * 基础Markdown解析器（fallback）
-     * @param {string} markdown - Markdown文本
-     * @returns {string} HTML文本
-     */
-    basicMarkdownParse(markdown) {
-        let html = markdown;
-        
-        // 基础标题处理
-        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-        
-        // 基础格式处理
-        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-        
-        // 段落处理
-        html = html.replace(/\n\n/g, '</p><p>');
-        html = '<p>' + html + '</p>';
-        html = html.replace(/<p><\/p>/g, '');
-        
-        return html;
     }
 
     /**
@@ -533,7 +315,7 @@ class DynamicContentLoader {
         
         // 完全清空动态内容，移除所有动态内容类
         this.dynamicContent.innerHTML = '';
-        this.dynamicContent.classList.remove('loaded-content', 'markdown-content');
+        this.dynamicContent.classList.remove('loaded-content');
         
         // 重新生成TOC，这次会显示静态内容的TOC
         this.updateTOC();

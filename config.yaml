@@ -68,52 +68,9 @@ diarization:
 
 
 # Phase 6: 多媒体内容分类与Web界面配置
-content_classification:
-  # 支持的内容类型定义
-  content_types:
-    lecture:      # 🎓 学术讲座
-      icon: "🎓"
-      display_name: "Academic Lecture"
-      diarization_default: false  # 讲座通常单人，默认不启用
-      subcategories:
-        CS101:
-          display_name: "CS101-Computer Science Course"
-          diarization: false  # CS课程，单人讲授
-        PHYS101:
-          display_name: "PHYS101-Physics Course"
-          diarization: false  # 物理课程，单人讲授
-        Seminar:
-          display_name: "Academic Seminar"
-          diarization: true   # 研讨会，可能有讨论环节
-      recommendations:
-        english:
-          - "whisper-base-mlx"
-          - "whisper-small-mlx"  # 英文快速模型
-        multilingual:
-          - "whisper-large-v3-mlx"         # 多语言高精度
-
-    meeting:      # 🏢 会议录音
-      icon: "🏢"
-      display_name: "Meeting Recording"
-      diarization_default: true   # 会议多人对话，默认启用
-      subcategories:
-        team_meeting:
-          display_name: "Team Meeting"
-          diarization: true   # 团队会议，多人参与
-        project_review:
-          display_name: "Project Review"
-          diarization: true   # 评审会议，多人讨论
-        client_call:
-          display_name: "Client Call"
-          diarization: true   # 客户电话，双人对话
-        standup:
-          display_name: "Daily Standup"
-          diarization: true   # 站会，多人参与
-      recommendations:
-        english:
-          - "whisper-base-mlx"                     # MLX英文处理
-        multilingual:
-          - "whisper-large-v3-mlx"                 # MLX多语言处理
+# content_classification:
+#   # 使用代码中的DEFAULT_CONTENT_TYPES默认值
+#   # 包含: lecture, meeting, youtube, others
 
 
 # Phase 6: Web前端配置
@@ -188,6 +145,14 @@ network:
       - "./output"
     enable_upload: true  # 是否允许文件上传
     enable_download: true  # 是否允许文件下载
+
+# GitHub Pages配置
+# GitHub username和token通过环境变量 GITHUB_USERNAME 和 GITHUB_TOKEN 提供
+github:
+  repo_name: "Project_Bach"  # 仓库名称（可配置）
+  pages:
+    enabled: true           # 是否启用GitHub Pages链接
+    # pages_url 将自动生成为: https://{username}.github.io/{repo_name}
 
 # YouTube处理器配置
 youtube:
