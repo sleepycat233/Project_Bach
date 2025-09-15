@@ -1,0 +1,24 @@
+{
+  "_system_defaults": {
+    "enable_anonymization": false,
+    "enable_summary": false,
+    "enable_mindmap": false,
+    "diarization": false
+  },
+  "lecture": {
+    "_defaults": {
+      "diarization": false
+    },
+    "MATH101": {
+      "_display_name": "Advanced Calculus"
+    },
+    "abc": {
+      "_display_name": "helloworld"
+    }
+  },
+  "meeting": {
+    "_defaults": {
+      "diarization": true
+    }
+  }
+}
