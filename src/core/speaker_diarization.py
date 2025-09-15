@@ -66,32 +66,6 @@ class SpeakerDiarization:
         self.logger.info(f"最大说话人数: {self.max_speakers}")
         self.logger.info(f"最小段落时长: {self.min_segment_duration}秒")
         
-    def should_enable_diarization(self, content_type: str, subcategory: str = None) -> bool:
-        """根据内容类型和子分类判断是否应该启用diarization
-        
-        Args:
-            content_type: 内容类型 (lecture, meeting等)
-            subcategory: 子分类 (CS101, Seminar, standup等)
-            
-        Returns:
-            是否应该启用diarization
-        """
-        if content_type not in self.content_types:
-            return False
-            
-        content_type_config = self.content_types[content_type]
-        
-        # 检查子分类设置
-        if subcategory:
-            subcategories = content_type_config.get('subcategories', {})
-            if subcategory in subcategories and isinstance(subcategories[subcategory], dict):
-                subcategory_config = subcategories[subcategory]
-                if 'diarization' in subcategory_config:
-                    return subcategory_config['diarization']
-        
-        # 使用主分类默认设置
-        return content_type_config.get('diarization_default', False)
-    
     def diarize_audio(self, audio_path: Path, **kwargs) -> List[Dict[str, Any]]:
         """执行说话人分离
         

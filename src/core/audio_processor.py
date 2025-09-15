@@ -177,17 +177,11 @@ class AudioProcessor:
             if self.speaker_diarization_service:
                 content_type = metadata.get('content_type') if metadata else None
                 subcategory = metadata.get('subcategory') if metadata else None
-                force_diarization = metadata.get('force_diarization', False) if metadata else False
+                enable_diarization = metadata.get('enable_diarization', None) if metadata else None
 
-                # 判断是否需要启用diarization
-                self.logger.info(f"🔍 Diarization决策: content_type='{content_type}', subcategory='{subcategory}', force_diarization={force_diarization}")
-
-                should_diarize = force_diarization
-                if not should_diarize and content_type:
-                    should_diarize = self.speaker_diarization_service.should_enable_diarization(
-                        content_type, subcategory
-                    )
-                    self.logger.info(f"🔍 should_enable_diarization('{content_type}', '{subcategory}') 返回: {should_diarize}")
+                # 简化的diarization决策：直接使用前端传来的选择（已包含默认值处理）
+                should_diarize = enable_diarization if enable_diarization is not None else False
+                self.logger.info(f"🔍 Diarization设置: {should_diarize} (来自前端选择，content_type='{content_type}')")
 
                 if should_diarize:
                     self.logger.info("检测到需要说话人分离，启用词级时间戳")
@@ -252,40 +246,83 @@ class AudioProcessor:
                     self.logger.error(f"说话人分离处理失败: {e}")
                     # 继续处理，不影响主流程
 
-            # 步骤2: 人名匿名化
-            self.logger.info("步骤2: 开始人名匿名化")
-            if processing_id:
-                self.processing_service.update_status(processing_id, ProcessingStage.ANONYMIZING, 50, "Anonymizing personal names...")
-            anonymized_text, mapping = self.anonymization_service.anonymize_names(transcript)
-            self.transcript_storage.save_anonymized_transcript(audio_path.stem, anonymized_text, privacy_level)
+            # 获取Post-Processing配置
+            enable_anonymization = metadata.get('enable_anonymization', True) if metadata else True
+            enable_summary = metadata.get('enable_summary', True) if metadata else True
+            enable_mindmap = metadata.get('enable_mindmap', True) if metadata else True
 
-            # 记录匿名化映射
-            if mapping:
-                self.logger.info(f"人名匿名化映射: {mapping}")
+            # 步骤2: 人名匿名化（可选）
+            anonymized_text = transcript
+            mapping = {}
+            
+            if enable_anonymization:
+                self.logger.info("步骤2: 开始人名匿名化")
+                if processing_id:
+                    self.processing_service.update_status(processing_id, ProcessingStage.ANONYMIZING, 50, "Anonymizing personal names...")
+                anonymized_text, mapping = self.anonymization_service.anonymize_names(transcript)
+                self.transcript_storage.save_anonymized_transcript(audio_path.stem, anonymized_text, privacy_level)
 
-            # 步骤3: AI内容生成
-            self.logger.info("步骤3: 开始AI内容生成")
-            if processing_id:
-                self.processing_service.update_status(processing_id, ProcessingStage.AI_GENERATING, 70, "Generating AI content...")
-            summary = self.ai_generation_service.generate_summary(anonymized_text)
-            mindmap = self.ai_generation_service.generate_mindmap(anonymized_text)
+                # 记录匿名化映射
+                if mapping:
+                    self.logger.info(f"人名匿名化映射: {mapping}")
+            else:
+                self.logger.info("步骤2: 跳过人名匿名化（用户未启用）")
+
+            # 步骤3: AI内容生成（可选）
+            summary = ""
+            mindmap = ""
+            
+            if enable_summary or enable_mindmap:
+                self.logger.info("步骤3: 开始AI内容生成")
+                if processing_id:
+                    self.processing_service.update_status(processing_id, ProcessingStage.AI_GENERATING, 70, "Generating AI content...")
+                
+                if enable_summary:
+                    summary = self.ai_generation_service.generate_summary(anonymized_text)
+                    self.logger.info("摘要生成完成")
+                else:
+                    self.logger.info("跳过摘要生成（用户未启用）")
+                
+                if enable_mindmap:
+                    mindmap = self.ai_generation_service.generate_mindmap(anonymized_text)
+                    self.logger.info("思维导图生成完成")
+                else:
+                    self.logger.info("跳过思维导图生成（用户未启用）")
+            else:
+                self.logger.info("步骤3: 跳过AI内容生成（用户未启用）")
 
             # 步骤4: 保存结果
             self.logger.info("步骤4: 保存处理结果")
+            
+            # 构建统一的元数据结构
+            metadata_dict = {
+                'filename': audio_path.stem,
+                'original_file': str(audio_path),
+                'processed_time': datetime.now().isoformat(),
+                'format_version': '2.0',
+                'privacy_level': privacy_level,
+            }
+            
+            # 添加上传时的元数据（包含分类信息）
+            if metadata:
+                metadata_dict.update({
+                    'content_type': metadata.get('content_type', 'others'),
+                    'subcategory': metadata.get('subcategory', ''),
+                    'audio_language': metadata.get('audio_language', ''),
+                    'whisper_model': metadata.get('whisper_model', ''),
+                    'description': metadata.get('description', ''),
+                    'file_size': metadata.get('file_size', 0)
+                })
+            
+            # 根级别的核心数据（新结构）
             results = {
                 'summary': summary,
                 'mindmap': mindmap,
-                'original_file': str(audio_path),
-                'processed_time': datetime.now().isoformat(),
-                'anonymized_transcript': anonymized_text,  # 添加匿名化转录文本
+                'transcription': self._clean_transcription_for_output(transcription_result),
+                'anonymized_transcript': anonymized_text,
                 'anonymization_mapping': mapping,
-                'privacy_level': privacy_level,
-                'transcription_result': self._clean_transcription_for_output(transcription_result),  # 清理后的转录结果
+                'metadata': metadata_dict
             }
-
-            # 保存上传时的metadata（包含课程信息）
-            if metadata:
-                results['upload_metadata'] = metadata
 
             # 添加说话人分离结果（如果存在）
             if 'diarization_result' in locals():
@@ -496,25 +533,36 @@ class AudioProcessor:
 
             # 保存最终结果
             if self.result_storage:
-                result_data = {
-                    'title': video_title,
-                    'video_id': video_id,
-                    'video_url': youtube_result.get('source_url', ''),
-                    'summary': summary,
-                    'mindmap': mindmap,
-                    'transcription_method': transcription_method,
-                    'privacy_level': privacy_level,
+                # 构建统一的元数据结构
+                metadata_dict = {
+                    'filename': f"youtube_{video_id}",
+                    'original_file': youtube_result.get('source_url', ''),
                     'processed_time': datetime.now().isoformat(),
+                    'format_version': '2.0',
+                    'privacy_level': privacy_level,
                     'content_type': 'youtube',
-                    'video_metadata': video_metadata,
-                    'anonymized_transcript': anonymized_text,  # 添加匿名化转录文本
-                    'anonymization_mapping': mapping
+                    'transcription_method': transcription_method,
+                    'title': video_title,
+                    'video_metadata': video_metadata
                 }
                 
                 # 添加upload_metadata（包含用户提交的信息）
                 upload_metadata = youtube_result.get('upload_metadata', {})
                 if upload_metadata:
-                    result_data['upload_metadata'] = upload_metadata
+                    metadata_dict.update({
+                        'subcategory': upload_metadata.get('subcategory', ''),
+                        'description': upload_metadata.get('description', '')
+                    })
+                
+                # 根级别的核心数据（新结构）
+                result_data = {
+                    'summary': summary,
+                    'mindmap': mindmap,
+                    'transcription': anonymized_text,  # YouTube的原始转录（不保存匿名化前的）
+                    'anonymized_transcript': anonymized_text,
+                    'anonymization_mapping': mapping,
+                    'metadata': metadata_dict
+                }
 
                 # 保存HTML和JSON格式的YouTube处理结果
                 self.result_storage.save_html_result(
@@ -720,40 +768,6 @@ class AudioProcessor:
 
         return html_content
 
-    def get_processing_stats(self) -> Dict[str, Any]:
-        """获取处理统计信息
-
-        Returns:
-            统计信息字典
-        """
-        stats = {
-            'dependencies_status': {
-                'transcription_service': self.transcription_service is not None,
-                'anonymization_service': self.anonymization_service is not None,
-                'ai_generation_service': self.ai_generation_service is not None,
-                'transcript_storage': self.transcript_storage is not None,
-                'result_storage': self.result_storage is not None,
-                'file_monitor': self.file_monitor is not None
-            }
-        }
-
-        # 添加存储统计信息
-        if self.result_storage:
-            try:
-                storage_stats = self.result_storage.get_storage_stats()
-                stats['storage_stats'] = storage_stats
-            except Exception as e:
-                stats['storage_stats'] = {'error': str(e)}
-
-        # 添加队列统计信息
-        if self.file_monitor:
-            try:
-                queue_stats = self.get_queue_status()
-                stats['queue_stats'] = queue_stats
-            except Exception as e:
-                stats['queue_stats'] = {'error': str(e)}
-
-        return stats
 
     def validate_audio_file(self, file_path: str) -> bool:
         """验证音频文件是否有效
@@ -805,44 +819,3 @@ class AudioProcessor:
         self.logger.info(f"强制处理文件: {Path(file_path).name}")
         return self.process_audio_file(file_path)
 
-    def get_file_processing_history(self, filename: str) -> Dict[str, Any]:
-        """获取文件的处理历史
-
-        Args:
-            filename: 文件名（不含扩展名）
-
-        Returns:
-            处理历史信息
-        """
-        history = {
-            'filename': filename,
-            'transcripts': {},
-            'results': {},
-            'status': 'not_found'
-        }
-
-        # 检查转录文件
-        if self.transcript_storage:
-            for suffix in ['raw', 'anonymized', 'processed']:
-                transcript = self.transcript_storage.load_transcript(filename, suffix)
-                if transcript:
-                    history['transcripts'][suffix] = {
-                        'exists': True,
-                        'length': len(transcript)
-                    }
-
-        # 检查结果文件
-        if self.result_storage:
-            for format_type in ['json', 'markdown', 'html']:
-                result = self.result_storage.load_result(filename, format_type)
-                if result:
-                    history['results'][format_type] = {
-                        'exists': True,
-                        'data': result
-                    }
-
-        # 确定状态
-        if history['transcripts'] or history['results']:
-            history['status'] = 'processed'
-
-        return history

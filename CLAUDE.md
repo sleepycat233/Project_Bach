@@ -78,10 +78,21 @@
 - **依赖减少**: 移除不必要的python-dotenv依赖
 - **安全提升**: 敏感信息完全从配置文件分离
 
-### 🔴 **当前开发任务 - Phase 7: 前端用户体验优化 (分阶段实施)**
+### 🔴 **当前开发任务 - Phase 7: 前端用户体验优化**
 
-**Phase 7.1 进行中**: API重构和代码优化 (重构/private/路由，统一API响应)
-**Phase 7.2 待开发**: 实时进度API + Post-Processing选择器
+**Phase 7.1 已完成** ✅: API重构和代码优化 (重构/private/路由，统一API响应)
+**Phase 7.2 部分完成** 🔄: Post-Processing选择器 + 智能Subcategory管理
+
+**Phase 7.2 已完成功能** ✅:
+- Post-Processing选择器UI (匿名化、摘要、思维导图、说话人分离)
+- PreferencesManager核心架构 (差异化存储、继承机制)
+- 创建新subcategory功能 (API + 前端UI)
+- Diarization决策逻辑简化 (移除三层冗余逻辑)
+- 配置系统重构 (默认值从代码迁移到user_preferences.json)
+
+**Phase 7.2 待完成功能** 📋:
+- **编辑已有subcategory功能**: 前端UI + 后端API支持修改已创建的subcategory配置
+- **删除subcategory功能**: 前端UI + 后端API支持删除不需要的subcategory
 
 ### 📋 **后续开发重点**
 
@@ -106,7 +117,7 @@
 
 #### **Phase 7.2: Post-Processing选择器 + 智能Subcategory管理**
 
-**需求背景**: 
+**需求背景**:
 1. **成本控制**: 当前所有后处理步骤(NER匿名化、摘要生成、思维导图)都是hardcoded，用户无法根据需要选择性启用
 2. **配置管理**: subcategory配置分散在config.yaml中，难以动态管理，用户无法灵活添加自定义类别
 
@@ -114,7 +125,7 @@
 
 ##### **A. Post-Processing选择器**:
 1. **NER + 匿名化**: 可选的敏感信息识别和匿名化
-2. **摘要生成**: 可选的AI内容摘要生成  
+2. **摘要生成**: 可选的AI内容摘要生成
 3. **思维导图生成**: 可选的AI结构化思维导图
 4. **说话人分离**: 可选的多人对话识别
 5. **智能记忆**: 配置按content_type和subcategory自动保存和加载
@@ -202,7 +213,7 @@ content_types:
 class PreferencesManager:
     def get_effective_config(self, content_type, subcategory):
         """继承机制：系统默认 → content_type默认 → subcategory覆盖"""
-        
+
     def save_config(self, content_type, subcategory, display_name, config):
         """差异化存储：只保存与有效默认值不同的配置"""
 ```
@@ -232,26 +243,26 @@ class DynamicContentLoader {
     async loadContent(url, title, type) {
         // 1. 加载HTML内容 (现有功能)
         const htmlContent = await this.fetchHTML(url);
-        
+
         // 2. 同时加载JSON数据获取transcript
         const jsonUrl = url.replace('_result.html', '_result.json');
         const jsonData = await this.fetchJSON(jsonUrl);
-        
+
         // 3. 在页面中添加transcript功能
         this.renderContentWithTranscript(htmlContent, jsonData, title, type);
     }
-    
+
     renderContentWithTranscript(htmlContent, jsonData, title, type) {
         // 渲染主要内容
         this.renderLoadedContent(htmlContent, title, type);
-        
+
         // 添加transcript section (如果存在且为public内容)
-        if (jsonData.anonymized_transcript && 
+        if (jsonData.anonymized_transcript &&
             jsonData.metadata?.privacy_level === 'public') {
             this.addTranscriptSection(jsonData.anonymized_transcript);
         }
     }
-    
+
     addTranscriptSection(transcript) {
         // 创建可交互的transcript显示区域
         // - 预览模式 (前500字符)
@@ -266,11 +277,11 @@ class DynamicContentLoader {
 ```python
 # 增强的ProcessingService
 class ProcessingService:
-    def update_substage(self, processing_id: str, substage: str, 
+    def update_substage(self, processing_id: str, substage: str,
                        progress: int = None, eta_seconds: int = None):
         """更新子阶段进度和预计剩余时间"""
         pass
-    
+
     def cancel_processing(self, processing_id: str):
         """取消处理任务"""
         pass
@@ -280,20 +291,20 @@ class AudioProcessor:
     def process_audio_file(self, audio_path, metadata=None):
         # 1. 转录 (必需)
         transcript = self.transcribe_audio(...)
-        
+
         # 2. 条件化后处理
         post_config = metadata.get('post_processing', {})
-        
+
         if post_config.get('enable_anonymization', True):
             anonymized_text = self.anonymizer.anonymize(transcript)
         else:
             anonymized_text = transcript  # 跳过匿名化
-            
+
         if post_config.get('enable_summary', True):
             summary = self.ai_generator.generate_summary(anonymized_text)
         else:
             summary = None  # 跳过摘要生成
-            
+
         if post_config.get('enable_mindmap', True):
             mindmap = self.ai_generator.generate_mindmap(anonymized_text)
         else:
@@ -306,7 +317,7 @@ def upload_audio():
     enable_anonymization = request.form.get('enable_anonymization', 'on') == 'on'
     enable_summary = request.form.get('enable_summary', 'on') == 'on'
     enable_mindmap = request.form.get('enable_mindmap', 'on') == 'on'
-    
+
     metadata = {
         'post_processing': {
             'enable_anonymization': enable_anonymization,
@@ -314,27 +325,6 @@ def upload_audio():
             'enable_mindmap': enable_mindmap
         }
     }
-```
-
-##### **C. 配置系统扩展**
-```yaml
-# config.yaml
-post_processing:
-  defaults:
-    enable_anonymization: true    # 默认启用匿名化
-    enable_summary: true         # 默认启用摘要
-    enable_mindmap: true         # 默认启用思维导图
-  
-  # 基于content type的智能默认值
-  content_type_defaults:
-    lecture:
-      enable_anonymization: false  # 讲座通常无敏感信息
-      enable_summary: true
-      enable_mindmap: true
-    meeting:
-      enable_anonymization: true   # 会议可能包含人名
-      enable_summary: true  
-      enable_mindmap: false        # 会议不适合mindmap
 ```
 
 **Phase 7完成标准**:
@@ -443,49 +433,7 @@ class SpeakerDiarization:
         # 合并转录文本与说话人信息
         # 使用IoU时间戳对齐算法
         return enhanced_transcription_with_speakers
-
-# 配置系统扩展 - 基于content type的解耦设计
-mlx_whisper:
-  available_models:
-    - "mlx-community/whisper-tiny-mlx"
-    - "mlx-community/whisper-large-v3-mlx"     # 统一使用HuggingFace缓存
-  word_timestamps: true                         # 词级时间戳(原生支持)
-
-diarization:
-  provider: "pyannote"   # 使用pyannote-audio，从HuggingFace缓存加载
-  max_speakers: 6
-  min_segment_duration: 1.0
-
-  # 基于content type和subcategory的diarization配置
-  content_type_defaults:
-    # 主分类默认设置
-    lecture: false       # 讲座通常单人，默认不启用
-    meeting: true        # 会议多人对话，默认启用
-
-    # Lecture子分类配置 - 用户可自定义
-    lecture_subcategories:
-      cs: false          # CS课程，单人讲授
-      math: false        # 数学课程，单人讲授
-      physics: false     # 物理课程，单人讲授
-      seminar: true      # 研讨会，可能有讨论环节
-      workshop: true     # 工作坊，可能有互动
-
-    # Meeting子分类配置 - 用户可自定义
-    meeting_subcategories:
-      standup: true      # 站会，多人参与
-      review: true       # 评审会议，多人讨论
-      planning: true     # 规划会议，多人参与
-      interview: true    # 面试，双人对话
-      oneonone: false    # 一对一会议，可选择不启用
-
-  # 输出格式配置
-  output_format:
-    group_by_speaker: true          # 默认按说话人分组，便于阅读
-    timestamp_precision: 1          # 时间戳精度(小数位数)
-    include_confidence: false       # 是否包含置信度信息
 ```
-
----
 
 ## 📋 后续开发重点
 

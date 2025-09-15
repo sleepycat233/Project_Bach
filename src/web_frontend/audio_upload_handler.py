@@ -101,12 +101,7 @@ class AudioUploadHandler:
                         # 自定义子分类，添加到文件名但保持在根目录
                         subcategory_code = f"_{subcategory}"
                         logger.info(f"Using custom subcategory in filename: {subcategory}")
-                elif subcategory == 'other':
-                    # 处理'other'情况下的custom_subcategory
-                    custom_subcategory = metadata.get('custom_subcategory', '') if metadata else ''
-                    if custom_subcategory:
-                        subcategory_code = f"_{custom_subcategory}"
-                        logger.info(f"Using custom subcategory in filename: {custom_subcategory}")
+                # 移除了'other'的特殊处理，现在所有subcategory都直接使用值
                 
                 # 生成最终文件名
                 from datetime import datetime

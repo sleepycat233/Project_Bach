@@ -192,56 +192,73 @@ class WebApp {
             await this.updateSubcategoryOptions(selectedType);
         });
 
-        // 处理自定义子分类
+        // 处理"Add new"子分类功能
         const subcategorySelect = document.getElementById('subcategory-select');
-        const customInput = document.getElementById('custom-subcategory-input');
+        const addNewForm = document.getElementById('add-new-subcategory-form');
         
-        if (subcategorySelect && customInput) {
-            subcategorySelect.addEventListener('change', (e) => {
-                const isCustom = e.target.value === 'other';
-                customInput.style.display = isCustom ? 'block' : 'none';
-                customInput.required = isCustom;
+        if (subcategorySelect && addNewForm) {
+            subcategorySelect.addEventListener('change', async (e) => {
+                const isAddNew = e.target.value === 'add_new';
+                addNewForm.style.display = isAddNew ? 'block' : 'none';
+                
+                if (isAddNew) {
+                    // 清空输入框
+                    document.getElementById('new-subcategory-name').value = '';
+                    document.getElementById('new-subcategory-display').value = '';
+                    // 聚焦到名称输入框
+                    document.getElementById('new-subcategory-name').focus();
+                } else if (e.target.value) {
+                    // 选择了现有的subcategory，更新Post-Processing默认值
+                    const contentType = contentTypeSelect.value;
+                    await this.updatePostProcessingDefaults(contentType, e.target.value);
+                }
             });
         }
+
+        // 处理Add new按钮
+        this.setupAddNewSubcategoryHandlers();
     }
 
     async updateSubcategoryOptions(contentType) {
         try {
-            const response = await this.apiClient.get('/api/categories');
-            const contentTypeData = response.data[contentType];
+            // 使用新的PreferencesManager API获取子分类
+            const response = await this.apiClient.get(`/api/preferences/subcategories/${contentType}`);
+            const subcategories = response.data.data || [];
             
             const subcategoryContainer = document.getElementById('subcategory-container');
             const subcategorySelect = document.getElementById('subcategory-select');
             const subcategoryLabel = document.getElementById('subcategory-label');
             
-            if (contentTypeData?.subcategories && Object.keys(contentTypeData.subcategories).length > 0) {
-                subcategoryContainer.style.display = 'block';
-                subcategoryLabel.textContent = contentType === 'lecture' ? 'Course Selection' : 'Subcategory';
+            // 总是显示subcategory容器（支持动态添加）
+            subcategoryContainer.style.display = 'block';
+            subcategoryLabel.textContent = contentType === 'lecture' ? 'Course Selection' : 'Subcategory';
+            
+            // 清空并重新填充选项
+            subcategorySelect.innerHTML = '<option value="">Select a ' + 
+                (contentType === 'lecture' ? 'course' : 'subcategory') + '...</option>';
+            
+            // 添加现有的subcategories
+            subcategories.forEach(subcat => {
+                const option = document.createElement('option');
+                option.value = subcat.value;
+                option.textContent = subcat.display_name;
+                subcategorySelect.appendChild(option);
+            });
+            
+            // 添加"Add new"选项
+            const addNewOption = document.createElement('option');
+            addNewOption.value = 'add_new';
+            addNewOption.textContent = '+ Add new ' + (contentType === 'lecture' ? 'course' : 'subcategory');
+            subcategorySelect.appendChild(addNewOption);
+            
+            // 更新Post-Processing默认值
+            await this.updatePostProcessingDefaults(contentType);
                 
-                // 清空并重新填充选项
-                subcategorySelect.innerHTML = '<option value="">Select a ' + 
-                    (contentType === 'lecture' ? 'course' : 'subcategory') + '...</option>';
-                
-                // 处理对象形式的subcategories
-                Object.entries(contentTypeData.subcategories).forEach(([key, subData]) => {
-                    const option = document.createElement('option');
-                    option.value = key;
-                    option.textContent = subData.display_name || key;
-                    subcategorySelect.appendChild(option);
-                });
-                
-                // 添加"其他"选项
-                const otherOption = document.createElement('option');
-                otherOption.value = 'other';
-                otherOption.textContent = 'Other (specify below)';
-                subcategorySelect.appendChild(otherOption);
-                
-            } else {
-                subcategoryContainer.style.display = 'none';
-                document.getElementById('custom-subcategory-input').style.display = 'none';
-            }
         } catch (error) {
             console.error('Error loading subcategories:', error);
+            // 回退到基本显示
+            const subcategoryContainer = document.getElementById('subcategory-container');
+            subcategoryContainer.style.display = 'block';
         }
     }
 
@@ -322,6 +339,108 @@ class WebApp {
             this.notifications.error('Failed to save configuration: ' + error.message);
         } finally {
             loader.hide();
+        }
+    }
+
+    setupAddNewSubcategoryHandlers() {
+        const saveBtn = document.getElementById('save-add-subcategory');
+        const cancelBtn = document.getElementById('cancel-add-subcategory');
+        
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                await this.handleAddNewSubcategory();
+            });
+        }
+        
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                this.cancelAddNewSubcategory();
+            });
+        }
+    }
+
+    async handleAddNewSubcategory() {
+        const nameInput = document.getElementById('new-subcategory-name');
+        const displayInput = document.getElementById('new-subcategory-display');
+        const contentTypeSelect = document.querySelector('select[name="content_type"]');
+        
+        const name = nameInput.value.trim();
+        const displayName = displayInput.value.trim();
+        const contentType = contentTypeSelect.value;
+        
+        if (!name || !displayName) {
+            this.notifications.error('Please fill in both subcategory name and display name');
+            return;
+        }
+        
+        if (!contentType) {
+            this.notifications.error('Please select a content type first');
+            return;
+        }
+        
+        try {
+            const loader = this.loadingManager.show('add-new-subcategory-form', 'Creating subcategory...');
+            
+            // 调用API创建新的subcategory
+            await this.apiClient.post('/api/preferences/subcategory', {
+                content_type: contentType,
+                subcategory: name,
+                display_name: displayName,
+                config: {} // 使用默认配置
+            });
+            
+            this.notifications.success(`Subcategory "${displayName}" created successfully`);
+            
+            // 重新加载subcategory选项
+            await this.updateSubcategoryOptions(contentType);
+            
+            // 自动选择新创建的subcategory
+            const subcategorySelect = document.getElementById('subcategory-select');
+            subcategorySelect.value = name;
+            
+            // 隐藏添加表单
+            document.getElementById('add-new-subcategory-form').style.display = 'none';
+            
+            loader.hide();
+            
+        } catch (error) {
+            console.error('Error creating subcategory:', error);
+            this.notifications.error('Failed to create subcategory: ' + error.message);
+        }
+    }
+
+    cancelAddNewSubcategory() {
+        // 重置选择为空
+        const subcategorySelect = document.getElementById('subcategory-select');
+        subcategorySelect.value = '';
+        
+        // 隐藏添加表单
+        document.getElementById('add-new-subcategory-form').style.display = 'none';
+        
+        // 清空输入框
+        document.getElementById('new-subcategory-name').value = '';
+        document.getElementById('new-subcategory-display').value = '';
+    }
+
+    async updatePostProcessingDefaults(contentType, subcategory = null) {
+        try {
+            // 获取有效配置
+            const response = await this.apiClient.get(`/api/preferences/config/${contentType}${subcategory ? `/${subcategory}` : ''}`);
+            const config = response.data.data || {};
+            
+            // 更新checkbox状态
+            const anonymizationCheck = document.querySelector('input[name="enable_anonymization"]');
+            const summaryCheck = document.querySelector('input[name="enable_summary"]');
+            const mindmapCheck = document.querySelector('input[name="enable_mindmap"]');
+            const diarizationCheck = document.querySelector('input[name="enable_diarization"]');
+            
+            if (anonymizationCheck) anonymizationCheck.checked = config.enable_anonymization !== false;
+            if (summaryCheck) summaryCheck.checked = config.enable_summary !== false;
+            if (mindmapCheck) mindmapCheck.checked = config.enable_mindmap !== false;
+            if (diarizationCheck) diarizationCheck.checked = config.diarization === true;
+            
+        } catch (error) {
+            console.error('Error loading post-processing defaults:', error);
         }
     }
 
