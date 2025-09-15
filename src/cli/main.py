@@ -1,7 +1,7 @@
 #!/usr/bin/env python3.11
 """
-Project Bach - 简化的主入口文件
-支持批量处理和自动监控两种模式
+Project Bach - 主入口文件
+启动文件监控和Web服务器
 """
 
 import os
@@ -10,187 +10,102 @@ import time
 import signal
 import argparse
 import logging
+import threading
 from pathlib import Path
-from typing import List, Dict
 
 # 添加src目录到Python路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from src.core.dependency_container import DependencyContainer, ServiceFactory
 from src.utils.config import ConfigManager
+from src.web_frontend.app import create_app
+from src.network.tailscale_manager import TailscaleManager
 
 
-def check_dependencies() -> List[str]:
-    """检查系统依赖
-    
-    Returns:
-        依赖问题列表，如果为空则表示所有依赖都正常
-    """
-    issues = []
-    
-    # 检查spaCy模型
-    try:
-        import spacy
-        nlp_zh = spacy.load("zh_core_web_sm")
-        print("✅ spaCy中文模型已安装")
-    except ImportError:
-        issues.append("❌ spaCy未安装，请运行: pip install spacy")
-    except OSError:
-        issues.append("❌ spaCy中文模型未安装，请运行: python -m spacy download zh_core_web_sm")
-    
-    try:
-        nlp_en = spacy.load("en_core_web_sm")
-        print("✅ spaCy英文模型已安装")
-    except OSError:
-        issues.append("❌ spaCy英文模型未安装，请运行: python -m spacy download en_core_web_sm")
-    
-    # 检查其他必要依赖
-    required_packages = [
-        ('yaml', 'pyyaml'),
-        ('requests', 'requests'),
-        ('watchdog', 'watchdog'),
-        ('faker', 'faker')
-    ]
-    
-    for import_name, package_name in required_packages:
-        try:
-            __import__(import_name)
-            print(f"✅ {package_name} 已安装")
-        except ImportError:
-            issues.append(f"❌ {package_name} 未安装，请运行: pip install {package_name}")
-    
-    return issues
+def run_monitor_and_web_server(container: DependencyContainer):
+    """运行文件监控和Web服务器
 
-
-def setup_test_environment(watch_folder: Path) -> List[str]:
-    """设置测试环境
-    
-    Args:
-        watch_folder: 监控文件夹路径
-        
-    Returns:
-        创建的测试文件列表
-    """
-    print("设置测试环境...")
-    
-    test_files = [
-        "test_meeting.mp3",
-        "tech_lecture.wav", 
-        "discussion.m4a"
-    ]
-    
-    created_files = []
-    
-    for test_file in test_files:
-        test_path = watch_folder / test_file
-        if not test_path.exists():
-            test_path.write_bytes(b'fake audio data for testing')
-            created_files.append(test_file)
-            print(f"创建测试文件: {test_file}")
-    
-    return created_files
-
-
-def run_batch_mode(container: DependencyContainer) -> bool:
-    """批量处理模式
-    
     Args:
         container: 依赖容器
-        
-    Returns:
-        是否全部处理成功
     """
-    print("=== 批量处理模式 ===")
-    
+    print("=== Project Bach 服务器启动 ===")
+    print("启动文件监控和Web服务器...")
+    print("按 Ctrl+C 停止服务")
+    print()
+
+    # 获取配置
     config_manager = container.get_config_manager()
-    watch_folder = Path(config_manager.get_paths_config()['watch_folder'])
-    
-    # 查找音频文件
-    audio_extensions = ['*.mp3', '*.wav', '*.m4a', '*.flac', '*.aac', '*.ogg']
-    audio_files = []
-    for ext in audio_extensions:
-        audio_files.extend(watch_folder.glob(ext))
-    
-    if not audio_files:
-        print(f"在 {watch_folder} 中没有找到音频文件")
-        created_files = setup_test_environment(watch_folder)
-        if created_files:
-            print("已创建测试文件，请重新运行程序")
-        return True
-    
-    # 获取音频处理器
-    processor = container.get_audio_processor()
-    
-    # 批量处理文件
-    print(f"找到 {len(audio_files)} 个音频文件，开始处理...")
-    print()
-    
-    results = {}
-    for i, audio_file in enumerate(audio_files, 1):
-        print(f"[{i}/{len(audio_files)}] 正在处理: {audio_file.name}")
-        
-        success = processor.process_audio_file(str(audio_file))
-        results[str(audio_file)] = success
-        
-        if success:
-            print(f"✅ 处理完成: {audio_file.name}")
+    if not config_manager:
+        print("❌ 无法获取配置管理器")
+        return
+
+    # 检查Tailscale连接状态
+    print("🔍 检查Tailscale网络连接...")
+    tailscale_config = config_manager.config.get('network', {}).get('tailscale', {})
+    tailscale_manager = TailscaleManager(tailscale_config)
+
+    if not tailscale_manager.check_tailscale_installed():
+        print("❌ Tailscale未安装，无法启动远程模式")
+        print("   请先安装Tailscale: https://tailscale.com/download")
+        return
+
+    status = tailscale_manager.check_status()
+    if not status.get('connected', False):
+        print("⚠️  Tailscale未连接，尝试自动连接...")
+        if tailscale_manager.connect():
+            print("✅ Tailscale连接成功")
         else:
-            print(f"❌ 处理失败: {audio_file.name}")
-        print()
-    
-    # 输出处理摘要
-    success_count = sum(1 for success in results.values() if success)
-    total_count = len(audio_files)
-    
-    print("=== 处理摘要 ===")
-    print(f"总文件数: {total_count}")
-    print(f"成功处理: {success_count}")
-    print(f"失败数量: {total_count - success_count}")
-    print(f"成功率: {success_count/total_count*100:.1f}%")
-    print()
-    
-    # 显示输出路径
-    output_folder = config_manager.get_paths_config()['output_folder']
-    log_file = config_manager.config.get("logging", {}).get("file", "app.log")
-    print(f"结果保存在: {output_folder}")
-    print(f"日志文件: {log_file}")
-    
-    return success_count == total_count
+            print("❌ Tailscale连接失败")
+            print("   请手动运行: tailscale up")
+            return
+    else:
+        print("✅ Tailscale已连接")
+        print(f"   节点IP: {status.get('tailscale_ips', ['未知'])[0] if status.get('tailscale_ips') else '未知'}")
 
-
-def run_monitor_mode(container: DependencyContainer):
-    """文件监控模式
-    
-    Args:
-        container: 依赖容器
-    """
-    print("=== 自动文件监控模式 ===")
-    print("监控文件夹中的新音频文件，自动处理...")
-    print("按 Ctrl+C 停止监控")
     print()
-    
+
     # 获取完全配置的音频处理器（包含文件监控）
     processor = container.get_configured_audio_processor()
-    
+
+    # 创建Flask应用
+    app = create_app(config_manager)
+
+    # Web服务器配置
+    web_config = (config_manager.config or {}).get('web_frontend', {}).get('app', {})
+    host = web_config.get('host', '0.0.0.0')
+    port = web_config.get('port', 8080)
+
     # 设置信号处理器
-    def signal_handler(signum, frame):
-        print("\n正在停止文件监控...")
+    def signal_handler(_signum, _frame):
+        print("\n正在停止服务...")
         processor.stop_file_monitoring()
         sys.exit(0)
-    
+
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    
+
     # 启动文件监控
     if not processor.start_file_monitoring():
         print("❌ 启动文件监控失败")
         return
-    
+
+    print("✅ 文件监控已启动")
+
+    # 在后台线程中启动Web服务器
+    def run_web_server():
+        print(f"🚀 启动Web服务器: http://{host}:{port}")
+        print(f"🔒 私有内容: http://{host}:{port}/private/")
+        print("⚠️  生产模式：需要Tailscale网络访问")
+        app.run(host=host, port=port, debug=False, use_reloader=False)
+
+    web_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_thread.start()
+
     try:
-        # 保持程序运行
+        # 保持程序运行，显示状态
         while True:
             time.sleep(5)
-            
+
             # 显示队列状态
             status = processor.get_queue_status()
             if status.get("queue_stats", {}).get("processing") > 0:
@@ -198,18 +113,18 @@ def run_monitor_mode(container: DependencyContainer):
                 if processing_files:
                     file_names = [Path(f).name for f in processing_files]
                     print(f"正在处理: {', '.join(file_names)}")
-            
+
     except KeyboardInterrupt:
-        print("\n停止监控...")
+        print("\n停止服务...")
         processor.stop_file_monitoring()
 
 
 def validate_config_file(config_path: str) -> bool:
     """验证配置文件
-    
+
     Args:
         config_path: 配置文件路径
-        
+
     Returns:
         配置是否有效
     """
@@ -217,22 +132,22 @@ def validate_config_file(config_path: str) -> bool:
         print(f"❌ 错误: 找不到 {config_path} 配置文件")
         print("请先创建配置文件并填入API密钥")
         return False
-    
+
     try:
         config_manager = ConfigManager(config_path)
-        
+
         # 检查API密钥配置
-        openrouter_config = config_manager.config.get("openrouter", {})
+        openrouter_config = (config_manager.config or {}).get("openrouter", {})
         api_key = openrouter_config.get('key', '')
-        
+
         if api_key == 'YOUR_API_KEY_HERE' or not api_key:
             print("⚠️  警告: 请在 config.yaml 中配置真实的 OpenRouter API 密钥")
             print("当前将使用模拟模式运行...")
         else:
             print("✅ 配置文件验证通过")
-        
+
         return True
-        
+
     except Exception as e:
         print(f"❌ 配置文件验证失败: {str(e)}")
         return False
@@ -241,65 +156,38 @@ def validate_config_file(config_path: str) -> bool:
 def main():
     """主函数"""
     # 解析命令行参数
-    parser = argparse.ArgumentParser(description='Project Bach - 音频处理系统')
-    parser.add_argument('--mode', choices=['batch', 'monitor'], default='batch',
-                       help='运行模式: batch=批量处理（默认），monitor=自动监控')
+    parser = argparse.ArgumentParser(description='Project Bach - 音频处理和Web服务器')
     parser.add_argument('--config', default='config.yaml',
                        help='配置文件路径（默认: config.yaml）')
-    
+
     args = parser.parse_args()
-    
-    print("=== Project Bach - 音频处理系统 ===")
-    print(f"运行模式: {'批量处理' if args.mode == 'batch' else '自动监控'}")
+
+    print("=== Project Bach - 音频处理和Web服务器 ===")
     print()
-    
-    # 检查依赖
-    print("检查系统依赖...")
-    issues = check_dependencies()
-    if issues:
-        print("依赖检查失败:")
-        for issue in issues:
-            print(f"  {issue}")
-        print("\n请解决上述问题后重新运行")
-        return False
-    
+
     # 验证配置文件
     if not validate_config_file(args.config):
         return False
-    
+
     try:
-        # 创建依赖容器
+        # 创建依赖容器（自动处理所有依赖检查和验证）
         container = ServiceFactory.create_container_from_config_file(args.config)
-        print("✅ 依赖容器初始化成功")
-        
-        # 验证依赖
-        validation_results = container.validate_dependencies()
-        failed_deps = [name for name, success in validation_results.items() if not success]
-        
-        if failed_deps:
-            print(f"❌ 依赖验证失败: {', '.join(failed_deps)}")
-            return False
-        
-        print("✅ 所有依赖验证通过")
-        print()
-        
-        # 根据模式运行
-        if args.mode == 'batch':
-            return run_batch_mode(container)
-        else:
-            run_monitor_mode(container)
-            return True
-            
+        print("✅ 系统初始化成功")
+
+        # 运行集成的监控和Web服务器
+        run_monitor_and_web_server(container)
+        return True
+
     except Exception as e:
         print(f"❌ 程序运行失败: {str(e)}")
-        
+
         # 在调试模式下显示详细错误
         import logging
         logger = logging.getLogger('project_bach')
         if logger.isEnabledFor(logging.DEBUG):
             import traceback
             traceback.print_exc()
-        
+
         return False
 
 

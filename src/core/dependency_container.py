@@ -163,8 +163,10 @@ class DependencyContainer:
             audio_processor = self.get_audio_processor()
             
             # 从配置获取支持的音频格式
-            supported_formats_list = self.config_manager.get_nested_config('audio', 'supported_formats')
-            supported_formats = set(supported_formats_list) if supported_formats_list else None
+            supported_formats_list = self.config_manager.get_nested_config('web_frontend', 'upload', 'supported_formats')
+            if not supported_formats_list:
+                raise ValueError("配置文件缺少 web_frontend.upload.supported_formats")
+            supported_formats = set(supported_formats_list)
             
             # 创建文件监控器，传入处理回调和支持的格式
             self._services['file_monitor'] = FileMonitor(
@@ -217,8 +219,10 @@ class DependencyContainer:
             watch_folder = paths_config.get('watch_folder', './watch_folder')
             
             # 从配置获取支持的音频格式
-            supported_formats_list = self.config_manager.get_nested_config('audio', 'supported_formats')
-            supported_formats = set(supported_formats_list) if supported_formats_list else None
+            supported_formats_list = self.config_manager.get_nested_config('web_frontend', 'upload', 'supported_formats')
+            if not supported_formats_list:
+                raise ValueError("配置文件缺少 web_frontend.upload.supported_formats")
+            supported_formats = set(supported_formats_list)
             
             file_monitor = FileMonitor(
                 watch_folder=watch_folder,

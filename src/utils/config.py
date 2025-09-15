@@ -158,7 +158,10 @@ class ConfigManager:
         Returns:
             路径配置字典
         """
-        return (self.config or {}).get('paths', {})
+        paths_config = (self.config or {}).get('paths', {})
+        if not paths_config:
+            self.logger.warning("配置文件缺少 'paths' 配置，使用空字典")
+        return paths_config
 
     # 其他配置建议直接使用:
     # config_manager.config.get('openrouter', {}) 或
@@ -176,10 +179,13 @@ class ConfigManager:
             配置值，如果路径不存在返回None
         """
         current = self.config
-        for key in keys:
+        for i, key in enumerate(keys):
             if isinstance(current, dict) and key in current:
                 current = current[key]
             else:
+                config_path = '.'.join(keys)
+                missing_at = '.'.join(keys[:i+1])
+                self.logger.warning(f"配置路径不存在: {config_path} (在 {missing_at} 处中断)")
                 return None
         return current
 
