@@ -83,15 +83,18 @@ class WebApp {
             autoStart: true
         });
 
-        this.setupComponentInteractions();
+        // 异步设置组件交互
+        this.setupComponentInteractions().catch(error => {
+            console.error('Failed to setup component interactions:', error);
+        });
     }
 
-    setupComponentInteractions() {
-        // 文件上传事件
-        this.components.fileUpload.onFilesChanged((event) => {
+    async setupComponentInteractions() {
+        // 文件上传事件 - 等待组件初始化完成
+        await this.components.fileUpload.onFilesChanged((event) => {
             const { files, count } = event.detail;
             console.log(`Files selected: ${count}`, files);
-            
+
             if (count > 0) {
                 this.components.tabManager.enableTab('audio-processing');
             }

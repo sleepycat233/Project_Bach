@@ -22,8 +22,8 @@ export class FileUploadComponent {
         this.files = [];
         this.notifications = new NotificationManager();
 
-        // 异步初始化，先加载配置
-        this.initWithConfig();
+        // Promise-based异步初始化
+        this.initPromise = this.initWithConfig();
     }
 
     async initWithConfig() {
@@ -50,6 +50,9 @@ export class FileUploadComponent {
 
         // 继续正常初始化
         this.init();
+
+        // 返回this以支持链式调用，表示初始化完成
+        return this;
     }
 
     init() {
@@ -338,8 +341,16 @@ export class FileUploadComponent {
         this.clearFiles();
     }
 
-    // 事件监听器
-    onFilesChanged(callback) {
+    // 事件监听器 - Promise-based优雅解决方案
+    async onFilesChanged(callback) {
+        // 等待组件完全初始化完成
+        await this.initPromise;
+
+        if (!this.dropZone) {
+            console.error('FileUploadComponent: dropZone still not available after initialization');
+            return;
+        }
+
         this.dropZone.addEventListener('filesChanged', callback);
     }
 
