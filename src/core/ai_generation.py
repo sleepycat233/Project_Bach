@@ -72,7 +72,7 @@ class AIContentGenerator:
         self.logger.info(f"开始生成内容摘要，使用模型: {model_name}")
         
         try:
-            prompt = f"请为以下内容生成一个简洁的摘要（300字以内）：\n\n{text}"
+            prompt = f"Please generate a concise summary (within 300 words) for the following content:\n\n{text}"
             
             result = self.client.generate_content(
                 model_type='summary',
@@ -111,8 +111,8 @@ class AIContentGenerator:
         
         try:
             prompt = (
-                f"请将以下内容整理成Markdown格式的思维导图结构，"
-                f"使用#、##、###等标题层级和-列表项：\n\n{text}"
+                f"Please organize the following content into a mind map structure in Markdown format, "
+                f"using #, ##, ### heading levels and - list items:\n\n{text}"
             )
             
             result = self.client.generate_content(

@@ -1,0 +1,196 @@
+{% extends "base/github_base.html" %}
+
+{% block title %}{{ content.title }} - Project Bach{% endblock %}
+{% block description %}{{ content.summary | truncate(200) if content.summary else 'AI-powered content analysis result' }}{% endblock %}
+
+{% block page_title %}{{ content.title }}{% endblock %}
+{% block page_subtitle %}
+    {% if content.content_type %}{{ content.content_type | title }} Analysis{% endif %}
+{% endblock %}
+
+{% block main_content %}
+<article class="content-article">
+    <header class="content-header card">
+        <div class="content-meta">
+            <div class="meta-row">
+                <span class="meta-item">
+                    <span class="meta-icon">📅</span>
+                    {{ content.processed_time | format_date('%Y-%m-%d %H:%M') if content.processed_time else 'Recently' }}
+                </span>
+                <span class="meta-item">
+                    <span class="meta-icon">🎵</span>
+                    {{ content.original_file or 'Audio File' }}
+                </span>
+                {% if content.file_size %}
+                <span class="meta-item">
+                    <span class="meta-icon">📦</span>
+                    {{ content.file_size | file_size }}
+                </span>
+                {% endif %}
+                {% if content.audio_duration %}
+                <span class="meta-item">
+                    <span class="meta-icon">⏱️</span>
+                    {{ content.audio_duration }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    {% if content.summary %}
+    <section class="content-section card">
+        <h2 class="section-title">
+            <span class="section-icon">📄</span>
+            Content Summary
+        </h2>
+        <div class="section-content">
+            {{ content.summary | markdown | safe }}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if content.mindmap %}
+    <section class="content-section card">
+        <h2 class="section-title">
+            <span class="section-icon">🧠</span>
+            Mind Map
+        </h2>
+        <div class="section-content">
+            {{ content.mindmap | markdown | safe }}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if content.anonymized_names and content.anonymized_names | length > 0 %}
+    <section class="content-section card">
+        <h2 class="section-title">
+            <span class="section-icon">🔒</span>
+            Name Anonymization
+        </h2>
+        <div class="section-content">
+            <p>This processing anonymized <strong>{{ content.anonymized_names | length }}</strong> personal names:</p>
+
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Anonymized Name</th>
+                        <th>Type</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for original, anonymous in content.anonymized_names.items() %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><code>{{ anonymous }}</code></td>
+                        <td>Name</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <p class="privacy-note">
+                💡 For privacy protection, all personal names have been replaced with virtual names
+            </p>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if content.diarization_enabled and content.speakers_info %}
+    <section class="content-section card">
+        <h2 class="section-title">
+            <span class="section-icon">🎙️</span>
+            Speaker Diarization
+        </h2>
+        <div class="section-content">
+            <p>Detected <strong>{{ content.speakers_info.speaker_count or 'multiple' }}</strong> speakers in this audio:</p>
+
+            {% if content.speakers_info.speaker_segments %}
+            <div class="speaker-timeline">
+                {% for segment in content.speakers_info.speaker_segments[:10] %}
+                <div class="speaker-segment">
+                    <span class="speaker-label">{{ segment.speaker }}</span>
+                    <span class="time-range">{{ segment.start_time }} - {{ segment.end_time }}</span>
+                    {% if segment.text %}
+                    <div class="segment-text">{{ segment.text | truncate(100) }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+                {% if content.speakers_info.speaker_segments | length > 10 %}
+                <div class="more-segments">
+                    ... and {{ content.speakers_info.speaker_segments | length - 10 }} more segments
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if content.statistics or content.processing_duration or content.transcript_stats %}
+    <section class="content-section card">
+        <h2 class="section-title">
+            <span class="section-icon">📊</span>
+            Processing Statistics
+        </h2>
+        <div class="section-content">
+            <table class="data-table">
+                <tbody>
+                    {% if content.summary %}
+                    <tr>
+                        <td>Summary Length</td>
+                        <td>{{ content.summary | length }} characters</td>
+                    </tr>
+                    {% endif %}
+                    {% if content.mindmap %}
+                    <tr>
+                        <td>Mind Map Length</td>
+                        <td>{{ content.mindmap | length }} characters</td>
+                    </tr>
+                    {% endif %}
+                    {% if content.anonymized_names %}
+                    <tr>
+                        <td>Anonymized Names</td>
+                        <td>{{ content.anonymized_names | length }} names</td>
+                    </tr>
+                    {% endif %}
+                    {% if content.processing_duration %}
+                    <tr>
+                        <td>Processing Time</td>
+                        <td>{{ content.processing_duration }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if content.transcript_stats and content.transcript_stats.word_count %}
+                    <tr>
+                        <td>Transcript Word Count</td>
+                        <td>{{ content.transcript_stats.word_count }} words</td>
+                    </tr>
+                    {% endif %}
+                    {% if content.whisper_model %}
+                    <tr>
+                        <td>Transcription Model</td>
+                        <td>{{ content.whisper_model }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if content.language %}
+                    <tr>
+                        <td>Detected Language</td>
+                        <td>{{ content.language | title }}</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+</article>
+
+<!-- Navigation -->
+<div class="content-navigation">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">🔙 Back to Home</a>
+    {% if content.content_type %}
+    <a href="{{ url_for(content.content_type + 's') }}" class="btn btn-secondary">📋 View All {{ content.content_type | title }}s</a>
+    {% endif %}
+</div>
+{% endblock %}
