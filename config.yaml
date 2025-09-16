@@ -84,7 +84,7 @@ web_frontend:
 
   # 文件上传配置
   upload:
-    max_file_size: 524288000     # 500MB (500 * 1024 * 1024)
+    max_file_size: 1073741824    # 1GB (1024 * 1024 * 1024)
     supported_formats: [".mp3", ".wav", ".m4a", ".mp4", ".flac", ".aac", ".ogg", ".wma"]
 
   # 安全配置
@@ -116,7 +116,6 @@ network:
     timeout: 60  # 传输超时时间（秒）
     retry_attempts: 3  # 重试次数
     verify_integrity: true  # 是否验证文件完整性
-    max_file_size: 104857600  # 最大文件大小限制（100MB）
 
   security:
     allowed_networks: ["100.64.0.0/10"]  # Tailscale CGNAT范围

@@ -28,7 +28,7 @@
                 </div>
                 
                 <div class="form-group">
-                    <small style="color: var(--text-secondary); text-align: center; display: block;">Supported: MP3, WAV, M4A, MP4, FLAC, AAC, OGG (Max 500MB)</small>
+                    <small style="color: var(--text-secondary); text-align: center; display: block;">Supported: MP3, WAV, M4A, MP4, FLAC, AAC, OGG (Max 1GB)</small>
                 </div>
                 
                 <!-- Upload success/error message area -->
@@ -385,64 +385,8 @@
         event.target.classList.add('active');
     }
 
-    // Drag and Drop functionality for audio upload
-    function setupDragAndDrop() {
-        const dropZone = document.getElementById('audio-drop-zone');
-        const fileInput = document.getElementById('audio-file-input');
-        
-        if (!dropZone || !fileInput) return;
-        
-        // Click to open file dialog
-        dropZone.addEventListener('click', () => fileInput.click());
-        
-        // Prevent default drag behaviors
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, e => {
-                e.preventDefault();
-                e.stopPropagation();
-            });
-        });
-        
-        // Visual feedback for drag over
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => {
-                dropZone.classList.add('dragover');
-            });
-        });
-        
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => {
-                dropZone.classList.remove('dragover');
-            });
-        });
-        
-        // Handle dropped files
-        dropZone.addEventListener('drop', (e) => {
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                updateDropZoneText(files[0].name);
-            }
-        });
-        
-        // File input change
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                updateDropZoneText(e.target.files[0].name);
-            }
-        });
-    }
-    
-    function updateDropZoneText(filename) {
-        const dropZone = document.getElementById('audio-drop-zone');
-        const content = dropZone.querySelector('.drop-zone-content');
-        
-        content.innerHTML = `
-            <span class="drop-icon">✅</span>
-            <div class="drop-text">File Selected</div>
-            <div class="drop-hint">${filename}</div>
-        `;
-    }
+    // Note: Drag and Drop functionality is now handled by FileUploadComponent in web-app.js
+    // to prevent duplicate event binding conflicts
 
     // GitHub配置检查功能
     async function checkGitHubConfig() {
@@ -504,13 +448,12 @@
         }
     }
 
-    // Initialize drag & drop on page load
-    // Note: All form handling, model selection, and YouTube functionality
+    // Initialize page functionality on load
+    // Note: All form handling, model selection, and file upload functionality
     // is now managed by web-app.js WebApp class to prevent conflicts
     document.addEventListener('DOMContentLoaded', () => {
-        setupDragAndDrop();
         checkGitHubConfig(); // 检查GitHub配置
-        console.log('Upload page: Drag & drop initialized, GitHub config checked, other functionality handled by WebApp');
+        console.log('Upload page: GitHub config checked, other functionality handled by WebApp');
     });
 
     // Global functions for backward compatibility
