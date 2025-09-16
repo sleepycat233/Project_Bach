@@ -4,21 +4,51 @@
  */
 
 import { fileUtils, NotificationManager } from '../shared.js';
+import configManager from '../utils/ConfigManager.js';
 
 export class FileUploadComponent {
     constructor(options = {}) {
-        this.options = {
+        // 默认配置（作为fallback）
+        this.defaultOptions = {
             dropZoneId: 'audio-drop-zone',
             fileInputId: 'audio-file-input',
             allowedExtensions: ['mp3', 'wav', 'm4a', 'mp4', 'flac', 'aac', 'ogg'],
-            maxFileSize: 500 * 1024 * 1024, // 500MB
+            maxFileSize: 1024 * 1024 * 1024, // 1GB
             multipleFiles: false,
-            showPreview: true,
-            ...options
+            showPreview: true
         };
 
+        this.options = { ...this.defaultOptions, ...options };
         this.files = [];
         this.notifications = new NotificationManager();
+
+        // 异步初始化，先加载配置
+        this.initWithConfig();
+    }
+
+    async initWithConfig() {
+        try {
+            // 使用centralized ConfigManager
+            const config = await configManager.loadConfig();
+
+            if (config) {
+                const uploadConfig = configManager.getUploadConfig();
+                // 更新配置
+                this.options.maxFileSize = uploadConfig.max_file_size;
+                this.options.allowedExtensions = uploadConfig.allowed_extensions;
+                this.maxFileSizeDisplay = uploadConfig.max_file_size_display;
+
+                console.log('Frontend config loaded via ConfigManager:', uploadConfig);
+            } else {
+                console.warn('Failed to load frontend config, using defaults');
+                this.maxFileSizeDisplay = '1GB';
+            }
+        } catch (error) {
+            console.warn('Error loading frontend config:', error);
+            this.maxFileSizeDisplay = '1GB';
+        }
+
+        // 继续正常初始化
         this.init();
     }
 
@@ -139,7 +169,7 @@ export class FileUploadComponent {
         if (file.size > this.options.maxFileSize) {
             return {
                 isValid: false,
-                error: `File too large. Maximum size: ${fileUtils.formatFileSize(this.options.maxFileSize)}`
+                error: `File too large. Maximum size: ${this.maxFileSizeDisplay || fileUtils.formatFileSize(this.options.maxFileSize)}`
             };
         }
 

@@ -64,13 +64,13 @@ def create_app(config=None):
         
         # 从配置读取文件大小限制 - ConfigManager负责提供默认值
         upload_config = config_manager.get_nested_config('web_frontend', 'upload') or {}
-        max_file_size = upload_config.get('max_file_size') or (500 * 1024 * 1024)
+        max_file_size = upload_config.get('max_file_size') or (1024 * 1024 * 1024)  # 1GB default
         app.config['MAX_CONTENT_LENGTH'] = max_file_size
             
     except Exception as e:
         logger.warning(f"Failed to load config manager: {e}")
         app.config['CONFIG_MANAGER'] = None
-        app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
+        app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB default
 
 
     # 初始化处理服务
@@ -319,6 +319,45 @@ def create_app(config=None):
         except Exception as e:
             logger.error(f"Debug config API error: {e}")
             return jsonify(create_api_response(success=False, error=str(e))), 500
+
+    @app.route('/api/config/frontend')
+    def api_frontend_config():
+        """前端配置API - 提供动态配置给JavaScript"""
+        try:
+            config_manager = app.config.get('CONFIG_MANAGER')
+
+            # 获取上传配置
+            upload_config = config_manager.get_nested_config('web_frontend', 'upload') if config_manager else {}
+            max_file_size = upload_config.get('max_file_size') or (1024 * 1024 * 1024)  # 1GB default
+            supported_formats = upload_config.get('supported_formats') or ['.mp3', '.wav', '.m4a', '.mp4', '.flac', '.aac', '.ogg']
+
+            # 格式化文件大小显示
+            def format_file_size(bytes):
+                if bytes >= 1024**3:
+                    return f"{bytes // (1024**3)}GB"
+                elif bytes >= 1024**2:
+                    return f"{bytes // (1024**2)}MB"
+                else:
+                    return f"{bytes // 1024}KB"
+
+            frontend_config = {
+                'upload': {
+                    'max_file_size': max_file_size,
+                    'max_file_size_display': format_file_size(max_file_size),
+                    'supported_formats': supported_formats,
+                    'allowed_extensions': [fmt.lstrip('.') for fmt in supported_formats]  # 去掉点号
+                }
+            }
+
+            return jsonify(create_api_response(success=True, data=frontend_config))
+
+        except Exception as e:
+            logger.error(f"Frontend config API error: {e}")
+            return jsonify(create_api_response(
+                success=False,
+                error=str(e),
+                data={'upload': {'max_file_size': 1073741824, 'max_file_size_display': '1GB'}}  # fallback
+            )), 500
 
     @app.route('/api/results/recent')
     def api_recent_results():
