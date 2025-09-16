@@ -77,7 +77,7 @@ class YouTubeHandler:
             try:
                 # 获取processing service用于日志记录
                 try:
-                    from ...core.processing_service import get_processing_service
+                    from ..core.processing_service import get_processing_service
                     processing_service = get_processing_service()
                 except ImportError:
                     processing_service = None
@@ -109,7 +109,7 @@ class YouTubeHandler:
                                     result['upload_metadata'] = {'content_type': content_type}
                                 
                                 # 集成AudioProcessor进行AI内容生成
-                                from ...core.dependency_container import DependencyContainer
+                                from ..core.dependency_container import DependencyContainer
                                 container = DependencyContainer(self.config_manager)
                                 audio_processor = container.get_configured_audio_processor()
                                 

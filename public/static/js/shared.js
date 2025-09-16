@@ -645,14 +645,16 @@ export const domUtils = {
 export class DarkModeManager {
     constructor() {
         this.key = 'darkMode';
-        this.prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        this.currentMode = this.getStoredMode() || (this.prefersDark ? 'dark' : 'light');
+        // 已禁用自动根据系统主题切换
+        // this.prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        this.currentMode = this.getStoredMode() || 'light'; // 默认为light模式
         this.init();
     }
 
     init() {
         this.applyMode(this.currentMode);
-        this.setupSystemListener();
+        // 已禁用系统主题监听
+        // this.setupSystemListener();
         this.bindExistingButtons();
     }
 
@@ -709,6 +711,8 @@ export class DarkModeManager {
     }
 
     setupSystemListener() {
+        // 已禁用系统偏好监听
+        /*
         // 监听系统偏好变化，但只在没有手动设置时响应
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
             const stored = this.getStoredMode();
@@ -717,6 +721,7 @@ export class DarkModeManager {
                 this.applyMode(e.matches ? 'dark' : 'light');
             }
         });
+        */
     }
 
     bindExistingButtons() {

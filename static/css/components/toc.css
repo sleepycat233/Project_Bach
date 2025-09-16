@@ -338,16 +338,19 @@
 }
 
 /* ===== 暗色模式适配 ===== */
+/* 已禁用自动根据系统主题切换 */
+/*
 @media (prefers-color-scheme: dark) {
     .toc-link:hover {
         background-color: rgba(255, 255, 255, 0.1);
     }
-    
+
     .toc-link.active {
         background-color: rgba(255, 255, 255, 0.15);
     }
-    
+
     .toc-toggle:hover {
         background-color: rgba(255, 255, 255, 0.1);
     }
 }
+*/
