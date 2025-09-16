@@ -1,7 +1,6 @@
 /**
  * Dynamic Content Loader
  * 动态内容加载功能 - 支持在侧栏点击内容时动态加载到中间区域
- * 支持直接加载和渲染Markdown文件
  */
 
 class DynamicContentLoader {
@@ -45,6 +44,13 @@ class DynamicContentLoader {
                 
                 this.loadContent(url, title, type);
             }
+            
+            // 绑定面包屑点击事件
+            if (e.target.closest('.breadcrumb-item')) {
+                e.preventDefault();
+                const breadcrumbItem = e.target.closest('.breadcrumb-item');
+                this.handleBreadcrumbClick(breadcrumbItem);
+            }
         });
 
         // 绑定搜索功能
@@ -65,6 +71,116 @@ class DynamicContentLoader {
 
         // 绑定全局返回Hub功能
         window.showWelcome = () => this.showWelcome();
+    }
+
+    /**
+     * 生成面包屑导航HTML
+     * @param {string} title - 内容标题
+     */
+    generateBreadcrumb(title) {
+        const breadcrumbParts = [];
+        
+        // 动态查找当前激活项的层级结构
+        const activeLink = document.querySelector('.content-item-link.active') || 
+                          document.querySelector('.nav-tree-link.active');
+        
+        if (activeLink) {
+            // 向上遍历DOM树，收集层级信息
+            let current = activeLink;
+            const hierarchy = [];
+            
+            while (current) {
+                // 查找父级菜单项
+                const parentSubmenu = current.closest('.nav-tree-submenu');
+                if (parentSubmenu) {
+                    const toggleButton = document.querySelector(`[data-target="${parentSubmenu.id}"]`);
+                    if (toggleButton) {
+                        const label = toggleButton.querySelector('.nav-tree-label')?.textContent?.trim();
+                        if (label && !hierarchy.includes(label)) {
+                            hierarchy.unshift(label); // 添加到开头，保持正确顺序
+                        }
+                    }
+                    current = parentSubmenu.parentNode;
+                } else {
+                    break;
+                }
+            }
+            
+            // 添加收集到的层级
+            breadcrumbParts.push(...hierarchy);
+        }
+        
+        // 添加内容标题
+        breadcrumbParts.push(title);
+        
+        // 生成HTML，中间项设为可点击
+        return breadcrumbParts.map((part, index) => {
+            if (index === breadcrumbParts.length - 1) {
+                // 最后一项，当前页面，不可点击
+                return `<span class="breadcrumb-current">${this.escapeHtml(part)}</span>`;
+            } else {
+                // 中间项，可点击
+                return `<span class="breadcrumb-item" data-breadcrumb-level="${index}" data-breadcrumb-text="${this.escapeHtml(part)}">${this.escapeHtml(part)}</span>`;
+            }
+        }).join(' <span class="breadcrumb-separator">/</span> ').trim();
+    }
+
+    /**
+     * 处理面包屑点击事件
+     * @param {Element} breadcrumbItem - 被点击的面包屑项
+     */
+    handleBreadcrumbClick(breadcrumbItem) {
+        const level = parseInt(breadcrumbItem.getAttribute('data-breadcrumb-level'));
+        const text = breadcrumbItem.getAttribute('data-breadcrumb-text');
+        
+        console.log(`Breadcrumb clicked: Level ${level}, Text: ${text}`);
+        
+        // 根据层级执行不同的操作
+        if (level === 0) {
+            // 点击了顶级分类（如 Lectures, Videos）
+            this.showWelcome(); // 返回欢迎页面，展示该分类
+        } else if (level === 1) {
+            // 点击了子分类（如 CS101, PHYS101）  
+            // 可以展开该分类但不加载具体内容
+            this.expandCategoryInNavigation(text);
+        }
+        // level === 2 是当前页面，不需要处理
+    }
+
+    /**
+     * 在导航树中展开指定分类
+     * @param {string} categoryName - 分类名称
+     */
+    expandCategoryInNavigation(categoryName) {
+        // 找到对应的toggle按钮并展开
+        const toggles = document.querySelectorAll('.nav-tree-toggle');
+        
+        toggles.forEach(toggle => {
+            const label = toggle.querySelector('.nav-tree-label');
+            if (label && label.textContent.trim() === categoryName) {
+                // 找到了，确保展开
+                const targetId = toggle.getAttribute('data-target');
+                const submenu = document.getElementById(targetId);
+                
+                if (submenu && submenu.classList.contains('collapsed')) {
+                    // 如果是折叠状态，则展开
+                    toggle.setAttribute('aria-expanded', 'true');
+                    submenu.classList.remove('collapsed');
+                    
+                    const expandIcon = toggle.querySelector('.nav-expand-icon');
+                    if (expandIcon) {
+                        expandIcon.textContent = '⌄';
+                    }
+                }
+                
+                // 高亮该按钮
+                toggle.classList.add('active');
+                setTimeout(() => toggle.classList.remove('active'), 1000);
+            }
+        });
+        
+        // 返回到欢迎页面
+        this.showWelcome();
     }
 
     /**
@@ -93,121 +209,18 @@ class DynamicContentLoader {
             </div>
         `;
         
-        // 将HTML URL转换为Markdown URL
-        const markdownUrl = url.replace('_result.html', '_result.md');
-        
-        // 通过AJAX加载Markdown内容
-        fetch(markdownUrl)
+        // 直接加载HTML内容
+        fetch(url)
             .then(response => {
                 if (!response.ok) {
-                    // 如果Markdown文件不存在，回退到HTML加载
-                    return fetch(url).then(htmlResponse => {
-                        if (!htmlResponse.ok) {
-                            throw new Error(`HTTP ${htmlResponse.status}: ${htmlResponse.statusText}`);
-                        }
-                        return { content: htmlResponse.text(), type: 'html' };
-                    });
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                return { content: response.text(), type: 'markdown' };
+                return response.text();
             })
-            .then(async result => {
-                const content = await result.content;
-                if (result.type === 'markdown') {
-                    this.renderMarkdownContent(content, title, type, markdownUrl);
-                } else {
-                    this.renderLoadedContent(content, title, type, url);
-                }
+            .then(content => {
+                this.renderLoadedContent(content, title, type, url);
             })
             .catch(error => this.renderErrorContent(error, title, url));
-    }
-
-    /**
-     * 渲染Markdown内容
-     * @param {string} markdown - Markdown内容
-     * @param {string} title - 内容标题
-     * @param {string} type - 内容类型
-     * @param {string} url - 原始URL
-     */
-    renderMarkdownContent(markdown, title, type, url) {
-        // 简单的Markdown到HTML转换
-        const html = this.parseMarkdown(markdown);
-        
-        this.dynamicContent.innerHTML = `
-            <div class="content-header">
-                <button class="back-btn btn btn-secondary" onclick="showWelcome()">
-                    <span>← Back to Hub</span>
-                </button>
-                <div class="content-title-area">
-                    <h1>${this.escapeHtml(title)}</h1>
-                    <span class="content-type-badge badge-${type}">${type.charAt(0).toUpperCase() + type.slice(1)}</span>
-                </div>
-            </div>
-            <div class="loaded-content markdown-content">
-                ${html}
-            </div>
-        `;
-        
-        // 重新生成TOC
-        this.updateTOC();
-    }
-
-    /**
-     * 简单的Markdown解析器
-     * @param {string} markdown - Markdown文本
-     * @returns {string} HTML文本
-     */
-    parseMarkdown(markdown) {
-        let html = markdown;
-        
-        // 处理标题
-        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-        html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
-        html = html.replace(/^##### (.+)$/gm, '<h5>$1</h5>');
-        html = html.replace(/^###### (.+)$/gm, '<h6>$1</h6>');
-        
-        // 处理加粗和斜体
-        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-        
-        // 处理代码块
-        html = html.replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>');
-        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-        
-        // 处理链接
-        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-        
-        // 处理列表
-        html = html.replace(/^[-*+] (.+)$/gm, '<li>$1</li>');
-        html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-        
-        // 处理表格
-        html = html.replace(/\|(.+)\|/g, (match, content) => {
-            const cells = content.split('|').map(cell => cell.trim());
-            return '<tr>' + cells.map(cell => `<td>${cell}</td>`).join('') + '</tr>';
-        });
-        html = html.replace(/(<tr>.*<\/tr>)/s, '<table class="markdown-table">$1</table>');
-        
-        // 处理分隔线
-        html = html.replace(/^---+$/gm, '<hr>');
-        
-        // 处理换行和段落
-        html = html.replace(/\n\n/g, '</p><p>');
-        html = '<p>' + html + '</p>';
-        html = html.replace(/<p><\/p>/g, '');
-        html = html.replace(/<p>(<h[1-6]>)/g, '$1');
-        html = html.replace(/(<\/h[1-6]>)<\/p>/g, '$1');
-        html = html.replace(/<p>(<ul>)/g, '$1');
-        html = html.replace(/(<\/ul>)<\/p>/g, '$1');
-        html = html.replace(/<p>(<pre>)/g, '$1');
-        html = html.replace(/(<\/pre>)<\/p>/g, '$1');
-        html = html.replace(/<p>(<table)/g, '$1');
-        html = html.replace(/(<\/table>)<\/p>/g, '$1');
-        html = html.replace(/<p>(<hr>)/g, '$1');
-        html = html.replace(/(<hr>)<\/p>/g, '$1');
-        
-        return html;
     }
 
     /**
@@ -238,11 +251,13 @@ class DynamicContentLoader {
         }
         
         if (mainContent) {
+            const breadcrumbHtml = this.generateBreadcrumb(title);
+            
             this.dynamicContent.innerHTML = `
                 <div class="content-header">
-                    <button class="back-btn btn btn-secondary" onclick="showWelcome()">
-                        <span>← Back to Hub</span>
-                    </button>
+                    <div class="content-breadcrumb">
+                        ${breadcrumbHtml}
+                    </div>
                     <div class="content-title-area">
                         <h1>${this.escapeHtml(title)}</h1>
                         <span class="content-type-badge badge-${type}">${type.charAt(0).toUpperCase() + type.slice(1)}</span>
@@ -268,9 +283,6 @@ class DynamicContentLoader {
         
         this.dynamicContent.innerHTML = `
             <div class="content-header">
-                <button class="back-btn btn btn-secondary" onclick="showWelcome()">
-                    <span>← Back to Hub</span>
-                </button>
                 <div class="content-title-area">
                     <h1>${this.escapeHtml(title)}</h1>
                 </div>
@@ -303,7 +315,7 @@ class DynamicContentLoader {
         
         // 完全清空动态内容，移除所有动态内容类
         this.dynamicContent.innerHTML = '';
-        this.dynamicContent.classList.remove('loaded-content', 'markdown-content');
+        this.dynamicContent.classList.remove('loaded-content');
         
         // 重新生成TOC，这次会显示静态内容的TOC
         this.updateTOC();

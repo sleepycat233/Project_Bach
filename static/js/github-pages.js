@@ -13,63 +13,193 @@ class GitHubPagesNavigation {
         this.sidebarOpen = false;
         this.searchActive = false;
         this.scrollObserver = null;
+        this.sidebarCollapsed = false;
+        this.isMobile = window.innerWidth <= 768;
         this.init();
     }
 
     init() {
-        this.setupMobileNavigation();
+        this.initSidebar();
         this.setupSidebarInteractions();
         this.setupNavigationTree();
         this.setupSearchFunctionality();
         this.setupKeyboardShortcuts();
         this.setupTOC();
     }
-
-    setupMobileNavigation() {
-        const toggleButton = document.querySelector('.mobile-menu-toggle');
-        const leftSidebar = document.querySelector('.left-sidebar');
-
-        if (toggleButton && leftSidebar) {
-            toggleButton.addEventListener('click', () => {
-                this.toggleSidebar();
-            });
-
-            // 点击内容区域关闭侧边栏
-            document.addEventListener('click', (e) => {
-                if (this.sidebarOpen && 
-                    !leftSidebar.contains(e.target) && 
-                    !toggleButton.contains(e.target)) {
-                    this.closeSidebar();
-                }
-            });
+    
+    initSidebar() {
+        this.sidebar = document.getElementById('sidebarContainer');
+        this.sidebarToggle = document.getElementById('sidebarToggle');
+        
+        if (!this.sidebar || !this.sidebarToggle) {
+            console.warn('Sidebar elements not found');
+            return;
+        }
+        
+        // 从localStorage读取状态
+        const savedState = localStorage.getItem('sidebarCollapsed');
+        if (savedState !== null) {
+            this.sidebarCollapsed = savedState === 'true';
+        } else {
+            // 移动端默认隐藏
+            this.sidebarCollapsed = this.isMobile;
+        }
+        
+        this.updateSidebarState();
+        
+        // 绑定切换按钮事件
+        this.sidebarToggle.addEventListener('click', () => {
+            this.toggleSidebar();
+        });
+        
+        // 窗口大小变化事件
+        window.addEventListener('resize', () => {
+            const currentIsMobile = window.innerWidth <= 768;
+            if (!this.isMobile && currentIsMobile && !this.sidebarCollapsed) {
+                // 从桌面切换到移动端时自动隐藏
+                this.sidebarCollapsed = true;
+                this.updateSidebarState();
+            }
+            this.isMobile = currentIsMobile;
+        });
+    }
+    
+    toggleSidebar() {
+        this.sidebarCollapsed = !this.sidebarCollapsed;
+        this.updateSidebarState();
+        localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed);
+    }
+    
+    updateSidebarState() {
+        if (this.sidebarCollapsed) {
+            this.sidebar.classList.add('hidden');
+            this.sidebarToggle.classList.add('collapsed');
+        } else {
+            this.sidebar.classList.remove('hidden');
+            this.sidebarToggle.classList.remove('collapsed');
         }
     }
 
     setupNavigationTree() {
-        // 设置导航树折叠/展开功能
-        const treeToggles = document.querySelectorAll('.nav-tree-toggle');
-        
-        treeToggles.forEach(toggle => {
-            toggle.addEventListener('click', () => {
+        const nav = document.querySelector('.sidebar-container');
+        if (!nav) return;
+
+        // 核心函数：根据指定的链接元素，更新整个树的状态
+        const setTreeState = (targetElement) => {
+            if (!targetElement) return;
+
+            // 如果是toggle按钮，获取其父级li
+            const targetItem = targetElement.closest('.nav-tree-item');
+            if (!targetItem) return;
+
+            // 1. 清除所有active和is-active-path状态（但保留is-open状态用于折叠控制）
+            nav.querySelectorAll('.active, .is-active-path').forEach(el => {
+                el.classList.remove('active', 'is-active-path');
+            });
+
+            // 2. 设置新的激活项
+            targetItem.classList.add('active');
+
+            // 3. 沿着路径向上，设置父级的is-active-path状态
+            let current = targetItem.parentElement;
+            while (current && current !== nav) {
+                if (current.classList.contains('nav-tree-submenu')) {
+                    current.classList.add('is-active-path');
+                }
+                const parentItem = current.closest('.nav-tree-item');
+                if (parentItem) {
+                    parentItem.classList.add('is-active-path');
+                }
+                current = current.parentElement;
+            }
+        };
+
+        // 事件委托：处理所有在导航树内的点击
+        nav.addEventListener('click', (event) => {
+            const toggle = event.target.closest('.nav-tree-toggle');
+            
+            if (toggle) {
+                event.preventDefault();
+                const parentLi = toggle.closest('.nav-tree-item');
                 const targetId = toggle.dataset.target;
                 const submenu = document.getElementById(targetId);
-                const expanded = toggle.getAttribute('aria-expanded') === 'true';
                 
-                if (submenu) {
-                    toggle.setAttribute('aria-expanded', !expanded);
-                    submenu.classList.toggle('collapsed', expanded);
+                if (parentLi && submenu) {
+                    const isOpen = parentLi.classList.contains('is-open');
                     
-                    // 更新图标
-                    const expandIcon = toggle.querySelector('.nav-expand-icon');
-                    if (expandIcon) {
-                        expandIcon.textContent = expanded ? '▶' : '▼';
+                    // 手风琴效果：关闭同级的其他菜单
+                    const parentContainer = parentLi.parentElement;
+                    if (parentContainer && !isOpen) {
+                        // 只在打开时关闭其他菜单
+                        parentContainer.querySelectorAll(':scope > .nav-tree-item.is-open').forEach(sibling => {
+                            if (sibling !== parentLi) {
+                                sibling.classList.remove('is-open');
+                                const siblingToggle = sibling.querySelector(':scope > .nav-tree-toggle');
+                                if (siblingToggle) {
+                                    siblingToggle.setAttribute('aria-expanded', 'false');
+                                }
+                            }
+                        });
+                    }
+                    
+                    // 切换当前菜单的折叠状态
+                    parentLi.classList.toggle('is-open');
+                    toggle.setAttribute('aria-expanded', !isOpen);
+                    
+                    // 设置为当前激活项
+                    setTreeState(toggle);
+                }
+            } else {
+                // 处理链接点击
+                const link = event.target.closest('.nav-tree-link');
+                if (link) {
+                    // 对于所有链接（包括content-item-link），设置高亮状态
+                    setTreeState(link);
+                    
+                    // 处理链接点击 - 移动端点击后自动关闭侧边栏
+                    if (link && this.isMobile && !this.sidebarCollapsed) {
+                        // 延迟关闭，让用户看到点击效果
+                        setTimeout(() => {
+                            this.toggleSidebar();
+                        }, 200);
                     }
                 }
-            });
+            }
         });
 
-        // 活动链接高亮
+        // 初始化：展开包含活动链接的所有父级
         this.highlightActiveNavItems();
+        
+        // 确保初始状态正确
+        this.initializeNavigationState();
+    }
+
+    initializeNavigationState() {
+        // 初始化导航树状态，确保展开包含活动链接的分支
+        const activeLink = document.querySelector('.nav-tree-link.active, .nav-tree-link.current');
+        if (activeLink) {
+            let parent = activeLink.closest('.nav-tree-item');
+            while (parent) {
+                // 向上遍历，展开所有父级
+                const parentItem = parent.parentElement.closest('.nav-tree-item');
+                if (parentItem) {
+                    parentItem.classList.add('is-open', 'is-active-path');
+                    const toggle = parentItem.querySelector(':scope > .nav-tree-toggle');
+                    if (toggle) {
+                        toggle.setAttribute('aria-expanded', 'true');
+                    }
+                }
+                parent = parentItem;
+            }
+        }
+
+        // 同步所有is-open状态到aria-expanded
+        document.querySelectorAll('.nav-tree-item.is-open').forEach(item => {
+            const toggle = item.querySelector(':scope > .nav-tree-toggle');
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', 'true');
+            }
+        });
     }
 
     setupSidebarInteractions() {
@@ -144,7 +274,7 @@ class GitHubPagesNavigation {
                 }
             }
 
-            // Escape key to close search or sidebar
+            // Escape key to close search
             if (e.key === 'Escape') {
                 if (this.searchActive) {
                     const searchInput = document.querySelector('#nav-search');
@@ -153,8 +283,6 @@ class GitHubPagesNavigation {
                         searchInput.value = '';
                         this.clearNavSearch();
                     }
-                } else if (this.sidebarOpen) {
-                    this.closeSidebar();
                 }
             }
 
@@ -173,34 +301,86 @@ class GitHubPagesNavigation {
     setupTOC() {
         this.generateTOC();
         this.setupTOCInteractions();
+        this.initTOCToggle();
     }
-
-    toggleSidebar() {
-        const leftSidebar = document.querySelector('.left-sidebar');
-        if (leftSidebar) {
-            this.sidebarOpen = !this.sidebarOpen;
-            leftSidebar.classList.toggle('open', this.sidebarOpen);
-            
-            // 更新切换按钮图标
-            const toggleButton = document.querySelector('.mobile-menu-toggle');
-            if (toggleButton) {
-                toggleButton.innerHTML = this.sidebarOpen ? '✕' : '☰';
+    
+    initTOCToggle() {
+        const tocContainer = document.getElementById('tocContainer');
+        const tocToggle = document.getElementById('tocToggle');
+        const mainContent = document.querySelector('.main-content');
+        
+        if (!tocToggle || !tocContainer) return;
+        
+        // 保存移动端状态
+        this.isMobile = window.innerWidth <= 768;
+        
+        // 从 localStorage 读取折叠状态
+        const savedState = localStorage.getItem('tocCollapsed');
+        
+        // 初始状态：移动端默认折叠，桌面端根据保存状态
+        if (savedState !== null) {
+            this.tocCollapsed = savedState === 'true';
+        } else {
+            this.tocCollapsed = this.isMobile;
+        }
+        
+        this.updateTOCToggleState();
+        
+        // 绑定切换按钮事件
+        tocToggle.addEventListener('click', () => {
+            this.toggleTOC();
+        });
+        
+        // 监听窗口大小变化
+        window.addEventListener('resize', () => {
+            const currentIsMobile = window.innerWidth <= 768;
+            // 从桌面切换到移动端时，如果TOC是展开的，自动折叠
+            if (!this.isMobile && currentIsMobile && !this.tocCollapsed) {
+                this.tocCollapsed = true;
+                this.updateTOCToggleState();
+            }
+            this.isMobile = currentIsMobile;
+        });
+    }
+    
+    toggleTOC() {
+        const tocContainer = document.getElementById('tocContainer');
+        const tocToggle = document.getElementById('tocToggle');
+        const mainContent = document.querySelector('.main-content');
+        
+        if (!tocContainer || !tocToggle) return;
+        
+        this.tocCollapsed = !this.tocCollapsed;
+        this.updateTOCToggleState();
+        
+        // 保存状态到 localStorage
+        localStorage.setItem('tocCollapsed', this.tocCollapsed);
+        
+        // 更新内容区域宽度（桌面端）
+        if (window.innerWidth > 768) {
+            if (this.tocCollapsed) {
+                mainContent?.classList.add('full-width');
+            } else {
+                mainContent?.classList.remove('full-width');
             }
         }
     }
-
-    closeSidebar() {
-        const leftSidebar = document.querySelector('.left-sidebar');
-        if (leftSidebar && this.sidebarOpen) {
-            this.sidebarOpen = false;
-            leftSidebar.classList.remove('open');
-            
-            const toggleButton = document.querySelector('.mobile-menu-toggle');
-            if (toggleButton) {
-                toggleButton.innerHTML = '☰';
-            }
+    
+    updateTOCToggleState() {
+        const tocContainer = document.getElementById('tocContainer');
+        const tocToggle = document.getElementById('tocToggle');
+        
+        if (this.tocCollapsed) {
+            tocContainer?.classList.add('hidden');
+            tocToggle?.classList.add('collapsed');
+            tocToggle?.setAttribute('data-tooltip', 'Show TOC');
+        } else {
+            tocContainer?.classList.remove('hidden');
+            tocToggle?.classList.remove('collapsed');
+            tocToggle?.setAttribute('data-tooltip', 'Hide TOC');
         }
     }
+
 
     // ===== TOC 功能 =====
     generateTOC() {
@@ -245,7 +425,10 @@ class GitHubPagesNavigation {
             tocList.appendChild(tocItem);
         });
 
-        this.setupScrollSync();
+        // 延迟设置滚动同步，确保DOM完全渲染
+        setTimeout(() => {
+            this.setupScrollSync();
+        }, 100);
     }
 
     createTOCItem(heading, level) {
@@ -261,6 +444,11 @@ class GitHubPagesNavigation {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             this.scrollToHeading(heading);
+            
+            // 移动端点击后自动关闭TOC
+            if (this.isMobile && !this.tocCollapsed) {
+                this.toggleTOC();
+            }
         });
 
         li.appendChild(link);
@@ -307,35 +495,129 @@ class GitHubPagesNavigation {
             return;
         }
 
-        // 清除之前的观察器（如果存在）
-        if (this.scrollObserver) {
-            this.scrollObserver.disconnect();
+        // 清除之前的滚动监听器
+        if (this.scrollHandler) {
+            window.removeEventListener('scroll', this.scrollHandler);
         }
 
-        // 最简单的滚动高亮逻辑
-        this.scrollObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const id = entry.target.id;
-                    const tocLink = document.querySelector(`.toc-link[href="#${id}"]`);
-                    
-                    if (tocLink) {
-                        // 移除所有活动状态
-                        tocLinks.forEach(link => link.classList.remove('active'));
-                        // 添加当前活动状态
-                        tocLink.classList.add('active');
-                    }
+        // 收集标题信息
+        this.headingData = Array.from(headings).map(heading => ({
+            element: heading,
+            id: heading.id,
+            offsetTop: heading.offsetTop
+        }));
+
+        this.tocItems = Array.from(tocLinks);
+        this.currentActiveIndex = -1;
+
+        // 创建优化的滚动处理器
+        let ticking = false;
+        this.scrollHandler = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    this.updateActiveHeading();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        // 监听滚动事件
+        window.addEventListener('scroll', this.scrollHandler);
+
+        // 监听窗口大小变化，更新偏移位置
+        if (this.resizeHandler) {
+            window.removeEventListener('resize', this.resizeHandler);
+        }
+        this.resizeHandler = () => {
+            this.updateHeadingOffsets();
+        };
+        window.addEventListener('resize', this.resizeHandler);
+
+        // 初始更新
+        this.updateActiveHeading();
+    }
+
+    updateHeadingOffsets() {
+        // 更新所有标题的偏移位置
+        if (this.headingData) {
+            this.headingData.forEach(heading => {
+                heading.offsetTop = heading.element.offsetTop;
+            });
+        }
+    }
+
+    updateActiveHeading() {
+        if (!this.headingData || !this.tocItems) return;
+
+        const scrollPosition = window.scrollY + 100; // 添加偏移量以提前触发
+        
+        // 从后向前遍历，找到第一个offsetTop小于滚动位置的标题
+        let activeIndex = -1;
+        for (let i = this.headingData.length - 1; i >= 0; i--) {
+            if (scrollPosition >= this.headingData[i].offsetTop) {
+                activeIndex = i;
+                break;
+            }
+        }
+
+        // 如果激活项发生变化，更新样式
+        if (activeIndex !== this.currentActiveIndex) {
+            // 移除之前的激活状态
+            this.tocItems.forEach(item => {
+                item.classList.remove('active');
+                // 也移除父级li的active类（如果存在）
+                const parentLi = item.closest('.toc-item');
+                if (parentLi) {
+                    parentLi.classList.remove('active');
                 }
             });
-        });
 
-        headings.forEach(heading => this.scrollObserver.observe(heading));
+            // 添加新的激活状态
+            if (activeIndex >= 0 && activeIndex < this.tocItems.length) {
+                const activeLink = this.tocItems[activeIndex];
+                activeLink.classList.add('active');
+                
+                // 也为父级li添加active类
+                const parentLi = activeLink.closest('.toc-item');
+                if (parentLi) {
+                    parentLi.classList.add('active');
+                }
+
+                // 确保激活项在TOC容器中可见
+                this.ensureTOCItemVisible(activeLink);
+            }
+
+            this.currentActiveIndex = activeIndex;
+        }
+    }
+
+    ensureTOCItemVisible(element) {
+        const tocContainer = element.closest('.toc, .toc-content');
+        if (!tocContainer) return;
+
+        const containerRect = tocContainer.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+
+        // 如果元素不在容器可见区域内，滚动使其可见
+        if (elementRect.top < containerRect.top || 
+            elementRect.bottom > containerRect.bottom) {
+            element.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest'
+            });
+        }
     }
 
     scrollToHeading(heading) {
-        heading.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
+        // 计算目标位置，考虑固定header的高度
+        const offset = 20; // 顶部偏移量
+        const elementPosition = heading.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+        window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
         });
     }
 
@@ -363,14 +645,16 @@ class GitHubPagesNavigation {
                 this.highlightSearchTermInNav(item, query);
                 
                 // 展开父级菜单
-                const parentSubmenu = item.closest('.nav-tree-submenu');
-                if (parentSubmenu) {
-                    parentSubmenu.classList.remove('collapsed');
-                    const parentToggle = document.querySelector(`[data-target="${parentSubmenu.id}"]`);
-                    if (parentToggle) {
-                        parentToggle.setAttribute('aria-expanded', 'true');
-                        const expandIcon = parentToggle.querySelector('.nav-expand-icon');
-                        if (expandIcon) expandIcon.textContent = '▼';
+                const parentItem = item.closest('.nav-tree-item');
+                if (parentItem) {
+                    let parent = parentItem.parentElement.closest('.nav-tree-item');
+                    while (parent) {
+                        parent.classList.add('is-open');
+                        const toggle = parent.querySelector(':scope > .nav-tree-toggle');
+                        if (toggle) {
+                            toggle.setAttribute('aria-expanded', 'true');
+                        }
+                        parent = parent.parentElement.closest('.nav-tree-item');
                     }
                 }
             } else {
@@ -430,15 +714,27 @@ class GitHubPagesNavigation {
         navLinks.forEach(link => {
             const href = link.getAttribute('href');
             if (href && (href === currentPath || href === currentPath.replace('.html', ''))) {
-                link.classList.add('active');
-                
-                // 展开父级菜单
-                const parentSubmenu = link.closest('.nav-tree-submenu');
-                if (parentSubmenu) {
-                    parentSubmenu.classList.remove('collapsed');
-                    const parentToggle = document.querySelector(`[data-target="${parentSubmenu.id}"]`);
-                    if (parentToggle) {
-                        parentToggle.setAttribute('aria-expanded', 'true');
+                // 使用新的active类在nav-tree-item上
+                const navItem = link.closest('.nav-tree-item');
+                if (navItem) {
+                    navItem.classList.add('active');
+                    
+                    // 展开所有父级菜单并添加is-active-path类
+                    let parent = navItem.parentElement.closest('.nav-tree-item');
+                    while (parent) {
+                        parent.classList.add('is-open', 'is-active-path');
+                        const toggle = parent.querySelector(':scope > .nav-tree-toggle');
+                        if (toggle) {
+                            toggle.setAttribute('aria-expanded', 'true');
+                        }
+                        parent = parent.parentElement.closest('.nav-tree-item');
+                    }
+                    
+                    // 标记所有父级submenu为active path
+                    let submenu = navItem.parentElement.closest('.nav-tree-submenu');
+                    while (submenu) {
+                        submenu.classList.add('is-active-path');
+                        submenu = submenu.parentElement.closest('.nav-tree-submenu');
                     }
                 }
             }
