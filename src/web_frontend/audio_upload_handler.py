@@ -81,10 +81,8 @@ class AudioUploadHandler:
                 
                 # 获取配置中的subcategories
                 subcategories = []
-                if metadata and self.config_manager:
-                    content_types = self.config_manager.get_nested_config('content_classification', 'content_types') or {}
-                    type_config = content_types.get(content_type, {})
-                    subcategories = type_config.get('subcategories', [])
+                # 注：content_classification.content_types已迁移到PreferencesManager
+                # 此处保留空的subcategories列表作为fallback
                 
                 # 确定目标文件夹和子分类代码
                 subcategory = metadata.get('subcategory', '') if metadata else ''
@@ -126,7 +124,7 @@ class AudioUploadHandler:
                 # 验证文件大小 - 从配置读取限制
                 file_size = target_file.stat().st_size
                 upload_config = self.config_manager.get_nested_config('web_frontend', 'upload') or {}
-                max_file_size = upload_config.get('max_file_size') or (500 * 1024 * 1024)
+                max_file_size = upload_config.get('max_file_size') or (1024 * 1024 * 1024)  # 1GB default
                 if file_size > max_file_size:
                     target_file.unlink()
                     max_size_mb = max_file_size // (1024 * 1024)

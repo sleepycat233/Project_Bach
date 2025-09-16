@@ -32,13 +32,13 @@ class EnvironmentManager:
         
     def load_env_file(self) -> Dict[str, str]:
         """
-        加载.env文件中的环境变量
-        
+        加载.env文件中的环境变量，并设置到系统环境中
+
         Returns:
             Dict: 环境变量字典
         """
         env_vars = {}
-        
+
         if self.env_file.exists():
             try:
                 with open(self.env_file, 'r', encoding='utf-8') as f:
@@ -48,13 +48,19 @@ class EnvironmentManager:
                             key, value = line.split('=', 1)
                             # 移除引号
                             value = value.strip().strip('"').strip("'")
-                            env_vars[key.strip()] = value
-                            
+                            key = key.strip()
+                            env_vars[key] = value
+
+                            # 设置到系统环境变量中（如果尚未设置）
+                            if key not in os.environ:
+                                os.environ[key] = value
+                                self.logger.debug(f"设置环境变量: {key}")
+
                 self.logger.debug(f"从{self.env_file}加载了{len(env_vars)}个环境变量")
-                
+
             except Exception as e:
                 self.logger.error(f"加载.env文件失败: {e}")
-        
+
         return env_vars
     
     

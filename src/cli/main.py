@@ -68,7 +68,7 @@ def run_monitor_and_web_server(container: DependencyContainer):
     processor = container.get_configured_audio_processor()
 
     # 创建Flask应用
-    app = create_app(config_manager)
+    app = create_app()  # 不传递config_manager，让Flask应用自己创建
 
     # Web服务器配置
     web_config = (config_manager.config or {}).get('web_frontend', {}).get('app', {})
@@ -118,41 +118,6 @@ def run_monitor_and_web_server(container: DependencyContainer):
         print("\n停止服务...")
         processor.stop_file_monitoring()
 
-
-def validate_config_file(config_path: str) -> bool:
-    """验证配置文件
-
-    Args:
-        config_path: 配置文件路径
-
-    Returns:
-        配置是否有效
-    """
-    if not os.path.exists(config_path):
-        print(f"❌ 错误: 找不到 {config_path} 配置文件")
-        print("请先创建配置文件并填入API密钥")
-        return False
-
-    try:
-        config_manager = ConfigManager(config_path)
-
-        # 检查API密钥配置
-        openrouter_config = (config_manager.config or {}).get("openrouter", {})
-        api_key = openrouter_config.get('key', '')
-
-        if api_key == 'YOUR_API_KEY_HERE' or not api_key:
-            print("⚠️  警告: 请在 config.yaml 中配置真实的 OpenRouter API 密钥")
-            print("当前将使用模拟模式运行...")
-        else:
-            print("✅ 配置文件验证通过")
-
-        return True
-
-    except Exception as e:
-        print(f"❌ 配置文件验证失败: {str(e)}")
-        return False
-
-
 def main():
     """主函数"""
     # 解析命令行参数
@@ -164,10 +129,6 @@ def main():
 
     print("=== Project Bach - 音频处理和Web服务器 ===")
     print()
-
-    # 验证配置文件
-    if not validate_config_file(args.config):
-        return False
 
     try:
         # 创建依赖容器（自动处理所有依赖检查和验证）
@@ -186,7 +147,9 @@ def main():
         logger = logging.getLogger('project_bach')
         if logger.isEnabledFor(logging.DEBUG):
             import traceback
+            print("=== 详细错误信息 ===")
             traceback.print_exc()
+            print("=== 错误信息结束 ===")
 
         return False
 

@@ -29,7 +29,7 @@ class TemplateEngine:
         self.template_dir = Path(config.get('base_dir', config.get('template_dir', './templates')))
         self.theme = config.get('theme', 'default')
         self.site_title = config.get('site_title', 'Project Bach')
-        self.site_description = config.get('site_description', 'AI音频处理结果发布')
+        self.site_description = config.get('site_description', 'AI-powered Content Processing Results')
         
         # 创建模板目录
         self.template_dir.mkdir(parents=True, exist_ok=True)
@@ -68,7 +68,7 @@ class TemplateEngine:
                 return text
             return ' '.join(words[:length]) + '...'
         
-        def format_date_filter(date_str, format_str='%Y年%m月%d日'):
+        def format_date_filter(date_str, format_str='%Y-%m-%d'):
             """格式化日期"""
             try:
                 if isinstance(date_str, str):
@@ -112,11 +112,11 @@ class TemplateEngine:
                 now = datetime.now()
                 diff = now - dt
                 if diff.days > 0:
-                    return f"{diff.days}天前"
+                    return f"{diff.days} days ago"
                 elif diff.seconds > 3600:
-                    return f"{diff.seconds // 3600}小时前"
+                    return f"{diff.seconds // 3600} hours ago"
                 else:
-                    return f"{diff.seconds // 60}分钟前"
+                    return f"{diff.seconds // 60} minutes ago"
             except:
                 return "Recently"
         
@@ -143,14 +143,14 @@ class TemplateEngine:
     def _get_base_template(self) -> str:
         """获取基础模板内容"""
         return '''<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="{{ description or site_description }}">
     <meta name="keywords" content="{{ keywords | join(', ') if keywords else '' }}">
     <meta name="author" content="{{ author or 'Project Bach' }}">
-    
+
     <title>{{ title }}{% if title != site_title %} - {{ site_title }}{% endif %}</title>
     
     <!-- 响应式样式 -->
@@ -169,7 +169,8 @@ class TemplateEngine:
             --card-bg: #F2F2F7;
         }
         
-        /* 暗色模式支持 */
+        /* 暗色模式支持 - 已暂时禁用，默认使用light mode */
+        /*
         @media (prefers-color-scheme: dark) {
             :root {
                 --bg-color: #000000;
@@ -179,6 +180,7 @@ class TemplateEngine:
                 --card-bg: #1C1C1E;
             }
         }
+        */
         
         /* 基础样式 */
         * {
@@ -377,10 +379,10 @@ class TemplateEngine:
             <p>{{ site_description }}</p>
             
             <nav class="nav">
-                <a href="index.html">🏠 首页</a>
-                <a href="archive.html">📋 归档</a>
-                <a href="stats.html">📊 统计</a>
-                <a href="about.html">ℹ️ 关于</a>
+                <a href="index.html">🏠 Home</a>
+                <a href="archive.html">📋 Archive</a>
+                <a href="stats.html">📊 Statistics</a>
+                <a href="about.html">ℹ️ About</a>
             </nav>
         </header>
         
@@ -391,11 +393,11 @@ class TemplateEngine:
         
         <!-- 页脚 -->
         <footer class="footer">
-            <p><strong>{{ site_title }}</strong> - AI音频处理与内容分析</p>
-            <p><em>最后更新: {{ current_time | format_date('%Y年%m月%d日 %H:%M:%S') }}</em></p>
+            <p><strong>{{ site_title }}</strong> - AI-powered Content Processing & Analysis</p>
+            <p><em>Last updated: {{ current_time | format_date('%Y-%m-%d %H:%M:%S') }}</em></p>
             <p>
                 <a href="https://github.com/project-bach" target="_blank">🔗 GitHub</a> |
-                <a href="mailto:contact@project-bach.com">📧 联系我们</a>
+                <a href="mailto:contact@project-bach.com">📧 Contact</a>
             </p>
         </footer>
     </div>
@@ -426,14 +428,14 @@ class TemplateEngine:
     
     <div style="margin-top: 30px;">
         <section class="summary">
-            <h2>📄 内容摘要</h2>
+            <h2>📄 Content Summary</h2>
             <div style="margin-top: 15px; padding: 20px; background-color: var(--card-bg); border-radius: 8px;">
                 {{ content.summary | markdown | safe }}
             </div>
         </section>
-        
+
         <section class="mindmap" style="margin-top: 30px;">
-            <h2>🧠 思维导图</h2>
+            <h2>🧠 Mind Map</h2>
             <div style="margin-top: 15px; padding: 20px; background-color: var(--card-bg); border-radius: 8px;">
                 {{ content.mindmap | markdown | safe }}
             </div>
@@ -441,16 +443,16 @@ class TemplateEngine:
         
         {% if content.anonymized_names and content.anonymized_names | length > 0 %}
         <section class="anonymization" style="margin-top: 30px;">
-            <h2>🔒 人名匿名化</h2>
+            <h2>🔒 Name Anonymization</h2>
             <div style="margin-top: 15px;">
-                <p>本次处理中共匿名化了 <strong>{{ content.anonymized_names | length }}</strong> 个人名：</p>
-                
+                <p>This processing anonymized <strong>{{ content.anonymized_names | length }}</strong> personal names:</p>
+
                 <table class="table table-striped" style="margin-top: 15px;">
                     <thead>
                         <tr>
-                            <th>序号</th>
-                            <th>匿名化后</th>
-                            <th>类型</th>
+                            <th>#</th>
+                            <th>Anonymized Name</th>
+                            <th>Type</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -458,14 +460,14 @@ class TemplateEngine:
                         <tr>
                             <td>{{ loop.index }}</td>
                             <td>{{ anonymous }}</td>
-                            <td>中文/英文</td>
+                            <td>Name</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-                
+
                 <p style="margin-top: 15px; font-style: italic; color: var(--text-secondary);">
-                    💡 为保护隐私，所有人名已被替换为虚拟姓名
+                    💡 For privacy protection, all personal names have been replaced with virtual names
                 </p>
             </div>
         </section>
@@ -473,24 +475,24 @@ class TemplateEngine:
         
         {% if content.statistics %}
         <section class="statistics" style="margin-top: 30px;">
-            <h2>📊 处理统计</h2>
+            <h2>📊 Processing Statistics</h2>
             <table class="table table-striped" style="margin-top: 15px;">
                 <tbody>
                     <tr>
-                        <td>摘要长度</td>
-                        <td>{{ content.summary | length }} 字符</td>
+                        <td>Summary Length</td>
+                        <td>{{ content.summary | length }} characters</td>
                     </tr>
                     <tr>
-                        <td>思维导图长度</td>
-                        <td>{{ content.mindmap | length }} 字符</td>
+                        <td>Mind Map Length</td>
+                        <td>{{ content.mindmap | length }} characters</td>
                     </tr>
                     <tr>
-                        <td>匿名化人名数</td>
-                        <td>{{ content.anonymized_names | length }} 个</td>
+                        <td>Anonymized Names</td>
+                        <td>{{ content.anonymized_names | length }} names</td>
                     </tr>
                     {% if content.processing_duration %}
                     <tr>
-                        <td>处理时长</td>
+                        <td>Processing Time</td>
                         <td>{{ content.processing_duration }}</td>
                     </tr>
                     {% endif %}
@@ -503,7 +505,7 @@ class TemplateEngine:
 
 <!-- 返回按钮 -->
 <div style="margin-top: 30px; text-align: center;">
-    <a href="index.html" class="btn btn-primary">🔙 返回首页</a>
+    <a href="index.html" class="btn btn-primary">🔙 Back to Home</a>
 </div>
 {% endblock %}'''
     
@@ -514,19 +516,19 @@ class TemplateEngine:
 {% block content %}
 <div class="index">
     <div class="card">
-        <h2>🎵 音频处理结果</h2>
-        <p>智能音频处理与内容分析平台</p>
-        
+        <h2>🎵 Audio Processing Results</h2>
+        <p>Intelligent Audio Processing & Content Analysis Platform</p>
+
         <div style="margin-top: 20px;">
             <span style="background-color: var(--success-color); color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.9em;">
-                📊 共收录 {{ results | length }} 个处理结果
+                📊 Total {{ results | length }} processing results
             </span>
         </div>
     </div>
     
     {% if results and results | length > 0 %}
     <div class="results-section">
-        <h2 style="margin-top: 30px;">📋 最新结果</h2>
+        <h2 style="margin-top: 30px;">📋 Latest Results</h2>
         
         {% for result in results[:10] %}
         <article class="card result-item" style="margin-top: 20px;">
@@ -546,7 +548,7 @@ class TemplateEngine:
             </p>
             <div style="margin-top: 15px;">
                 <a href="{{ result.file }}" class="btn btn-primary" style="font-size: 0.9em; padding: 6px 16px;">
-                    查看详情 →
+                    View Details →
                 </a>
             </div>
         </article>
@@ -554,30 +556,30 @@ class TemplateEngine:
         
         {% if results | length > 10 %}
         <div style="text-align: center; margin-top: 30px;">
-            <a href="archive.html" class="btn btn-primary">查看全部 {{ results | length }} 个结果 →</a>
+            <a href="archive.html" class="btn btn-primary">View All {{ results | length }} Results →</a>
         </div>
         {% endif %}
     </div>
     
     <!-- 统计概览 -->
     <div class="stats-overview card" style="margin-top: 30px;">
-        <h2>📊 统计概览</h2>
+        <h2>📊 Statistics Overview</h2>
         <table class="table table-striped" style="margin-top: 15px;">
             <tbody>
                 <tr>
-                    <td>总处理数</td>
+                    <td>Total Processed</td>
                     <td><strong>{{ results | length }}</strong></td>
                 </tr>
                 <tr>
-                    <td>本月新增</td>
+                    <td>This Month</td>
                     <td><strong>{{ stats.this_month if stats else 0 }}</strong></td>
                 </tr>
                 <tr>
-                    <td>本周新增</td>
+                    <td>This Week</td>
                     <td><strong>{{ stats.this_week if stats else 0 }}</strong></td>
                 </tr>
                 <tr>
-                    <td>最后更新</td>
+                    <td>Last Updated</td>
                     <td>{{ current_time | format_date('%Y-%m-%d %H:%M:%S') }}</td>
                 </tr>
             </tbody>
@@ -586,42 +588,42 @@ class TemplateEngine:
     
     {% else %}
     <div class="card empty-state" style="text-align: center; margin-top: 30px;">
-        <h3>🎵 暂无处理结果</h3>
+        <h3>🎵 No Processing Results Yet</h3>
         <p style="color: var(--text-secondary); margin-top: 15px;">
-            还没有音频文件被处理。请将音频文件放入监控文件夹开始处理。
+            No audio files have been processed yet. Please place audio files in the monitoring folder to start processing.
         </p>
     </div>
     {% endif %}
     
     <!-- 快速导航 -->
     <div class="quick-nav card" style="margin-top: 30px;">
-        <h2>🔍 快速导航</h2>
+        <h2>🔍 Quick Navigation</h2>
         <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
             <a href="archive.html" style="text-decoration: none;">
                 <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center; transition: transform 0.2s;">
                     <div style="font-size: 2em;">📋</div>
-                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">完整归档</div>
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">查看所有结果</div>
+                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">Complete Archive</div>
+                    <div style="color: var(--text-secondary); font-size: 0.9em;">View all results</div>
                 </div>
             </a>
             <a href="stats.html" style="text-decoration: none;">
                 <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center;">
                     <div style="font-size: 2em;">📈</div>
-                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">数据统计</div>
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">处理结果分析</div>
+                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">Data Statistics</div>
+                    <div style="color: var(--text-secondary); font-size: 0.9em;">Processing result analysis</div>
                 </div>
             </a>
             <a href="search.html" style="text-decoration: none;">
                 <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center;">
                     <div style="font-size: 2em;">🔎</div>
-                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">搜索功能</div>
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">快速查找内容</div>
+                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">Search Function</div>
+                    <div style="color: var(--text-secondary); font-size: 0.9em;">Quick content search</div>
                 </div>
             </a>
             <a href="about.html" style="text-decoration: none;">
                 <div style="padding: 20px; background-color: var(--card-bg); border-radius: 8px; text-align: center;">
                     <div style="font-size: 2em;">ℹ️</div>
-                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">关于项目</div>
+                    <div style="margin-top: 10px; font-weight: 500; color: var(--text-color);">About Project</div>
                     <div style="color: var(--text-secondary); font-size: 0.9em;">Project Bach</div>
                 </div>
             </a>
@@ -637,14 +639,14 @@ class TemplateEngine:
 {% block content %}
 <div class="error-page card" style="text-align: center; margin-top: 30px;">
     <div style="font-size: 4em; color: var(--error-color);">⚠️</div>
-    <h1 style="margin-top: 20px; color: var(--error-color);">出现错误</h1>
-    
+    <h1 style="margin-top: 20px; color: var(--error-color);">An Error Occurred</h1>
+
     {% if error_message %}
     <p style="margin-top: 15px; color: var(--text-secondary);">{{ error_message }}</p>
     {% endif %}
-    
+
     <div style="margin-top: 30px;">
-        <a href="index.html" class="btn btn-primary">🔙 返回首页</a>
+        <a href="index.html" class="btn btn-primary">🔙 Back to Home</a>
     </div>
 </div>
 {% endblock %}'''
@@ -822,8 +824,8 @@ class TemplateEngine:
         """
         context = {
             'title': self.site_title,
-            'description': f'共收录{len(results)}个音频处理结果',
-            'keywords': ['音频处理', 'AI分析', '结果索引'],
+            'description': f'Total {len(results)} audio processing results',
+            'keywords': ['audio processing', 'AI analysis', 'result index'],
             'results': results,
             'stats': stats or {}
         }
@@ -841,8 +843,8 @@ class TemplateEngine:
             渲染结果
         """
         context = {
-            'title': f'错误 {error_code}' if error_code else '出现错误',
-            'description': '页面处理时出现错误',
+            'title': f'Error {error_code}' if error_code else 'An Error Occurred',
+            'description': 'An error occurred while processing the page',
             'error_message': error_message,
             'error_code': error_code
         }

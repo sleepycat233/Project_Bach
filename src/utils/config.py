@@ -28,6 +28,7 @@ class ConfigManager:
             config_path: 配置文件路径
         """
         self.config_path = config_path
+        self.logger = logging.getLogger(__name__)
 
         # 首先尝试使用环境管理器
         try:
