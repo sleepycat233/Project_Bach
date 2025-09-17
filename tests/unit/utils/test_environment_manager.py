@@ -42,8 +42,6 @@ github:
 network:
   tailscale:
     auth_key: "${TAILSCALE_AUTH_KEY}"
-  secure_file_server:
-    auth_token: "${SECURE_FILE_SERVER_TOKEN}"
 """
         
         self.template_file = Path(self.test_dir) / 'config.template.yaml'
@@ -74,7 +72,6 @@ OPENROUTER_API_KEY=sk-test-key-123
 GITHUB_USERNAME=testuser
 GITHUB_TOKEN=ghp_test_token_456
 TAILSCALE_AUTH_KEY=tskey-auth-test
-SECURE_FILE_SERVER_TOKEN=secure-token-789
 DEBUG=true
 """
         

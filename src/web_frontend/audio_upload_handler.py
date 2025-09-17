@@ -121,19 +121,6 @@ class AudioUploadHandler:
                 file.save(str(target_file))
                 tracker.update_stage(ProcessingStage.UPLOADED, 15, f"File saved to organized directory: {target_file}")
                 
-                # 验证文件大小 - 从配置读取限制
-                file_size = target_file.stat().st_size
-                upload_config = self.config_manager.get_nested_config('web_frontend', 'upload') or {}
-                max_file_size = upload_config.get('max_file_size') or (1024 * 1024 * 1024)  # 1GB default
-                if file_size > max_file_size:
-                    target_file.unlink()
-                    max_size_mb = max_file_size // (1024 * 1024)
-                    tracker.set_error(f'File size exceeds {max_size_mb}MB limit')
-                    return {
-                        'status': 'error',
-                        'message': f'File size exceeds {max_size_mb}MB limit'
-                    }
-                
                 # 调用真正的AudioProcessor进行完整处理
                 from ..core.dependency_container import DependencyContainer
                 from ..core.processing_service import get_processing_service
