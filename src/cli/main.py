@@ -16,7 +16,11 @@ from pathlib import Path
 # 添加src目录到Python路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from src.core.dependency_container import DependencyContainer, ServiceFactory
+from src.core.dependency_container import (
+    DependencyContainer,
+    ServiceFactory,
+    set_global_container,
+)
 from src.utils.config import ConfigManager
 from src.web_frontend.app import create_app
 from src.network.tailscale_manager import TailscaleManager
@@ -161,6 +165,8 @@ def main():
     try:
         # 创建依赖容器（自动处理所有依赖检查和验证）
         container = ServiceFactory.create_container_from_config_file(args.config)
+        # 记录全局容器，供Flask应用在同一进程内复用依赖
+        set_global_container(container)
         print("✅ 系统初始化成功")
 
         # 运行集成的监控和Web服务器

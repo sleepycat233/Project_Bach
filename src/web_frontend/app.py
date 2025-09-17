@@ -22,6 +22,7 @@ from .audio_upload_handler import AudioUploadHandler
 from .youtube_handler import YouTubeHandler
 from ..core.processing_service import get_processing_service
 from ..utils.config import ConfigManager
+from ..core.dependency_container import get_global_container
 from .helpers import get_config_value, create_api_response, scan_content_directory, organize_content_by_type, render_private_index, serve_private_file, get_content_types_config, validate_github_config
 
 logger = logging.getLogger(__name__)
@@ -75,7 +76,11 @@ def create_app(config=None):
 
     # 初始化处理服务
     if config_manager:
-        app.config['AUDIO_HANDLER'] = AudioUploadHandler(config_manager)
+        global_container = get_global_container()
+        app.config['AUDIO_HANDLER'] = AudioUploadHandler(
+            config_manager,
+            container=global_container,
+        )
         app.config['YOUTUBE_HANDLER'] = YouTubeHandler(config_manager)
     else:
         logger.error("配置管理器加载失败，无法初始化处理服务")
