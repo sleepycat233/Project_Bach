@@ -89,10 +89,15 @@ def create_app(config=None):
         if app.config.get('TESTING'):
             return  # 测试环境跳过安全检查
 
-        # 检查配置管理器中的Tailscale设置
+        # 检查配置中的Tailscale访问限制
         config_manager = app.config.get('CONFIG_MANAGER')
-        if config_manager and config_manager.config.get('tailscale', {}).get('enabled', True) == False:
-            return  # Tailscale安全检查被禁用
+        tailscale_only_enabled = True
+        if config_manager:
+            security_config = config_manager.get_nested_config('web_frontend', 'security') or {}
+            tailscale_only_enabled = security_config.get('tailscale_only', True)
+
+        if not tailscale_only_enabled:
+            return  # 配置显式禁用Tailscale网络限制
 
         remote_ip = request.environ.get('REMOTE_ADDR', request.remote_addr)
 

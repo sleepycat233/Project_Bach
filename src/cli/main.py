@@ -39,28 +39,56 @@ def run_monitor_and_web_server(container: DependencyContainer):
         print("❌ 无法获取配置管理器")
         return
 
-    # 检查Tailscale连接状态
+    # 检查Tailscale连接状态（可选）
     print("🔍 检查Tailscale网络连接...")
-    tailscale_config = config_manager.config.get('network', {}).get('tailscale', {})
-    tailscale_manager = TailscaleManager(tailscale_config)
+    tailscale_manager = TailscaleManager()
 
     if not tailscale_manager.check_tailscale_installed():
-        print("❌ Tailscale未安装，无法启动远程模式")
-        print("   请先安装Tailscale: https://tailscale.com/download")
-        return
-
-    status = tailscale_manager.check_status()
-    if not status.get('connected', False):
-        print("⚠️  Tailscale未连接，尝试自动连接...")
-        if tailscale_manager.connect():
-            print("✅ Tailscale连接成功")
-        else:
-            print("❌ Tailscale连接失败")
-            print("   请手动运行: tailscale up")
-            return
+        print("⚠️  Tailscale未安装，跳过远程模式（可选功能）")
     else:
-        print("✅ Tailscale已连接")
-        print(f"   节点IP: {status.get('tailscale_ips', ['未知'])[0] if status.get('tailscale_ips') else '未知'}")
+        status = tailscale_manager.check_status()
+        if not status.get('connected', False):
+            print("⚠️  Tailscale未连接，尝试自动连接...")
+            if tailscale_manager.connect():
+                print("✅ Tailscale连接成功")
+                status = tailscale_manager.check_status()
+            else:
+                print("⚠️  自动连接失败，将继续以本地模式运行")
+                print("   如需远程访问请手动执行: tailscale up")
+                status = None
+        else:
+            print("✅ Tailscale已连接")
+
+        if status and status.get('connected', False):
+            tailscale_ips = status.get('tailscale_ips', [])
+            ip_display = tailscale_ips[0] if tailscale_ips else '未知'
+            print(f"   节点IP: {ip_display}")
+
+            network_info = tailscale_manager.get_network_info()
+            peers = network_info.get('peers', [])
+            if peers:
+                print(f"   已发现 {len(peers)} 个节点")
+                for peer in peers[:3]:
+                    host = peer.get('hostname') or peer.get('dns_name') or peer.get('id')
+                    peer_ip = peer.get('tailscale_ips', [None])[0]
+                    print(f"     • {host} ({peer_ip or '无IP'}) {'在线' if peer.get('online') else '离线'}")
+
+                first_online_peer_ip = next(
+                    (
+                        p.get('tailscale_ips', [None])[0]
+                        for p in peers
+                        if p.get('online') and p.get('tailscale_ips')
+                    ),
+                    None,
+                )
+                if first_online_peer_ip:
+                    latency = tailscale_manager.ping_peer(first_online_peer_ip)
+                    if latency is not None:
+                        print(f"   Ping {first_online_peer_ip}: {latency:.2f} ms")
+                    else:
+                        print(f"   Ping {first_online_peer_ip} 失败或超时")
+                else:
+                    print("   未找到在线节点，跳过Ping")
 
     print()
 

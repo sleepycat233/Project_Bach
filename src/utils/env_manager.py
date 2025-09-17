@@ -94,7 +94,7 @@ class EnvironmentManager:
         
         # 2. 验证必需的环境变量
         env_vars = self.load_env_file()
-        required_vars = ['OPENROUTER_API_KEY', 'TAILSCALE_AUTH_KEY']
+        required_vars = ['OPENROUTER_API_KEY']
         
         missing_vars = []
         for var in required_vars:
@@ -104,6 +104,10 @@ class EnvironmentManager:
         if missing_vars:
             self.logger.warning(f"缺少必需的环境变量: {missing_vars}")
             success = False
+
+        # Tailscale密钥改为可选，缺少时仅提示
+        if not env_vars.get('TAILSCALE_AUTH_KEY'):
+            self.logger.info("未检测到TAILSCALE_AUTH_KEY，自动登录Tailscale将被跳过")
         
         return success
     

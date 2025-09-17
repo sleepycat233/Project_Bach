@@ -7,7 +7,6 @@ Phase 7.1: API重构和代码优化的一部分。
 """
 
 import json
-import re
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -249,15 +248,10 @@ def organize_content_by_type(content_list: List[Dict[str, Any]], config_manager=
                 if subcategory:
                     category_name = subcategory
 
-            # 如果没有metadata，尝试从文件名解析
+            # 记录缺失subcategory的情况，但不再从文件名解析
             if category_name == "General":
                 filename = content.get('filename', '')
-                # 通用模式：查找类型标识
-                type_pattern = {'lecture': r'_LEC_', 'meeting': r'_MEE_'}
-                if content_type in type_pattern:
-                    match = re.search(rf'\d{{8}}_\d{{6}}_([A-Z]+\d+){type_pattern[content_type]}', filename)
-                    if match:
-                        category_name = match.group(1)
+                logger.debug(f"No subcategory in metadata for {filename}, using 'General' category")
 
             # 添加到对应分类
             target_dict = organized[f'{content_type}s']

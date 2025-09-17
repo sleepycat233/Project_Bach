@@ -9,6 +9,7 @@ import json
 import logging
 import time
 import os
+import re
 from typing import Dict, Any, List, Optional
 
 
@@ -123,7 +124,7 @@ class TailscaleManager:
         timeout = self.config.get('timeout', 30)
         
         if not auth_key:
-            self.logger.error("缺少TAILSCALE_AUTH_KEY环境变量，无法登录")
+            self.logger.info("未提供TAILSCALE_AUTH_KEY，跳过Tailscale自动登录")
             return False
         
         try:
@@ -169,45 +170,9 @@ class TailscaleManager:
         except Exception as e:
             self.logger.error(f"连接Tailscale时出错: {e}")
             return False
-    
-    def disconnect(self) -> bool:
-        """
-        断开Tailscale连接
-        
-        Returns:
-            bool: 断开是否成功
-        """
-        try:
-            self.logger.info("断开Tailscale连接")
-            
-            result = subprocess.run(
-                ['tailscale', 'down'],
-                capture_output=True,
-                text=True,
-                timeout=15
-            )
-            
-            if result.returncode == 0:
-                self.logger.info("Tailscale已断开连接")
-                return True
-            else:
-                self.logger.error(f"Tailscale断开失败: {result.stderr}")
-                return False
-                
-        except subprocess.TimeoutExpired:
-            self.logger.error("Tailscale断开连接超时")
-            return False
-        except Exception as e:
-            self.logger.error(f"断开Tailscale时出错: {e}")
-            return False
-    
+
     def get_network_info(self) -> Dict[str, Any]:
-        """
-        获取网络节点信息
-        
-        Returns:
-            Dict: 包含网络节点列表和状态
-        """
+        """获取当前tailnet节点信息（仅调试用）"""
         try:
             result = subprocess.run(
                 ['tailscale', 'status', '--json'],
@@ -215,38 +180,36 @@ class TailscaleManager:
                 text=True,
                 timeout=15
             )
-            
+
             if result.returncode != 0:
                 self.logger.error(f"获取网络信息失败: {result.stderr}")
                 return {'peers': [], 'network_status': 'error', 'error': result.stderr}
-            
+
             status_data = json.loads(result.stdout)
             peer_data = status_data.get('Peer', {})
-            
+
             peers = []
             for peer_id, peer_info in peer_data.items():
-                peer = {
+                peers.append({
                     'id': peer_info.get('ID', peer_id),
                     'hostname': peer_info.get('HostName', 'Unknown'),
                     'dns_name': peer_info.get('DNSName', ''),
                     'os': peer_info.get('OS', 'Unknown'),
                     'tailscale_ips': peer_info.get('TailscaleIPs', []),
                     'online': peer_info.get('Online', False)
-                }
-                peers.append(peer)
-            
-            network_status = 'active' if len(peers) > 0 else 'isolated'
-            
+                })
+
+            network_status = 'active' if peers else 'isolated'
             self.logger.info(f"发现 {len(peers)} 个网络节点")
-            
+
             return {
                 'peers': peers,
                 'network_status': network_status,
                 'total_peers': len(peers)
             }
-            
+
         except json.JSONDecodeError as e:
-            self.logger.error(f"解析网络信息JSON失败: {e}")
+            self.logger.error(f"解析Tailscale状态JSON失败: {e}")
             return {'peers': [], 'network_status': 'error', 'error': str(e)}
         except subprocess.TimeoutExpired:
             self.logger.error("获取网络信息超时")
@@ -254,54 +217,9 @@ class TailscaleManager:
         except Exception as e:
             self.logger.error(f"获取网络信息时出错: {e}")
             return {'peers': [], 'network_status': 'error', 'error': str(e)}
-    
-    def validate_config(self) -> bool:
-        """
-        验证配置有效性
-        
-        Returns:
-            bool: 配置是否有效
-        """
-        if not self.config:
-            self.logger.error("配置为空")
-            return False
-        
-        auth_key = os.environ.get('TAILSCALE_AUTH_KEY', '')
-        if not auth_key:
-            self.logger.error("缺少TAILSCALE_AUTH_KEY环境变量")
-            return False
-        
-        if not auth_key.startswith('tskey-'):
-            self.logger.error("TAILSCALE_AUTH_KEY格式无效，应以'tskey-'开头")
-            return False
-        
-        machine_name = self.config.get('machine_name', '')
-        if machine_name:
-            # 验证机器名格式（字母数字和连字符）
-            import re
-            if not re.match(r'^[a-zA-Z0-9\-]+$', machine_name):
-                self.logger.error("machine_name包含无效字符")
-                return False
-        
-        timeout = self.config.get('timeout', 30)
-        if not isinstance(timeout, (int, float)) or timeout <= 0:
-            self.logger.error("timeout必须是正数")
-            return False
-        
-        self.logger.info("Tailscale配置验证通过")
-        return True
-    
+
     def ping_peer(self, peer_ip: str, timeout: int = 5) -> Optional[float]:
-        """
-        Ping指定的Tailscale节点
-        
-        Args:
-            peer_ip: 节点IP地址
-            timeout: 超时时间（秒）
-            
-        Returns:
-            float: 延迟时间（毫秒），失败返回None
-        """
+        """Ping 指定的 tailnet 节点，返回延迟（毫秒）"""
         try:
             result = subprocess.run(
                 ['tailscale', 'ping', peer_ip],
@@ -309,27 +227,28 @@ class TailscaleManager:
                 text=True,
                 timeout=timeout
             )
-            
+
             if result.returncode == 0:
-                # 解析ping结果获取延迟
                 output = result.stdout.strip()
                 if 'time=' in output:
-                    import re
                     match = re.search(r'time=(\d+\.?\d*)ms', output)
                     if match:
                         latency = float(match.group(1))
                         self.logger.debug(f"Ping {peer_ip}: {latency}ms")
                         return latency
-                
                 self.logger.debug(f"Ping {peer_ip} 成功但无法解析延迟")
                 return 0.0
             else:
                 self.logger.warning(f"Ping {peer_ip} 失败: {result.stderr}")
                 return None
-                
+
         except subprocess.TimeoutExpired:
-            self.logger.warning(f"Ping {peer_ip} 超时")
+            self.logger.warning(f"Ping {peer_ip} 超时 ({timeout}秒)")
             return None
         except Exception as e:
             self.logger.error(f"Ping {peer_ip} 时出错: {e}")
             return None
+
+    
+    
+    
