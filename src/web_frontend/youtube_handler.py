@@ -9,6 +9,7 @@ import uuid
 import logging
 from urllib.parse import urlparse, parse_qs
 from ..core.processing_service import ProcessingTracker, ProcessingStage
+from ..core.audio_processor import AudioProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -121,12 +122,13 @@ class YouTubeHandler:
                                 
                                 if success:
                                     video_metadata = result.get('video_metadata', {})
-                                    
+
                                     # 生成结果URL
-                                    if privacy_level == 'public':
-                                        result_url = f"https://sleepycat233.github.io/Project_Bach/youtube_{video_id}_result.html"
-                                    else:
-                                        result_url = f"/private/youtube_{video_id}_result.html"
+                                    result_url = AudioProcessor.build_result_url(
+                                        self.config_manager,
+                                        f"youtube_{video_id}",
+                                        privacy_level,
+                                    )
                                     
                                     if processing_service:
                                         processing_service.add_log(tracker.processing_id, f"YouTube processing completed, result: {result_url}", 'success')
@@ -150,7 +152,11 @@ class YouTubeHandler:
                             import time
                             time.sleep(2)
                             
-                            result_url = f"/private/youtube_{video_id}_result.html" if privacy_level == 'private' else f"https://sleepycat233.github.io/Project_Bach/youtube_{video_id}_result.html"
+                            result_url = AudioProcessor.build_result_url(
+                                self.config_manager,
+                                f"youtube_{video_id}",
+                                privacy_level,
+                            )
                             if processing_service:
                                 processing_service.add_log(tracker.processing_id, f"Mock YouTube processing completed, result: {result_url}", 'success')
                             tracker.set_completed(result_url)

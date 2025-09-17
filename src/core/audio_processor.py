@@ -51,6 +51,35 @@ class AudioProcessor:
         # Git发布服务（可选）
         self.git_publisher: Optional[GitPublisher] = None
 
+    @staticmethod
+    def build_result_url(config_manager: Optional[ConfigManager], file_stem: str, privacy_level: str) -> str:
+        """根据配置与隐私级别生成结果URL"""
+        if privacy_level == 'public':
+            pages_url = None
+            username = None
+            repo_name = 'Project_Bach'
+
+            if config_manager:
+                github_config = config_manager.get_nested_config('github') or {}
+                if isinstance(github_config, dict):
+                    pages_url = github_config.get('pages_url')
+                    username = github_config.get('username')
+                    repo_name = github_config.get('repo_name', repo_name)
+
+                    if not pages_url:
+                        pages_cfg = github_config.get('pages') or {}
+                        if isinstance(pages_cfg, dict):
+                            pages_url = pages_cfg.get('url') or pages_cfg.get('pages_url')
+
+            if not pages_url and username:
+                pages_url = f"https://{username}.github.io/{repo_name}"
+
+            if pages_url:
+                return f"{pages_url.rstrip('/')}/{file_stem}_result.html"
+            return f"/public/{file_stem}_result.html"
+
+        return f"/private/{file_stem}_result.html"
+
     def set_transcription_service(self, service: TranscriptionService):
         """设置转录服务
 
@@ -138,7 +167,7 @@ class AudioProcessor:
 
         return cleaned
 
-    def process_audio_file(self, audio_path: str, privacy_level: str = 'public', metadata: Dict[str, Any] = None, processing_id: str = None) -> bool:
+    def process_audio_file(self, audio_path: str, privacy_level: str = 'private', metadata: Dict[str, Any] = None, processing_id: str = None) -> bool:
         """处理单个音频文件的完整流程
 
         Args:
@@ -301,18 +330,14 @@ class AudioProcessor:
                 'processed_time': datetime.now().isoformat(),
                 'format_version': '2.0',
                 'privacy_level': privacy_level,
+                'content_type': (metadata or {}).get('content_type', 'others'),
+                'subcategory': (metadata or {}).get('subcategory', ''),
+                'audio_language': (metadata or {}).get('audio_language', ''),
+                'whisper_model': (metadata or {}).get('whisper_model', ''),
+                'description': (metadata or {}).get('description', ''),
+                'file_size': (metadata or {}).get('file_size')
+                    or (audio_path.stat().st_size if audio_path.exists() else 0)
             }
-            
-            # 添加上传时的元数据（包含分类信息）
-            if metadata:
-                metadata_dict.update({
-                    'content_type': metadata.get('content_type', 'others'),
-                    'subcategory': metadata.get('subcategory', ''),
-                    'audio_language': metadata.get('audio_language', ''),
-                    'whisper_model': metadata.get('whisper_model', ''),
-                    'description': metadata.get('description', ''),
-                    'file_size': metadata.get('file_size', 0)
-                })
             
             # 根级别的核心数据（新结构）
             results = {
@@ -340,9 +365,13 @@ class AudioProcessor:
             self.result_storage.save_json_result(audio_path.stem, results, privacy_level=privacy_level)
             self.result_storage.save_html_result(audio_path.stem, results, privacy_level=privacy_level)
 
-            # 自动发布到GitHub Pages
+            # 计算结果访问链接
+            file_stem = audio_path.stem
+            result_url = self.build_result_url(self.config_manager, file_stem, privacy_level)
+
+            # 自动发布到GitHub Pages（仅公开内容）
             if self.git_publisher and privacy_level == 'public':
-                result_filename = f"{audio_path.stem}_result.html"
+                result_filename = f"{file_stem}_result.html"
                 publish_success = self.git_publisher.publish_result(result_filename, privacy_level)
                 if publish_success:
                     self.logger.info(f"音频处理结果已自动发布到GitHub Pages: {result_filename}")
@@ -351,8 +380,12 @@ class AudioProcessor:
 
             # 完成处理
             if processing_id:
-                status_msg = f"Processing complete ({privacy_level} content)"
-                self.processing_service.update_status(processing_id, ProcessingStage.COMPLETED, 100, status_msg)
+                self.processing_service.add_log(
+                    processing_id,
+                    f"Audio processing completed, result: {result_url}",
+                    'success'
+                )
+                self.processing_service.set_completed(processing_id, result_url)
 
             elapsed = time.time() - start_time
             self.logger.info(f"处理完成: {audio_path.name} (耗时: {elapsed:.2f}秒, 隐私级别: {privacy_level})")
@@ -818,4 +851,3 @@ class AudioProcessor:
 
         self.logger.info(f"强制处理文件: {Path(file_path).name}")
         return self.process_audio_file(file_path)
-

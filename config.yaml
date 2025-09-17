@@ -89,7 +89,7 @@ web_frontend:
 
   # 安全配置
   security:
-    tailscale_only: true         # 仅允许Tailscale网络访问
+    tailscale_only: false         # 仅允许Tailscale网络访问
     rate_limit_per_minute: 60    # 每分钟请求限制
     rate_limit_per_hour: 1000    # 每小时请求限制
     enable_csrf: true            # 启用CSRF保护
@@ -106,7 +106,7 @@ github:
   repo_name: "Project_Bach"  # 仓库名称（可配置）
   pages:
     enabled: true           # 是否启用GitHub Pages链接
-    # pages_url 将自动生成为: https://{username}.github.io/{repo_name}
+    url: "https://sleepycat233.github.io/Project_Bach"
 
 # YouTube处理器配置
 youtube:
