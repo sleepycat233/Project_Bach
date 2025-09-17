@@ -4,7 +4,6 @@
 负责监控文件夹变化并管理文件处理
 """
 
-import os
 import time
 import threading
 import signal
@@ -24,7 +23,8 @@ class FileMonitor:
                  watch_folder: str, 
                  file_processor_callback: Callable[[str], bool],
                  queue_max_size: int = 100,
-                 supported_formats: Set[str] = None):
+                 supported_formats: Set[str] = None,
+                 audio_processor=None):
         """初始化文件监控器
         
         Args:
@@ -35,6 +35,7 @@ class FileMonitor:
         """
         self.watch_folder = Path(watch_folder)
         self.file_processor_callback = file_processor_callback
+        self.audio_processor = audio_processor
         self.logger = logging.getLogger('project_bach.file_monitor')
         
         # 确保监控文件夹存在
@@ -132,13 +133,20 @@ class FileMonitor:
         # 等待文件稳定
         time.sleep(self.stability_check_delay)
         
-        if self._is_file_stable(file_path):
-            metadata = {
+        resolved_path = str(Path(file_path).resolve())
+
+        if self._is_file_stable(resolved_path):
+            if self.processing_queue.is_tracking(resolved_path):
+                self.logger.debug(f"文件已在处理队列中，跳过重复添加: {Path(file_path).name}")
+                return
+
+            metadata: Dict[str, Any] = {
                 'detected_time': time.time(),
-                'file_size': Path(file_path).stat().st_size if Path(file_path).exists() else 0
+                'file_size': Path(resolved_path).stat().st_size if Path(resolved_path).exists() else 0,
+                'source': 'watch_folder'
             }
-            
-            if self.processing_queue.add_file(file_path, metadata):
+
+            if self.processing_queue.add_file(resolved_path, metadata):
                 self.logger.info(f"文件已添加到处理队列: {Path(file_path).name}")
             else:
                 self.logger.warning(f"文件无法添加到队列: {Path(file_path).name}")
@@ -147,7 +155,7 @@ class FileMonitor:
     
     def _is_file_stable(self, file_path: str) -> bool:
         """检查文件是否稳定（大小不再变化）
-        
+
         Args:
             file_path: 文件路径
             
@@ -177,6 +185,54 @@ class FileMonitor:
         except Exception as e:
             self.logger.error(f"检查文件稳定性失败: {file_path}, 错误: {str(e)}")
             return False
+
+    def _invoke_processor(self, file_path: str, *, privacy_level: str,
+                          metadata: Optional[Dict[str, Any]], processing_id: Optional[str]) -> bool:
+        """统一封装文件处理调用，支持传递扩展参数"""
+        if self.audio_processor is not None:
+            return self.audio_processor.process_audio_file(
+                file_path,
+                privacy_level=privacy_level,
+                metadata=metadata,
+                processing_id=processing_id,
+            )
+
+        try:
+            return self.file_processor_callback(
+                file_path,
+                privacy_level=privacy_level,
+                metadata=metadata,
+                processing_id=processing_id,
+            )
+        except TypeError:
+            # 回调可能不接受扩展参数，退回单参调用
+            return self.file_processor_callback(file_path)
+
+    def enqueue_file_for_processing(self, file_path: str, metadata: Dict[str, Any]) -> bool:
+        """外部直接将文件加入处理队列"""
+        path = Path(file_path)
+        if not path.exists():
+            self.logger.error(f"无法加入队列，文件不存在: {file_path}")
+            return False
+
+        metadata = metadata or {}
+        metadata.setdefault('detected_time', time.time())
+        metadata.setdefault('file_size', path.stat().st_size)
+        metadata.setdefault('source', 'direct_enqueue')
+
+        if self.processing_queue.is_tracking(file_path):
+            updated = self.processing_queue.update_file_metadata(file_path, metadata)
+            if updated:
+                self.logger.info(f"文件已在队列中，更新元数据: {path.name}")
+                return True
+            # 如果更新失败，继续尝试重新入队
+
+        added = self.processing_queue.add_file(file_path, metadata)
+        if added:
+            self.logger.info(f"文件已通过enqueue加入处理队列: {path.name}")
+        else:
+            self.logger.warning(f"enqueue加入处理队列失败（可能已存在）: {path.name}")
+        return added
     
     def _processing_worker(self):
         """处理队列工作线程"""
@@ -186,20 +242,30 @@ class FileMonitor:
             try:
                 # 从队列获取文件
                 file_path = self.processing_queue.get_file(timeout=0.5)
-                
+
                 if file_path:
+                    queue_metadata = self.processing_queue.get_file_metadata(file_path) or {}
+
+                    processing_config = queue_metadata.get('processing_config')
+                    processing_id = queue_metadata.get('processing_id')
+                    privacy_level = queue_metadata.get('privacy_level', 'private')
+
                     self.logger.info(f"开始处理文件: {Path(file_path).name}")
                     start_time = time.time()
-                    
+
                     try:
-                        # 调用文件处理回调
-                        success = self.file_processor_callback(file_path)
-                        
+                        success = self._invoke_processor(
+                            file_path,
+                            privacy_level=privacy_level,
+                            metadata=processing_config,
+                            processing_id=processing_id,
+                        )
+
                         processing_time = time.time() - start_time
-                        
+
                         if success:
                             self.processing_queue.mark_completed(
-                                file_path, 
+                                file_path,
                                 {'processing_time': processing_time}
                             )
                             self.logger.info(
@@ -208,11 +274,11 @@ class FileMonitor:
                             )
                         else:
                             self.processing_queue.mark_failed(
-                                file_path, 
+                                file_path,
                                 "处理回调返回失败",
                                 retry=True
                             )
-                            
+
                     except Exception as e:
                         self.processing_queue.mark_failed(
                             file_path,
