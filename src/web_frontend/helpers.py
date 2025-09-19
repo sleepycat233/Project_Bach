@@ -8,12 +8,13 @@ Phase 7.1: API重构和代码优化的一部分。
 
 import json
 import logging
+from copy import deepcopy
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from collections import Counter
 
-from ..utils.config import DEFAULT_CONTENT_TYPES
+from ..utils.content_type_defaults import DEFAULT_CONTENT_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -36,18 +37,11 @@ def get_config_value(app, key_path: str, default=None):
     return default
 
 
-def _get_content_types_config_with_fallback(config_manager):
-    """获取内容类型配置，带默认值回退
-
-    Args:
-        config_manager: 配置管理器或None
-
-    Returns:
-        内容类型配置字典
-    """
-    if config_manager:
-        return config_manager.get_content_types_config()
-    return DEFAULT_CONTENT_TYPES
+def _get_content_types_config(content_type_service=None):
+    """获取内容类型配置，带默认值回退"""
+    if content_type_service:
+        return content_type_service.get_all()
+    return deepcopy(DEFAULT_CONTENT_TYPES)
 
 
 def get_content_types_config(app):
@@ -59,8 +53,8 @@ def get_content_types_config(app):
     Returns:
         内容类型配置字典
     """
-    config_manager = app.config.get('CONFIG_MANAGER')
-    return _get_content_types_config_with_fallback(config_manager)
+    content_type_service = app.config.get('CONTENT_TYPE_SERVICE')
+    return _get_content_types_config(content_type_service)
 
 
 def create_api_response(success: bool = True, data: Any = None,
@@ -91,13 +85,14 @@ def create_api_response(success: bool = True, data: Any = None,
     return response
 
 
-def scan_content_directory(directory_path: Path, is_private: bool = False, config_manager=None) -> tuple:
+def scan_content_directory(directory_path: Path, is_private: bool = False,
+                           content_type_service=None) -> tuple:
     """扫描目录获取内容文件信息
 
     Args:
         directory_path: 目录路径
         is_private: 是否为私有内容
-        config_manager: 配置管理器，用于获取内容类型定义
+        content_type_service: 内容类型服务实例
 
     Returns:
         (content_files列表, 按类型统计的计数字典)
@@ -106,8 +101,8 @@ def scan_content_directory(directory_path: Path, is_private: bool = False, confi
     if not directory_path.exists():
         return content_files, {}
 
-    # 从配置获取支持的内容类型
-    content_types_config = _get_content_types_config_with_fallback(config_manager)
+    # 从服务获取支持的内容类型
+    content_types_config = _get_content_types_config(content_type_service)
 
     supported_types = {}
     for content_type, config in content_types_config.items():
@@ -199,35 +194,33 @@ def scan_content_directory(directory_path: Path, is_private: bool = False, confi
 
 
 
-def organize_content_by_type(content_list: List[Dict[str, Any]], config_manager=None) -> Dict[str, Any]:
+def organize_content_by_type(content_list: List[Dict[str, Any]],
+                             content_type_service=None) -> Dict[str, Any]:
     """将内容按类型和课程组织为树形结构
 
     Args:
         content_list: 内容文件列表
-        config_manager: 配置管理器，用于获取内容类型定义
+        content_type_service: 内容类型服务实例
 
     Returns:
         组织化的内容结构
     """
-    # 从配置获取支持的内容类型
-    content_types_config = _get_content_types_config_with_fallback(config_manager)
+    # 从服务获取支持的内容类型
+    content_types_config = _get_content_types_config(content_type_service)
 
     supported_types = set(content_types_config.keys())
 
-    # 动态初始化organized结构，基于配置判断结构类型
+    # 动态初始化organized结构，基于是否存在subcategories信息决定结构
     organized = {}
     for content_type in supported_types:
         config = content_types_config[content_type]
-        has_subcategory = config.get('has_subcategory', False)
+        subcategories_meta = config.get('subcategories')
 
-        if has_subcategory:
-            # 有subcategory的类型用字典结构 (如 lectures, meetings)
+        if isinstance(subcategories_meta, list):
             organized[f'{content_type}s'] = {}
         elif content_type == 'youtube':
-            # YouTube视频特殊处理
             organized['videos'] = {}
         else:
-            # 其他类型用列表结构
             organized[f'{content_type}s'] = []
 
     for content in content_list:
@@ -235,9 +228,9 @@ def organize_content_by_type(content_list: List[Dict[str, Any]], config_manager=
 
         # 动态处理有subcategory的内容类型
         config = content_types_config.get(content_type, {})
-        has_subcategory = config.get('has_subcategory', False)
+        subcategories_meta = config.get('subcategories')
 
-        if has_subcategory and f'{content_type}s' in organized:
+        if isinstance(subcategories_meta, list) and f'{content_type}s' in organized:
             # 获取subcategory信息
             upload_metadata = content.get('upload_metadata', {})
             category_name = "General"  # 默认值

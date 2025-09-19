@@ -39,7 +39,7 @@
                     <label class="form-label">Content Type</label>
                     <select name="content_type" class="form-select" required>
                         {% for key, type_info in content_types.items() %}
-                        <option value="{{ key }}">{{ type_info.icon }} {{ type_info.display_name }}</option>
+                        <option value="{{ key }}">{{ type_info.display_name }}</option>
                         {% endfor %}
                     </select>
                 </div>

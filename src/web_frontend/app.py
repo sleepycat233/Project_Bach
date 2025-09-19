@@ -23,6 +23,7 @@ from .youtube_handler import YouTubeHandler
 from ..core.processing_service import get_processing_service
 from ..utils.config import ConfigManager
 from ..core.dependency_container import get_global_container
+from ..utils.content_type_service import ContentTypeService
 from .helpers import get_config_value, create_api_response, scan_content_directory, organize_content_by_type, render_private_index, serve_private_file, get_content_types_config, validate_github_config
 
 logger = logging.getLogger(__name__)
@@ -77,15 +78,25 @@ def create_app(config=None):
     # 初始化处理服务
     if config_manager:
         global_container = get_global_container()
+        content_type_service = None
+
+        if global_container:
+            content_type_service = global_container.get_content_type_service()
+        else:
+            content_type_service = ContentTypeService(config_manager)
+
+        app.config['CONTENT_TYPE_SERVICE'] = content_type_service
         app.config['AUDIO_HANDLER'] = AudioUploadHandler(
             config_manager,
             container=global_container,
+            content_type_service=content_type_service,
         )
         app.config['YOUTUBE_HANDLER'] = YouTubeHandler(config_manager)
     else:
         logger.error("配置管理器加载失败，无法初始化处理服务")
         app.config['AUDIO_HANDLER'] = None
         app.config['YOUTUBE_HANDLER'] = None
+        app.config['CONTENT_TYPE_SERVICE'] = None
     app.config['PROCESSING_SERVICE'] = get_processing_service()
 
     # Tailscale安全中间件
@@ -527,12 +538,18 @@ def create_app(config=None):
                     'config_info': {}  # MLX模型无需复杂配置信息
                 })
 
-            # 从配置读取推荐策略
-            config = config_manager.get_full_config()
-            content_types = config.get('content_classification', {}).get('content_types', {})
+            # 读取内容类型推荐（已由ContentTypeService归一化）
+            content_types = get_content_types_config(app)
+
             content_type_recommendations = {}
             for content_type, type_config in content_types.items():
-                content_type_recommendations[content_type] = type_config.get('recommendations', [])
+                recommendations = type_config.get('recommendations') or {}
+                english = recommendations.get('english', []) if isinstance(recommendations, dict) else []
+                multilingual = recommendations.get('multilingual', []) if isinstance(recommendations, dict) else []
+                content_type_recommendations[content_type] = {
+                    'english': list(english),
+                    'multilingual': list(multilingual),
+                }
 
 
             def _set_recommendation_flags(model, english_recs, multilingual_recs):
@@ -614,18 +631,13 @@ def create_app(config=None):
     def api_get_subcategories(content_type):
         """获取指定content_type的subcategory列表API"""
         try:
-            from ..utils.preferences_manager import PreferencesManager
-            
-            # 初始化PreferencesManager - 使用data目录
-            data_folder = app.config.get('CONFIG_MANAGER').get_paths_config().get('data_folder', './data')
-            prefs_file = os.path.join(data_folder, 'user_preferences.json')
-            preferences_manager = PreferencesManager(prefs_file)
-            
-            # 获取subcategory列表
-            subcategories = preferences_manager.get_subcategories_with_names(content_type)
-            
+            content_type_service: ContentTypeService = app.config.get('CONTENT_TYPE_SERVICE')
+            if not content_type_service:
+                raise RuntimeError('Content type service is not initialized')
+
+            subcategories = content_type_service.get_subcategories(content_type)
+
             return jsonify({'data': subcategories})
-            
         except Exception as e:
             logger.error(f"Get subcategories API error: {e}")
             return jsonify({'error': f'Failed to get subcategories: {str(e)}'}), 500
@@ -635,28 +647,59 @@ def create_app(config=None):
     def api_get_preferences_config(content_type, subcategory=None):
         """获取有效配置API（支持继承机制）"""
         try:
-            from ..utils.preferences_manager import PreferencesManager
-            
-            # 初始化PreferencesManager - 使用data目录
-            data_folder = app.config.get('CONFIG_MANAGER').get_paths_config().get('data_folder', './data')
-            prefs_file = os.path.join(data_folder, 'user_preferences.json')
-            preferences_manager = PreferencesManager(prefs_file)
-            
-            # 获取有效配置
-            config = preferences_manager.get_effective_config(content_type, subcategory)
-            
+            content_type_service: ContentTypeService = app.config.get('CONTENT_TYPE_SERVICE')
+            if not content_type_service:
+                raise RuntimeError('Content type service is not initialized')
+
+            config = content_type_service.get_effective_config(content_type, subcategory)
+
             return jsonify({'data': config})
-            
         except Exception as e:
             logger.error(f"Get preferences config API error: {e}")
             return jsonify({'error': f'Failed to get preferences config: {str(e)}'}), 500
+
+    @app.route('/api/preferences/recommendations/<content_type>', methods=['GET'])
+    def api_get_recommendations(content_type):
+        """获取指定内容类型的推荐模型配置"""
+        try:
+            content_type_service: ContentTypeService = app.config.get('CONTENT_TYPE_SERVICE')
+            if not content_type_service:
+                raise RuntimeError('Content type service is not initialized')
+
+            recommendations = content_type_service.get_content_type_recommendations(content_type)
+            return jsonify(create_api_response(success=True, data=recommendations))
+        except Exception as e:
+            logger.error(f"Get recommendations API error: {e}")
+            return jsonify(create_api_response(success=False, error=str(e))), 500
+
+    @app.route('/api/preferences/recommendations/<content_type>', methods=['POST'])
+    def api_save_recommendations(content_type):
+        """保存内容类型的推荐模型配置"""
+        try:
+            payload = request.get_json() or {}
+            if not isinstance(payload, dict):
+                return jsonify(create_api_response(success=False, error='Invalid payload')), 400
+
+            content_type_service: ContentTypeService = app.config.get('CONTENT_TYPE_SERVICE')
+            if not content_type_service:
+                raise RuntimeError('Content type service is not initialized')
+
+            content_type_service.save_content_type_recommendations(content_type, payload)
+            updated = content_type_service.get_content_type_recommendations(content_type)
+
+            return jsonify(create_api_response(
+                success=True,
+                data=updated,
+                message=f'Recommendations for "{content_type}" updated successfully'
+            ))
+        except Exception as e:
+            logger.error(f"Save recommendations API error: {e}")
+            return jsonify(create_api_response(success=False, error=str(e))), 500
 
     @app.route('/api/preferences/subcategory', methods=['POST'])
     def api_create_subcategory():
         """创建新subcategory API"""
         try:
-            from ..utils.preferences_manager import PreferencesManager
-            
             # 获取请求数据
             data = request.get_json()
             if not data:
@@ -670,14 +713,12 @@ def create_app(config=None):
             if not content_type or not subcategory or not display_name:
                 return jsonify({'error': 'content_type, subcategory and display_name are required'}), 400
             
-            # 初始化PreferencesManager - 使用data目录
-            data_folder = app.config.get('CONFIG_MANAGER').get_paths_config().get('data_folder', './data')
-            prefs_file = os.path.join(data_folder, 'user_preferences.json')
-            preferences_manager = PreferencesManager(prefs_file)
-            
-            # 保存新subcategory配置
-            preferences_manager.save_config(content_type, subcategory, display_name, config)
-            
+            content_type_service: ContentTypeService = app.config.get('CONTENT_TYPE_SERVICE')
+            if not content_type_service:
+                raise RuntimeError('Content type service is not initialized')
+
+            content_type_service.save_subcategory(content_type, subcategory, display_name, config)
+
             return jsonify({
                 'success': True,
                 'message': f'Subcategory "{display_name}" created successfully'
@@ -707,11 +748,20 @@ def create_app(config=None):
                 config_manager = app.config.get('CONFIG_MANAGER')
                 
                 # 扫描私有内容
-                private_files, private_counts = scan_content_directory(private_root, is_private=True, config_manager=config_manager)
+                content_type_service = app.config.get('CONTENT_TYPE_SERVICE')
+                private_files, private_counts = scan_content_directory(
+                    private_root,
+                    is_private=True,
+                    content_type_service=content_type_service,
+                )
 
                 # 扫描公有内容（output/public目录）
                 public_root = Path(output_folder) / 'public'
-                public_files, public_counts = scan_content_directory(public_root, is_private=False, config_manager=config_manager)
+                public_files, public_counts = scan_content_directory(
+                    public_root,
+                    is_private=False,
+                    content_type_service=content_type_service,
+                )
 
                 # 合并所有内容
                 all_content_files = private_files + public_files
@@ -756,7 +806,10 @@ def create_app(config=None):
                     })
 
                 # 生成组织化的内容结构
-                organized_content = organize_content_by_type(all_content, config_manager)
+                organized_content = organize_content_by_type(
+                    all_content,
+                    content_type_service=content_type_service,
+                )
 
                 # 渲染私有内容首页
                 return render_private_index(app, all_content, organized_content)

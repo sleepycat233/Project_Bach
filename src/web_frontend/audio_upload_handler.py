@@ -19,6 +19,7 @@ from ..core.processing_service import (
     get_processing_service,
 )
 from ..core.audio_processor import AudioProcessor
+from ..utils.content_type_service import ContentTypeService
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +27,27 @@ logger = logging.getLogger(__name__)
 class AudioUploadHandler:
     """音频上传Web处理器"""
 
-    def __init__(self, config_manager=None, container: Optional[object] = None):
+    def __init__(
+        self,
+        config_manager=None,
+        container: Optional[object] = None,
+        content_type_service: Optional[ContentTypeService] = None,
+    ):
         """初始化音频上传处理器"""
         if config_manager is None:
             raise ValueError("AudioUploadHandler requires a valid config_manager")
         self.config_manager = config_manager
         self.container = container
+        self.content_type_service = content_type_service
+
+        if self.content_type_service is None and self.container is not None:
+            try:
+                self.content_type_service = self.container.get_content_type_service()
+            except AttributeError:
+                logger.debug("Dependency container does not expose content type service yet")
+
+        if self.content_type_service is None:
+            self.content_type_service = ContentTypeService(self.config_manager)
 
 
     def process_upload(self, file, content_type: str, subcategory: str = None,
@@ -92,8 +108,18 @@ class AudioUploadHandler:
 
                 # 获取配置中的subcategories
                 subcategories = []
-                # 注：content_classification.content_types已迁移到PreferencesManager
-                # 此处保留空的subcategories列表作为fallback
+                if self.content_type_service:
+                    try:
+                        subcategories = [
+                            entry['value']
+                            for entry in self.content_type_service.get_subcategories(content_type)
+                        ]
+                    except Exception as lookup_error:
+                        logger.warning(
+                            "Failed to load subcategories for %s: %s",
+                            content_type,
+                            lookup_error,
+                        )
 
                 # 确定目标文件夹和子分类代码
                 subcategory = metadata.get('subcategory', '') if metadata else ''
