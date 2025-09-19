@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 
 import pytest
@@ -9,8 +8,9 @@ from src.utils.preferences_manager import PreferencesManager
 
 
 class DummyConfigManager:
-    def __init__(self, config=None, data_folder='.'):
-        self.config = config or {}
+    """Mock配置管理器，不依赖config.yaml"""
+    def __init__(self, data_folder='.'):
+        # 不再接受config参数，因为ContentTypeService不再从config读取content_types
         self._paths = {'data_folder': data_folder}
 
     def get_paths_config(self):
@@ -23,22 +23,31 @@ def temp_preferences(tmp_path: Path):
     return PreferencesManager(str(prefs_file))
 
 
-def test_service_returns_defaults_when_no_overrides(temp_preferences):
-    manager = DummyConfigManager(data_folder=os.path.dirname(temp_preferences.prefs_file))
+def test_service_returns_defaults_when_no_overrides(tmp_path: Path, temp_preferences):
+    """测试服务返回默认content types（来自DEFAULT_CONTENT_TYPES）"""
+    manager = DummyConfigManager(data_folder=str(tmp_path))
     service = ContentTypeService(manager, preferences_manager=temp_preferences)
 
     content_types = service.get_all()
 
+    # 验证默认的content types存在
     assert 'lecture' in content_types
     assert 'meeting' in content_types
-    assert 'subcategories' in content_types['lecture']
-    assert 'recommendations' in content_types['lecture']
+    assert 'youtube' in content_types  # 新增的默认类型
+
+    # 验证动态添加的字段
+    assert 'subcategories' in content_types['lecture']  # 动态从PreferencesManager获取
+    assert 'recommendations' in content_types['lecture']  # 动态添加的推荐配置
+    assert 'display_name' in content_types['lecture']  # 来自DEFAULT_CONTENT_TYPES
+
+    # subcategories应该是空的（没有保存的偏好）
+    assert content_types['lecture']['subcategories'] == []
 
 
 def test_service_merges_preferences_subcategories(tmp_path: Path, temp_preferences):
     temp_preferences.save_config('lecture', 'MATH101', 'Advanced Calculus', {'enable_summary': True})
 
-    manager = DummyConfigManager(data_folder=tmp_path)
+    manager = DummyConfigManager(data_folder=str(tmp_path))
     service = ContentTypeService(manager, preferences_manager=temp_preferences)
 
     content_types = service.get_all()
@@ -46,26 +55,25 @@ def test_service_merges_preferences_subcategories(tmp_path: Path, temp_preferenc
     assert any(sub['value'] == 'MATH101' for sub in lecture['subcategories'])
 
 
-def test_service_includes_configured_types(tmp_path: Path, temp_preferences):
-    config = {
-        'content_classification': {
-            'content_types': {
-                'podcast': {
-                    'icon': '🎙️',
-                    'display_name': 'Podcast',
-                    'has_subcategory': False,
-                }
-            }
-        }
-    }
-
-    manager = DummyConfigManager(config=config, data_folder=tmp_path)
+def test_service_only_uses_defaults_not_config(tmp_path: Path, temp_preferences):
+    """验证ContentTypeService不再从config.yaml读取content_types"""
+    # 即使我们尝试传入config参数，DummyConfigManager也不会使用它
+    # 因为ContentTypeService只从DEFAULT_CONTENT_TYPES获取基础定义
+    manager = DummyConfigManager(data_folder=str(tmp_path))
     service = ContentTypeService(manager, preferences_manager=temp_preferences)
 
     content_types = service.get_all()
-    assert 'podcast' in content_types
-    assert content_types['podcast']['display_name'] == 'Podcast'
-    assert 'recommendations' in content_types['podcast']
+
+    # 验证只有DEFAULT_CONTENT_TYPES中定义的类型
+    assert 'podcast' not in content_types  # 不存在的类型
+    assert 'lecture' in content_types
+    assert 'meeting' in content_types
+    assert 'youtube' in content_types
+
+    # 验证没有从config.yaml继承的字段
+    for ct in content_types.values():
+        assert 'icon' not in ct  # icon字段已被废弃
+        assert 'has_subcategory' not in ct  # has_subcategory字段已被废弃
 
 
 def test_service_adds_preference_only_types(tmp_path: Path, temp_preferences):
@@ -76,7 +84,7 @@ def test_service_adds_preference_only_types(tmp_path: Path, temp_preferences):
     }
     temp_preferences._save_to_file()
 
-    manager = DummyConfigManager(data_folder=tmp_path)
+    manager = DummyConfigManager(data_folder=str(tmp_path))
     service = ContentTypeService(manager, preferences_manager=temp_preferences)
 
     content_types = service.get_all()
@@ -85,7 +93,7 @@ def test_service_adds_preference_only_types(tmp_path: Path, temp_preferences):
 
 
 def test_service_gets_effective_config(tmp_path: Path, temp_preferences):
-    manager = DummyConfigManager(data_folder=tmp_path)
+    manager = DummyConfigManager(data_folder=str(tmp_path))
     service = ContentTypeService(manager, preferences_manager=temp_preferences)
 
     config = service.get_effective_config('lecture')
@@ -96,7 +104,7 @@ def test_service_gets_effective_config(tmp_path: Path, temp_preferences):
 
 
 def test_service_persists_subcategory_changes(tmp_path: Path, temp_preferences):
-    manager = DummyConfigManager(data_folder=tmp_path)
+    manager = DummyConfigManager(data_folder=str(tmp_path))
     service = ContentTypeService(manager, preferences_manager=temp_preferences)
 
     service.save_subcategory('lecture', 'CS101', 'Computer Science 101', {'enable_summary': True})
@@ -114,7 +122,7 @@ def test_service_persists_subcategory_changes(tmp_path: Path, temp_preferences):
 
 
 def test_service_reload_preferences(tmp_path: Path, temp_preferences):
-    manager = DummyConfigManager(data_folder=tmp_path)
+    manager = DummyConfigManager(data_folder=str(tmp_path))
     service = ContentTypeService(manager, preferences_manager=temp_preferences)
 
     # Simulate external change by writing directly to the file
@@ -130,14 +138,17 @@ def test_service_reload_preferences(tmp_path: Path, temp_preferences):
 
 
 def test_service_handles_recommendations(tmp_path: Path, temp_preferences):
-    manager = DummyConfigManager(data_folder=tmp_path)
+    manager = DummyConfigManager(data_folder=str(tmp_path))
     service = ContentTypeService(manager, preferences_manager=temp_preferences)
 
-    # 默认推荐应存在并为dict结构
+    # 默认推荐应存在并为dict结构（空的，因为DEFAULT_CONTENT_TYPES没有定义推荐）
     defaults = service.get_content_type_recommendations('lecture')
     assert isinstance(defaults, dict)
     assert 'english' in defaults
     assert 'multilingual' in defaults
+    # 默认应该是空列表
+    assert defaults['english'] == []
+    assert defaults['multilingual'] == []
 
     # 更新推荐并验证持久化
     service.save_content_type_recommendations('lecture', {
