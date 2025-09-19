@@ -6,11 +6,41 @@
 
 import yaml
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Sequence, Union, Tuple
 import logging
 
+DEFAULT_MAX_FILE_SIZE = 1024 * 1024 * 1024  # 1GB
+DEFAULT_SUPPORTED_FORMATS: Tuple[str, ...] = (
+    '.mp3', '.wav', '.m4a', '.mp4', '.flac', '.aac', '.ogg'
+)
+DEFAULT_UPLOAD_FOLDER = './data/uploads'
+DEFAULT_ORGANIZE_BY_CATEGORY = False
+DEFAULT_CREATE_SUBCATEGORY_FOLDERS = False
+DEFAULT_TAILSCALE_ONLY = True
 
+
+@dataclass(frozen=True)
+class UploadSettings:
+    """Typed view over web_frontend.upload configuration."""
+
+    max_file_size: int = DEFAULT_MAX_FILE_SIZE
+    supported_formats: Tuple[str, ...] = DEFAULT_SUPPORTED_FORMATS
+    upload_folder: str = DEFAULT_UPLOAD_FOLDER
+    organize_by_category: bool = DEFAULT_ORGANIZE_BY_CATEGORY
+    create_subcategory_folders: bool = DEFAULT_CREATE_SUBCATEGORY_FOLDERS
+
+    @property
+    def allowed_extensions(self) -> Tuple[str, ...]:
+        return tuple(fmt.lstrip('.') for fmt in self.supported_formats)
+
+
+@dataclass(frozen=True)
+class SecuritySettings:
+    """Typed view over web_frontend.security configuration."""
+
+    tailscale_only: bool = DEFAULT_TAILSCALE_ONLY
 
 
 class ConfigManager:
@@ -160,30 +190,75 @@ class ConfigManager:
         return paths_config
 
     # 其他配置建议直接使用:
-    # config_manager.config.get('openrouter', {}) 或
-    # config_manager.get_nested_config('openrouter')
+    # config_manager.config.get('openrouter', {}) 或 config_manager.get('openrouter')
 
+    def get(self, *path: Union[str, Sequence[str]], default=None) -> Any:
+        """通用配置读取，支持点路径或序列路径。
 
+        示例::
 
-    def get_nested_config(self, *keys) -> Any:
-        """获取嵌套配置值
+            config_manager.get('openrouter.base_url')
+            config_manager.get(['paths', 'data_folder'])
 
         Args:
-            *keys: 配置键路径，如 get_nested_config('content_classification', 'content_types', 'lecture')
-
-        Returns:
-            配置值，如果路径不存在返回None
+            *path: 点号分隔的字符串或键序列
+            default: 路径不存在时返回的默认值
         """
-        current = self.config
-        for i, key in enumerate(keys):
+        if len(path) == 1 and isinstance(path[0], (str, list, tuple)):
+            keys = path[0]
+        else:
+            keys = path
+
+        if isinstance(keys, str):
+            key_list = [segment for segment in keys.split('.') if segment]
+        else:
+            key_list = list(keys)
+
+        if not key_list:
+            return self.config if default is None else default
+
+        current: Any = self.config
+        traversed: list[str] = []
+        for key in key_list:
             if isinstance(current, dict) and key in current:
                 current = current[key]
+                traversed.append(str(key))
             else:
-                config_path = '.'.join(keys)
-                missing_at = '.'.join(keys[:i+1])
-                self.logger.warning(f"配置路径不存在: {config_path} (在 {missing_at} 处中断)")
-                return None
-        return current
+                missing_path = '.'.join(key_list)
+                missing_at = '.'.join(traversed + [str(key)]) if traversed else str(key)
+                self.logger.warning(
+                    "配置路径不存在: %s (在 %s 处中断)",
+                    missing_path,
+                    missing_at,
+                )
+                return default
+
+        return current if current is not None else default
+
+    def get_upload_settings(self) -> UploadSettings:
+        """获取上传配置（带默认值）。"""
+
+        raw = self.get('web_frontend.upload', default={}) or {}
+
+        supported_formats = tuple(
+            raw.get('supported_formats', DEFAULT_SUPPORTED_FORMATS)
+        )
+
+        return UploadSettings(
+            max_file_size=raw.get('max_file_size', DEFAULT_MAX_FILE_SIZE),
+            supported_formats=supported_formats if supported_formats else DEFAULT_SUPPORTED_FORMATS,
+            upload_folder=raw.get('upload_folder', DEFAULT_UPLOAD_FOLDER),
+            organize_by_category=raw.get('organize_by_category', DEFAULT_ORGANIZE_BY_CATEGORY),
+            create_subcategory_folders=raw.get('create_subcategory_folders', DEFAULT_CREATE_SUBCATEGORY_FOLDERS),
+        )
+
+    def get_security_settings(self) -> SecuritySettings:
+        """获取安全配置（带默认值）。"""
+
+        raw = self.get('web_frontend.security', default={}) or {}
+        return SecuritySettings(
+            tailscale_only=raw.get('tailscale_only', DEFAULT_TAILSCALE_ONLY)
+        )
 
 
     def get_full_config(self) -> Dict[str, Any]:

@@ -96,8 +96,8 @@ class AudioUploadHandler:
                 tracker.update_stage(ProcessingStage.UPLOADED, 5, f"Uploading file: {filename}")
 
                 # 使用配置文件中的watch_folder作为上传目录，文件监控系统会自动处理
-                if self.config_manager:
-                    watch_folder = self.config_manager.get_nested_config('paths', 'watch_folder') or "./data/uploads"
+                if self.config_manager and hasattr(self.config_manager, 'get'):
+                    watch_folder = self.config_manager.get('paths.watch_folder', default="./data/uploads")
                 else:
                     watch_folder = "./data/uploads"  # fallback
                 uploads_folder = Path(watch_folder)
@@ -293,8 +293,8 @@ class AudioUploadHandler:
 
     def get_supported_formats(self):
         """获取支持的音频格式 - 从配置文件读取"""
-        upload_config = self.config_manager.get_nested_config('web_frontend', 'upload') or {}
-        supported_formats_list = upload_config.get('supported_formats') or ['.mp3', '.wav', '.m4a', '.mp4', '.flac', '.aac', '.ogg', '.wma']
+        upload_settings = self.config_manager.get_upload_settings() if self.config_manager else None
+        supported_formats_list = list(upload_settings.supported_formats) if upload_settings else ['.mp3', '.wav', '.m4a', '.mp4', '.flac', '.aac', '.ogg', '.wma']
 
         # 生成格式名称映射
         format_names = {

@@ -60,7 +60,7 @@ class AudioProcessor:
             repo_name = 'Project_Bach'
 
             if config_manager:
-                github_config = config_manager.get_nested_config('github') or {}
+                github_config = config_manager.get('github', default={}) if hasattr(config_manager, 'get') else {}
                 if isinstance(github_config, dict):
                     pages_url = github_config.get('pages_url')
                     username = github_config.get('username')

@@ -304,13 +304,10 @@ class YouTubeHandler:
                 
                 # 获取配置中的超时设置 - 增加超时时间以处理网络延迟
                 timeout = 25  # 默认25秒，处理网络波动和复杂视频
-                if self.config_manager:
-                    try:
-                        youtube_config = self.config_manager.get_nested_config('youtube')
-                        if youtube_config and 'metadata' in youtube_config:
-                            timeout = youtube_config['metadata'].get('quick_metadata_timeout', 15)
-                    except:
-                        pass
+                if self.config_manager and hasattr(self.config_manager, 'get'):
+                    youtube_config = self.config_manager.get('youtube', default={}) or {}
+                    if 'metadata' in youtube_config:
+                        timeout = youtube_config['metadata'].get('quick_metadata_timeout', 15)
                 
                 # 最优化的yt-dlp调用 - 只获取必需信息，无额外检查
                 cmd = [
@@ -425,13 +422,10 @@ class YouTubeHandler:
         try:
             # 获取优先语言配置
             preferred_languages = ["zh-CN", "zh", "en"]
-            if self.config_manager:
-                try:
-                    youtube_config = self.config_manager.get_nested_config('youtube')
-                    if youtube_config and 'metadata' in youtube_config:
-                        preferred_languages = youtube_config['metadata'].get('preferred_subtitle_languages', preferred_languages)
-                except:
-                    pass
+            if self.config_manager and hasattr(self.config_manager, 'get'):
+                youtube_config = self.config_manager.get('youtube', default={}) or {}
+                if 'metadata' in youtube_config:
+                    preferred_languages = youtube_config['metadata'].get('preferred_subtitle_languages', preferred_languages)
             
             subtitles = {}
             auto_captions = {}
@@ -484,13 +478,10 @@ class YouTubeHandler:
         try:
             # 获取配置中的优先语言
             preferred_languages = ["zh-CN", "zh", "en"]  # 默认值
-            if self.config_manager:
-                try:
-                    youtube_config = self.config_manager.get_nested_config('youtube')
-                    if youtube_config and 'metadata' in youtube_config:
-                        preferred_languages = youtube_config['metadata'].get('preferred_subtitle_languages', preferred_languages)
-                except:
-                    pass
+            if self.config_manager and hasattr(self.config_manager, 'get'):
+                youtube_config = self.config_manager.get('youtube', default={}) or {}
+                if 'metadata' in youtube_config:
+                    preferred_languages = youtube_config['metadata'].get('preferred_subtitle_languages', preferred_languages)
             
             # 从video_info中检查字幕信息（如果yt-dlp已经获取了）
             if 'subtitles' in video_info:

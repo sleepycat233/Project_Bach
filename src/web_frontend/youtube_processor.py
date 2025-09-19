@@ -39,7 +39,7 @@ class YouTubeProcessor:
         self.logger = logging.getLogger('project_bach.youtube_processor')
         
         # 加载YouTube配置
-        self.youtube_config = config_manager.get_nested_config('youtube')
+        self.youtube_config = config_manager.get('youtube', default={})
         if not self.youtube_config:
             raise ValueError("YouTube配置缺失，请检查config.yaml中的youtube部分")
         
@@ -70,9 +70,8 @@ class YouTubeProcessor:
         subtitle_config = self.youtube_config.get('subtitles', {})
         
         # 从配置读取首选字幕语言，优先使用metadata下的配置
-        youtube_config = config_manager.get_nested_config('youtube')
-        if youtube_config and 'metadata' in youtube_config:
-            config_preferred_languages = youtube_config['metadata'].get('preferred_subtitle_languages', ['zh-CN', 'zh', 'en'])
+        if 'metadata' in self.youtube_config:
+            config_preferred_languages = self.youtube_config['metadata'].get('preferred_subtitle_languages', ['zh-CN', 'zh', 'en'])
         else:
             config_preferred_languages = ['zh-CN', 'zh', 'en']
         subtitle_preferred_languages = subtitle_config.get('preferred_languages', config_preferred_languages)

@@ -30,7 +30,7 @@ class GitPublisher:
         
         # 初始化模板引擎
         if config_manager:
-            template_config = config_manager.get_nested_config('publishing', 'template_engine')
+            template_config = config_manager.get('publishing.template_engine', default={}) if hasattr(config_manager, 'get') else {}
             if not template_config:  # 如果配置为空，提供默认配置
                 template_config = {'template_dir': './templates'}
             self.template_engine = TemplateEngine(template_config)

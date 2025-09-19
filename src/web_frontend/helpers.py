@@ -31,9 +31,8 @@ def get_config_value(app, key_path: str, default=None):
         配置值或默认值
     """
     config_manager = app.config.get('CONFIG_MANAGER')
-    if config_manager:
-        keys = key_path.split('.')
-        return config_manager.get_nested_config(*keys) or default
+    if config_manager and hasattr(config_manager, 'get'):
+        return config_manager.get(key_path, default=default)
     return default
 
 

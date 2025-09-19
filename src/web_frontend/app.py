@@ -21,7 +21,7 @@ import logging
 from .audio_upload_handler import AudioUploadHandler
 from .youtube_handler import YouTubeHandler
 from ..core.processing_service import get_processing_service
-from ..utils.config import ConfigManager
+from ..utils.config import ConfigManager, UploadSettings
 from ..core.dependency_container import get_global_container
 from ..utils.content_type_service import ContentTypeService
 from .helpers import get_config_value, create_api_response, scan_content_directory, organize_content_by_type, render_private_index, serve_private_file, get_content_types_config, validate_github_config
@@ -49,30 +49,20 @@ def create_app(config=None):
         app.config.update(config)
 
     # 初始化配置管理器
-    config_manager = None
+    config_manager = app.config.get('CONFIG_MANAGER')
     try:
-        if config:
-            # 使用提供的配置创建配置管理器
-            from types import SimpleNamespace
-            config_manager = SimpleNamespace()
-            config_manager.config = config
-            # 为测试环境添加必需的方法
-            config_manager.get_nested_config = lambda section, key=None: config.get(section, {}).get(key, {}) if key else config.get(section, {})
-            config_manager.get_full_config = lambda: config
-        else:
-            # 使用默认配置管理器
+        if not config_manager:
             config_manager = ConfigManager()
-        app.config['CONFIG_MANAGER'] = config_manager
-        
-        # 从配置读取文件大小限制 - ConfigManager负责提供默认值
-        upload_config = config_manager.get_nested_config('web_frontend', 'upload') or {}
-        max_file_size = upload_config.get('max_file_size') or (1024 * 1024 * 1024)  # 1GB default
-        app.config['MAX_CONTENT_LENGTH'] = max_file_size
-            
+            app.config['CONFIG_MANAGER'] = config_manager
+
+        upload_settings = config_manager.get_upload_settings()
+        app.config['MAX_CONTENT_LENGTH'] = upload_settings.max_file_size
+
     except Exception as e:
         logger.warning(f"Failed to load config manager: {e}")
+        config_manager = None
         app.config['CONFIG_MANAGER'] = None
-        app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB default
+        app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB fallback
 
 
     # 初始化处理服务
@@ -109,8 +99,8 @@ def create_app(config=None):
         config_manager = app.config.get('CONFIG_MANAGER')
         tailscale_only_enabled = True
         if config_manager:
-            security_config = config_manager.get_nested_config('web_frontend', 'security') or {}
-            tailscale_only_enabled = security_config.get('tailscale_only', True)
+            security_settings = config_manager.get_security_settings()
+            tailscale_only_enabled = security_settings.tailscale_only
 
         if not tailscale_only_enabled:
             return  # 配置显式禁用Tailscale网络限制
@@ -334,7 +324,7 @@ def create_app(config=None):
                 'config_github_username': get_config_value(app, 'github.username'),
                 'config_github_pages_url': get_config_value(app, 'github.pages_url'),
                 'config_manager_exists': config_manager is not None,
-                'full_github_config': config_manager.get_nested_config('github') if config_manager else None
+                'full_github_config': config_manager.get('github', default={}) if config_manager else None
             }
             return jsonify(create_api_response(success=True, data=debug_info))
         except Exception as e:
@@ -347,26 +337,21 @@ def create_app(config=None):
         try:
             config_manager = app.config.get('CONFIG_MANAGER')
 
-            # 获取上传配置
-            upload_config = config_manager.get_nested_config('web_frontend', 'upload') if config_manager else {}
-            max_file_size = upload_config.get('max_file_size') or (1024 * 1024 * 1024)  # 1GB default
-            supported_formats = upload_config.get('supported_formats') or ['.mp3', '.wav', '.m4a', '.mp4', '.flac', '.aac', '.ogg']
+            def format_file_size(bytes_value: int) -> str:
+                if bytes_value >= 1024 ** 3:
+                    return f"{bytes_value // (1024 ** 3)}GB"
+                if bytes_value >= 1024 ** 2:
+                    return f"{bytes_value // (1024 ** 2)}MB"
+                return f"{bytes_value // 1024}KB"
 
-            # 格式化文件大小显示
-            def format_file_size(bytes):
-                if bytes >= 1024**3:
-                    return f"{bytes // (1024**3)}GB"
-                elif bytes >= 1024**2:
-                    return f"{bytes // (1024**2)}MB"
-                else:
-                    return f"{bytes // 1024}KB"
+            upload_settings = config_manager.get_upload_settings() if config_manager else UploadSettings()
 
             frontend_config = {
                 'upload': {
-                    'max_file_size': max_file_size,
-                    'max_file_size_display': format_file_size(max_file_size),
-                    'supported_formats': supported_formats,
-                    'allowed_extensions': [fmt.lstrip('.') for fmt in supported_formats]  # 去掉点号
+                    'max_file_size': upload_settings.max_file_size,
+                    'max_file_size_display': format_file_size(upload_settings.max_file_size),
+                    'supported_formats': list(upload_settings.supported_formats),
+                    'allowed_extensions': list(upload_settings.allowed_extensions)
                 }
             }
 
