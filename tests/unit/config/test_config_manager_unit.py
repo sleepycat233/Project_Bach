@@ -46,17 +46,29 @@ class MockConfigManager:
         
         return current
     
-    def get_nested_config(self, *keys):
-        """获取嵌套配置"""
+    def get(self, *path, default=None):
+        """通用配置读取，支持点路径或序列路径"""
+        if len(path) == 1 and isinstance(path[0], (str, list, tuple)):
+            keys = path[0]
+        else:
+            keys = path
+
+        if isinstance(keys, str):
+            key_list = [segment for segment in keys.split('.') if segment]
+        else:
+            key_list = list(keys)
+
+        if not key_list:
+            return self.config if default is None else default
+
         current = self.config
-        
-        for key in keys:
+        for key in key_list:
             if isinstance(current, dict) and key in current:
                 current = current[key]
             else:
-                return {}
-        
-        return current if isinstance(current, dict) else {}
+                return default if default is not None else {}
+
+        return current
     
     def get_full_config(self):
         """获取完整配置"""
@@ -182,10 +194,10 @@ class TestConfigRetrieval(unittest.TestCase):
         
         self.assertEqual(result, expected)
     
-    def test_get_nested_config_with_dot_notation(self):
+    def test_get_with_dot_notation(self):
         """测试使用点号获取嵌套配置"""
-        result = self.manager.get_config_value('api.openrouter.model')
-        
+        result = self.manager.get('api.openrouter.model')
+
         self.assertEqual(result, 'deepseek/deepseek-chat')
     
     def test_get_non_existent_config(self):
@@ -203,7 +215,7 @@ class TestConfigRetrieval(unittest.TestCase):
     
     def test_get_nested_config_direct(self):
         """测试直接获取嵌套配置"""
-        result = self.manager.get_nested_config('api', 'openrouter')
+        result = self.manager.get(['api', 'openrouter'])
         expected = {
             'base_url': 'https://openrouter.ai/api/v1',
             'model': 'deepseek/deepseek-chat'
@@ -213,8 +225,8 @@ class TestConfigRetrieval(unittest.TestCase):
     
     def test_get_nested_config_non_existent(self):
         """测试获取不存在的嵌套配置"""
-        result = self.manager.get_nested_config('non', 'existent')
-        
+        result = self.manager.get(['non', 'existent'], default={})
+
         self.assertEqual(result, {})
 
 
@@ -347,7 +359,7 @@ class TestEdgeCases(unittest.TestCase):
     def test_nested_config_non_dict_value(self):
         """测试嵌套配置遇到非字典值"""
         self.manager.load_config({'api': 'string_value'})
-        result = self.manager.get_nested_config('api', 'sub_key')
+        result = self.manager.get(['api', 'sub_key'], default={})
         
         self.assertEqual(result, {})
     

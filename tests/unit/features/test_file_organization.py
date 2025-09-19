@@ -95,7 +95,7 @@ class TestFileOrganizationConfig(unittest.TestCase):
         
         # 获取配置
         paths_config = config_manager.get_paths_config()
-        upload_config = config_manager.get_nested_config('web_frontend', 'upload')
+        upload_config = config_manager.get(['web_frontend', 'upload'], default={})
         
         # 验证路径一致性
         watch_folder = paths_config.get('watch_folder')
@@ -111,7 +111,7 @@ class TestFileOrganizationConfig(unittest.TestCase):
         mock_setup_env.side_effect = Exception("Force use direct loading")
         
         config_manager = ConfigManager(self.config_path)
-        content_types = config_manager.get_nested_config('content_classification', 'content_types')
+        content_types = config_manager.get(['content_classification', 'content_types'], default={})
         
         # 验证所有内容类型都有子分类
         expected_types = ['lecture', 'meeting', 'others']
@@ -139,7 +139,7 @@ class TestFileOrganizationConfig(unittest.TestCase):
         mock_setup_env.side_effect = Exception("Force use direct loading")
         
         config_manager = ConfigManager(self.config_path)
-        upload_config = config_manager.get_nested_config('web_frontend', 'upload')
+        upload_config = config_manager.get(['web_frontend', 'upload'], default={})
         
         # 验证组织功能开关
         self.assertTrue(upload_config.get('organize_by_category'))

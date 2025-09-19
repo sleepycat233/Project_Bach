@@ -38,7 +38,7 @@ class TestAudioUploadHandler(unittest.TestCase):
         
         # 创建模拟配置管理器
         self.mock_config_manager = Mock()
-        self.mock_config_manager.get_nested_config.return_value = {
+        self.mock_config_manager.get.return_value = {
             'lecture': {
                 'icon': '🎓',
                 'display_name': 'Academic Lecture',

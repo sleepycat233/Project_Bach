@@ -112,8 +112,8 @@ class TestConfigManager(unittest.TestCase):
         manager = ConfigManager(self.config_path)
         
         # 测试各个API服务配置的单独获取
-        openrouter_config = manager.get_nested_config('openrouter')
-        huggingface_config = manager.get_nested_config('huggingface')
+        openrouter_config = manager.get('openrouter', default={})
+        huggingface_config = manager.get('huggingface', default={})
 
         # 验证配置结构正确
         self.assertIn('key', openrouter_config)
@@ -125,7 +125,7 @@ class TestConfigManager(unittest.TestCase):
         """测试获取OpenRouter配置"""
         mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
-        openrouter_config = manager.get_nested_config('openrouter')
+        openrouter_config = manager.get('openrouter', default={})
         self.assertEqual(openrouter_config, self.valid_config['openrouter'])
     
     @patch('utils.env_manager.setup_project_environment')
@@ -141,9 +141,9 @@ class TestConfigManager(unittest.TestCase):
         """测试获取MLX Whisper配置 - 测试不存在的配置项返回None"""
         mock_setup_env.side_effect = Exception("Force use direct loading")
         manager = ConfigManager(self.config_path)
-        mlx_config = manager.get_nested_config('mlx_whisper')
-        # 由于测试配置中没有mlx_whisper项，应该返回None
-        self.assertIsNone(mlx_config)
+        mlx_config = manager.get('mlx_whisper', default={})
+        # 由于测试配置中没有mlx_whisper项，应该返回默认值 {}
+        self.assertEqual(mlx_config, {})
     
     def test_update_config(self):
         """测试更新配置项 - 跳过，update_config方法已移除"""
@@ -195,7 +195,7 @@ class TestConfigManager(unittest.TestCase):
             yaml.dump(self.valid_config, f)
         
         manager = ConfigManager(self.config_path)
-        content_types = manager.get_nested_config('content_classification', 'content_types')
+        content_types = manager.get(['content_classification', 'content_types'], default={})
         
         # 验证内容类型配置
         self.assertIn('lecture', content_types)
@@ -238,7 +238,7 @@ class TestConfigManager(unittest.TestCase):
         
         # 获取路径配置
         paths_config = manager.get_paths_config()
-        upload_config = manager.get_nested_config('web_frontend', 'upload')
+        upload_config = manager.get(['web_frontend', 'upload'], default={})
         
         # 验证一致性
         watch_folder = paths_config.get('watch_folder')
@@ -380,7 +380,7 @@ class TestGitHubPagesURLGeneration(unittest.TestCase):
         manager = ConfigManager(self.config_path)
 
         # 验证自动生成的GitHub Pages URL
-        github_config = manager.get_nested_config('github')
+        github_config = manager.get('github', default={})
         self.assertEqual(github_config['username'], 'testuser')
         self.assertEqual(github_config['pages_url'], 'https://testuser.github.io/Project_Bach')
 
@@ -400,7 +400,7 @@ class TestGitHubPagesURLGeneration(unittest.TestCase):
         manager = ConfigManager(self.config_path)
 
         # 验证使用自定义仓库名的URL
-        github_config = manager.get_nested_config('github')
+        github_config = manager.get('github', default={})
         self.assertEqual(github_config['pages_url'], 'https://customuser.github.io/CustomRepo')
 
     @patch('utils.env_manager.setup_project_environment')
@@ -419,7 +419,7 @@ class TestGitHubPagesURLGeneration(unittest.TestCase):
         manager = ConfigManager(self.config_path)
 
         # 验证不生成pages_url
-        github_config = manager.get_nested_config('github')
+        github_config = manager.get('github', default={})
         self.assertEqual(github_config['username'], 'testuser')
         self.assertIsNone(github_config.get('pages_url'))
 
@@ -432,7 +432,7 @@ class TestGitHubPagesURLGeneration(unittest.TestCase):
         manager = ConfigManager(self.config_path)
 
         # 验证GitHub配置存在但没有pages_url
-        github_config = manager.get_nested_config('github')
+        github_config = manager.get('github', default={})
         self.assertIsNotNone(github_config)  # 配置文件中的基础配置仍然存在
         self.assertEqual(github_config['repo_name'], 'Project_Bach')
         self.assertNotIn('pages_url', github_config)  # 没有生成pages_url
@@ -454,7 +454,7 @@ class TestGitHubPagesURLGeneration(unittest.TestCase):
         manager = ConfigManager(self.config_path)
 
         # 验证使用默认仓库名
-        github_config = manager.get_nested_config('github')
+        github_config = manager.get('github', default={})
         self.assertEqual(github_config['pages_url'], 'https://fallbackuser.github.io/Project_Bach')
 
 

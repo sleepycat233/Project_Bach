@@ -45,14 +45,19 @@ class TestWebFrontendIntegration:
         """创建Flask应用实例"""
         from src.web_frontend.app import create_app
         
+        from src.utils.config import UploadSettings, SecuritySettings
+
         # 设置完整的mock配置
         mock_config_manager = Mock()
-        mock_config_manager.get_nested_config.return_value = {
-            'lecture': {'display_name': 'Lecture'},
-            'meeting': {'display_name': 'Meeting'}
-        }
+        mock_config_manager.get_upload_settings.return_value = UploadSettings()
+        mock_config_manager.get_security_settings.return_value = SecuritySettings()
         mock_config_manager.get_full_config.return_value = {}
-        mock_config_manager.get_paths_config.return_value = {'data_folder': app_config['UPLOAD_FOLDER']}
+        mock_config_manager.get_paths_config.return_value = {
+            'data_folder': app_config['UPLOAD_FOLDER'],
+            'output_folder': './data/output',
+            'watch_folder': './data/uploads'
+        }
+        mock_config_manager.get.return_value = {}
         mock_config_manager.config = {
             'tailscale': {'enabled': False},
             'paths': {'output_folder': './data/output'}
