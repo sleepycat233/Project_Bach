@@ -11,11 +11,6 @@ from typing import Dict, Any
 import logging
 
 
-# 默认内容类型定义 - 作为配置的单一真实来源
-DEFAULT_CONTENT_TYPES = {
-    'lecture': {'icon': '🎓', 'display_name': 'Academic Lecture', 'has_subcategory': True},
-    'meeting': {'icon': '🏢', 'display_name': 'Meeting Recording', 'has_subcategory': True},
-}
 
 
 class ConfigManager:
@@ -198,26 +193,7 @@ class ConfigManager:
             完整配置字典
         """
         return (self.config or {}).copy()
-
-    @staticmethod
-    def get_default_content_types() -> Dict[str, Any]:
-        """获取默认的内容类型定义
-
-        Returns:
-            默认内容类型字典
-        """
-        return DEFAULT_CONTENT_TYPES
-
-    def get_content_types_config(self) -> Dict[str, Any]:
-        """获取内容类型配置的统一入口
-
-        Returns:
-            内容类型配置字典，如果配置中不存在则返回默认值
-        """
-        return self.get_nested_config('content_classification', 'content_types') or self.get_default_content_types()
-
-
-
+    
 class LoggingSetup:
     """日志配置工具"""
 

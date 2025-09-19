@@ -113,6 +113,25 @@ class PreferencesManager:
 
         return config
 
+    @staticmethod
+    def _normalize_recommendations(recommendations: Optional[Dict[str, Any]]) -> Dict[str, List[str]]:
+        """Normalize recommendation structure to {english: [], multilingual: []}."""
+        if isinstance(recommendations, dict):
+            english = recommendations.get('english') or []
+            multilingual = recommendations.get('multilingual') or []
+        elif isinstance(recommendations, list):
+            english = recommendations
+            multilingual = []
+        else:
+            english = []
+            multilingual = []
+
+        # Ensure lists and remove falsy entries while preserving order
+        return {
+            'english': [str(item) for item in english],
+            'multilingual': [str(item) for item in multilingual],
+        }
+
     def save_config(self, content_type: str, subcategory: str, display_name: str, new_config: Dict[str, Any]) -> None:
         """保存配置（差异化存储）
 
@@ -144,6 +163,36 @@ class PreferencesManager:
 
         self._save_to_file()
         self.logger.debug(f"Saved config for {content_type}/{subcategory}: {diff}")
+
+    def get_content_type_recommendations(self, content_type: str) -> Optional[Dict[str, List[str]]]:
+        """Get stored model recommendations for a content type, if any."""
+        if content_type not in self.prefs:
+            return None
+
+        recommendations = self.prefs[content_type].get('_recommendations')
+        if recommendations is None:
+            return None
+
+        return self._normalize_recommendations(recommendations)
+
+    def save_content_type_recommendations(self, content_type: str,
+                                          recommendations: Dict[str, Any]) -> None:
+        """Persist model recommendations for a content type."""
+        normalized = self._normalize_recommendations(recommendations)
+
+        if content_type not in self.prefs:
+            self.prefs[content_type] = {'_defaults': {}}
+
+        # 始终写入归一化结构，空列表表示显式清除推荐
+        self.prefs[content_type]['_recommendations'] = normalized
+
+        self._save_to_file()
+        self.logger.debug(
+            "Saved recommendations for %s: english=%s, multilingual=%s",
+            content_type,
+            normalized['english'],
+            normalized['multilingual'],
+        )
 
     def get_subcategories_with_names(self, content_type: str) -> List[Dict[str, str]]:
         """获取某个content_type的所有subcategory及其显示名称

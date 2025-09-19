@@ -9,7 +9,10 @@ import logging
 import os
 import warnings
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..utils.content_type_service import ContentTypeService
 import numpy as np
 
 # 抑制torchaudio兼容性警告
@@ -30,19 +33,24 @@ except ImportError:
 class SpeakerDiarization:
     """说话人分离服务"""
     
-    def __init__(self, diarization_config: Dict[str, Any], huggingface_config: Dict[str, Any], content_classification_config: Dict[str, Any] = None):
+    def __init__(
+        self,
+        diarization_config: Dict[str, Any],
+        huggingface_config: Dict[str, Any],
+        content_type_service: Optional['ContentTypeService'] = None,
+    ):
         """初始化说话人分离服务
-        
+
         Args:
             diarization_config: 说话人分离配置字典
-            huggingface_config: HuggingFace配置字典  
-            content_classification_config: 内容分类配置字典（包含diarization设置）
+            huggingface_config: HuggingFace配置字典
+            content_type_service: 内容类型服务，用于读取偏好配置（可选）
         """
         # 延迟检查Pipeline，只在实际使用时检查，这样单元测试可以mock
             
         self.config = diarization_config
         self.hf_config = huggingface_config
-        self.content_classification_config = content_classification_config or {}
+        self.content_type_service = content_type_service
         self.logger = logging.getLogger('project_bach.speaker_diarization')
         self._pipeline = None  # 延迟加载
         
@@ -50,10 +58,7 @@ class SpeakerDiarization:
         self.provider = diarization_config.get('provider', 'pyannote')
         self.max_speakers = diarization_config.get('max_speakers', 6)
         self.min_segment_duration = diarization_config.get('min_segment_duration', 1.0)
-        
-        # 从content_classification配置中获取content_types
-        self.content_types = self.content_classification_config.get('content_types', {})
-        
+
         # 输出格式配置
         self.output_format = diarization_config.get('output_format', {
             'group_by_speaker': True,
@@ -537,5 +542,3 @@ class SpeakerDiarization:
         # 清理GPU内存（如果使用）
         if torch is not None and torch.cuda.is_available():
             torch.cuda.empty_cache()
-
-

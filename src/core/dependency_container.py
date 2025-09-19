@@ -9,6 +9,7 @@ import threading
 from typing import Dict, Any, Optional
 
 from ..utils.config import ConfigManager, LoggingSetup, DirectoryManager
+from ..utils.content_type_service import ContentTypeService
 from .mlx_transcription import MLXTranscriptionService
 from .speaker_diarization import SpeakerDiarization
 from .anonymization import NameAnonymizer
@@ -78,11 +79,11 @@ class DependencyContainer:
             self.logger.debug("创建说话人分离服务实例")
             diarization_config = self.config_manager.config.get("diarization", {})
             huggingface_config = self.config_manager.config.get("huggingface", {})
-            content_classification_config = self.config_manager.config.get("content_classification", {})
+            content_type_service = self.get_content_type_service()
             self._services['speaker_diarization_service'] = SpeakerDiarization(
                 diarization_config,
                 huggingface_config,
-                content_classification_config
+                content_type_service
             )
             self.logger.debug("说话人分离服务实例创建完成")
         else:
@@ -330,6 +331,14 @@ class DependencyContainer:
             self.logger.debug("创建Git发布服务实例")
 
         return self._services['git_publisher']
+
+    def get_content_type_service(self) -> ContentTypeService:
+        """获取内容类型服务实例"""
+        if 'content_type_service' not in self._services:
+            self._services['content_type_service'] = ContentTypeService(self.config_manager)
+            self.logger.debug("创建内容类型服务实例")
+
+        return self._services['content_type_service']
 
     def clear_cache(self):
         """清除服务缓存（用于测试或重置）"""
