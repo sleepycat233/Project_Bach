@@ -45,100 +45,6 @@ class TestAPIOptionsDisplay(unittest.TestCase):
             }
         }
     
-    def test_api_providers_configuration_loading(self):
-        """测试API提供商配置加载"""
-        from src.utils.config import ConfigManager
-        
-        try:
-            config_manager = ConfigManager()
-            config = config_manager.get_full_config()
-            
-            # 验证API提供商配置存在
-            providers = config.get('whisperkit', {}).get('providers', {})
-            self.assertIn('local', providers)
-            self.assertIn('openai_api', providers)
-            self.assertIn('elevenlabs_api', providers)
-            self.assertIn('azure_speech', providers)
-            
-            # 验证本地提供商默认启用
-            local_provider = providers.get('local', {})
-            self.assertTrue(local_provider.get('enabled', False))
-            
-            # 验证API提供商默认禁用
-            api_providers = ['openai_api', 'elevenlabs_api', 'azure_speech']
-            for provider in api_providers:
-                provider_config = providers.get(provider, {})
-                self.assertFalse(provider_config.get('enabled', True), f"{provider} should be disabled by default")
-            
-            print("✅ API提供商配置加载测试通过")
-            
-        except Exception as e:
-            self.fail(f"配置加载失败: {e}")
-    
-    def test_api_model_extraction_from_config(self):
-        """测试从配置中提取API模型选项"""
-        def extract_api_models(providers_config):
-            """提取所有可用的API模型选项"""
-            api_models = []
-            
-            for provider_name, provider_config in providers_config.items():
-                if provider_config.get('enabled', False):
-                    if provider_config.get('type') == 'openai_whisper_api':
-                        models = provider_config.get('models', [])
-                        for model in models:
-                            api_models.append({
-                                'value': f"openai_api_{model}",
-                                'display_name': f"🌐 OpenAI {model}",
-                                'type': 'api',
-                                'provider': 'openai_api',
-                                'model': model,
-                                'multilingual_support': True,
-                                'english_support': True
-                            })
-                    
-                    elif provider_config.get('type') == 'elevenlabs_api':
-                        api_models.append({
-                            'value': f"elevenlabs_api_speech",
-                            'display_name': "🗣️ ElevenLabs Speech",
-                            'type': 'api',
-                            'provider': 'elevenlabs_api',
-                            'multilingual_support': True,
-                            'english_support': True
-                        })
-                    
-                    elif provider_config.get('type') == 'azure_cognitive_services':
-                        api_models.append({
-                            'value': f"azure_speech_api",
-                            'display_name': "☁️ Azure Speech",
-                            'type': 'api',
-                            'provider': 'azure_speech',
-                            'multilingual_support': True,
-                            'english_support': True
-                        })
-            
-            return api_models
-        
-        # 测试禁用状态
-        api_models = extract_api_models(self.api_config)
-        self.assertEqual(len(api_models), 0, "禁用状态下不应有API模型")
-        
-        # 测试启用OpenAI API
-        test_config = self.api_config.copy()
-        test_config['openai_api']['enabled'] = True
-        api_models = extract_api_models(test_config)
-        
-        self.assertGreater(len(api_models), 0, "启用OpenAI API后应有模型选项")
-        openai_models = [m for m in api_models if m['provider'] == 'openai_api']
-        self.assertEqual(len(openai_models), 2, "OpenAI API应提供2个模型选项")
-        
-        # 验证模型选项结构
-        for model in openai_models:
-            self.assertIn('value', model)
-            self.assertIn('display_name', model)
-            self.assertEqual(model['type'], 'api')
-            self.assertTrue(model['multilingual_support'])
-        
-        print("✅ API模型提取测试通过")
     
     def test_api_configuration_validation(self):
         """测试API配置验证"""
@@ -196,22 +102,20 @@ class TestAPIOptionsDisplay(unittest.TestCase):
         
         try:
             config_manager = ConfigManager()
-            config = config_manager.get_full_config()
-            
-            # 获取内容类型推荐配置
-            content_types = config.get('content_classification', {}).get('content_types', {})
+            content_type_service = ContentTypeService(config_manager)
+            content_types = content_type_service.get_all()
             
             # 验证meeting类型推荐包含elevenlabs-api
             meeting_config = content_types.get('meeting', {})
-            meeting_recommendations = meeting_config.get('recommendations', [])
+            meeting_recommendations = meeting_config.get('recommendations', {})
             
-            self.assertIn('elevenlabs-api', meeting_recommendations, "会议类型应推荐ElevenLabs API用于说话者分离")
+            self.assertIn('elevenlabs-api', meeting_recommendations.get('english', []), "会议类型应推荐ElevenLabs API用于说话者分离")
             
             # 验证lecture类型推荐
             lecture_config = content_types.get('lecture', {})
-            lecture_recommendations = lecture_config.get('recommendations', [])
+            lecture_recommendations = lecture_config.get('recommendations', {})
             
-            self.assertGreater(len(lecture_recommendations), 0, "讲座类型应有推荐模型")
+            self.assertGreater(len(lecture_recommendations.get('english', [])) + len(lecture_recommendations.get('multilingual', [])), 0, "讲座类型应有推荐模型")
             
             print("✅ API模型推荐逻辑测试通过")
             

@@ -136,8 +136,8 @@ class TestAPIIntegrationSimple(unittest.TestCase):
             
             # 验证分类结构
             category_info = data[category]
-            self.assertIn('icon', category_info)
-            self.assertIn('name', category_info)
+            self.assertIn('display_name', category_info)
+            self.assertIn('recommendations', category_info)
         
         print(f"✅ Content categories API integration: {len(data)} categories validated")
     

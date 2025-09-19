@@ -48,10 +48,11 @@ class TestWebFrontendIntegration:
         # 设置完整的mock配置
         mock_config_manager = Mock()
         mock_config_manager.get_nested_config.return_value = {
-            'lecture': {'icon': '📚', 'display_name': 'Lecture'},
-            'meeting': {'icon': '👥', 'display_name': 'Meeting'}
+            'lecture': {'display_name': 'Lecture'},
+            'meeting': {'display_name': 'Meeting'}
         }
         mock_config_manager.get_full_config.return_value = {}
+        mock_config_manager.get_paths_config.return_value = {'data_folder': app_config['UPLOAD_FOLDER']}
         mock_config_manager.config = {
             'tailscale': {'enabled': False},
             'paths': {'output_folder': './data/output'}

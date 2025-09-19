@@ -310,8 +310,8 @@ FLASK_SECRET_KEY=test-secret-key
             
             # 验证分类信息结构
             for category_name, category_info in data.items():
-                assert 'icon' in category_info
-                assert 'name' in category_info
+                assert 'display_name' in category_info
+                assert 'recommendations' in category_info
             
             print("✅ Processing status integration test passed")
             return True
