@@ -105,33 +105,7 @@ class TestFileOrganizationConfig(unittest.TestCase):
         self.assertEqual(upload_folder, './data/uploads')
         self.assertEqual(watch_folder, upload_folder)
     
-    @patch('utils.env_manager.setup_project_environment')
-    def test_content_types_subcategories_configuration(self, mock_setup_env):
-        """测试内容类型子分类配置"""
-        mock_setup_env.side_effect = Exception("Force use direct loading")
-        
-        config_manager = ConfigManager(self.config_path)
-        content_types = config_manager.get(['content_classification', 'content_types'], default={})
-        
-        # 验证所有内容类型都有子分类
-        expected_types = ['lecture', 'meeting', 'others']
-        for content_type in expected_types:
-            self.assertIn(content_type, content_types)
-            
-            type_config = content_types[content_type]
-            self.assertIn('subcategories', type_config)
-            self.assertIn('icon', type_config)
-            self.assertIn('display_name', type_config)
-            
-            subcategories = type_config['subcategories']
-            self.assertIsInstance(subcategories, list)
-            self.assertGreater(len(subcategories), 0)
-        
-        # 验证specific课程配置
-        lecture_subcats = content_types['lecture']['subcategories']
-        expected_courses = ['PHYS101', 'CS101', 'ML301', 'PHYS401']
-        for course in expected_courses:
-            self.assertIn(course, lecture_subcats)
+    # Content types configuration test removed - now handled by ContentTypeService tests
     
     @patch('utils.env_manager.setup_project_environment')
     def test_upload_organization_flags(self, mock_setup_env):

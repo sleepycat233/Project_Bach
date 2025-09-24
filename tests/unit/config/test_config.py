@@ -169,52 +169,8 @@ class TestConfigManager(unittest.TestCase):
         
         self.assertEqual(saved_config['api']['openrouter']['key'], 'updated-key')
     
-    @patch('utils.env_manager.setup_project_environment')
-    def test_get_content_classification_config(self, mock_setup_env):
-        """测试获取内容分类配置"""
-        mock_setup_env.side_effect = Exception("Force use direct loading")
-        
-        # 添加内容分类配置到测试配置
-        self.valid_config['content_classification'] = {
-            'content_types': {
-                'lecture': {
-                    'icon': '🎓',
-                    'display_name': 'Academic Lecture',
-                    'subcategories': ['PHYS101', 'CS101', 'ML301']
-                },
-                'meeting': {
-                    'icon': '🏢', 
-                    'display_name': 'Meeting Recording',
-                    'subcategories': ['team_meeting', 'project_review']
-                }
-            }
-        }
-        
-        # 更新测试配置文件
-        with open(self.config_path, 'w', encoding='utf-8') as f:
-            yaml.dump(self.valid_config, f)
-        
-        manager = ConfigManager(self.config_path)
-        content_types = manager.get(['content_classification', 'content_types'], default={})
-        
-        # 验证内容类型配置
-        self.assertIn('lecture', content_types)
-        self.assertIn('meeting', content_types)
-        
-        # 验证lecture配置
-        lecture_config = content_types['lecture']
-        self.assertEqual(lecture_config['icon'], '🎓')
-        self.assertEqual(lecture_config['display_name'], 'Academic Lecture')
-        self.assertIn('PHYS101', lecture_config['subcategories'])
-        self.assertIn('CS101', lecture_config['subcategories'])
-        self.assertIn('ML301', lecture_config['subcategories'])
-        
-        # 验证meeting配置
-        meeting_config = content_types['meeting']
-        self.assertEqual(meeting_config['icon'], '🏢')
-        self.assertIn('team_meeting', meeting_config['subcategories'])
-        self.assertIn('project_review', meeting_config['subcategories'])
-    
+    # Content classification config test removed - now handled by ContentTypeService tests
+
     @patch('utils.env_manager.setup_project_environment')
     def test_uploads_folder_path_consistency(self, mock_setup_env):
         """测试uploads目录路径一致性"""
