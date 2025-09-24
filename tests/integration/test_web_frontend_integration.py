@@ -121,23 +121,8 @@ class TestWebFrontendIntegration:
             response = client.post('/upload/youtube', data=data)
             assert response.status_code in [200, 302]
 
-    def test_api_models_integration(self, client):
-        """测试模型API集成"""
-        with patch('src.web_frontend.app.get_processing_service') as mock_service:
-            mock_service.return_value.get_available_models.return_value = {
-                'english': [
-                    {'value': 'distil-large-v3', 'name': 'Distil Large V3', 'recommended': True}
-                ],
-                'multilingual': [
-                    {'value': 'large-v3', 'name': 'Large V3', 'recommended': True}
-                ]
-            }
-            
-            response = client.get('/api/models/smart-config')
-            assert response.status_code == 200
-            
-            data = response.get_json()
-            assert 'english' in data or 'all' in data
+    # Models API测试已移至 test_api_endpoints.py
+    # 此文件专注于前端页面和模板集成测试
 
     def test_template_rendering_integration(self, client):
         """测试模板渲染集成"""
@@ -236,43 +221,8 @@ class TestTemplateIntegration:
                 assert '{' in content and '}' in content
 
 
-class TestAPIIntegration:
-    """API系统集成测试"""
-    
-    @pytest.fixture
-    def client(self):
-        """创建测试客户端"""
-        from src.web_frontend.app import create_app
-        
-        app_config = {'TESTING': True, 'WTF_CSRF_ENABLED': False}
-        mock_config = Mock()
-        mock_config.get_nested_config.return_value = {}
-        mock_config.get_full_config.return_value = {}
-        mock_config.config = {'tailscale': {'enabled': False}}
-        
-        app = create_app(app_config)
-        app.config['CONFIG_MANAGER'] = mock_config
-        return app.test_client()
-
-    def test_multiple_api_endpoints_work(self, client):
-        """测试多个API端点协同工作"""
-        endpoints_to_test = [
-            '/api/models/smart-config',
-            '/api/categories'
-        ]
-        
-        for endpoint in endpoints_to_test:
-            with patch('src.web_frontend.app.get_processing_service'):
-                response = client.get(endpoint)
-                # API应该返回JSON响应而不是崩溃
-                assert response.status_code in [200, 500]  # 500也可接受，表示内部错误但不是路由问题
-
-    def test_api_content_type_headers(self, client):
-        """测试API返回正确的Content-Type"""
-        with patch('src.web_frontend.app.get_processing_service'):
-            response = client.get('/api/categories')
-            if response.status_code == 200:
-                assert 'application/json' in response.content_type
+# API测试已迁移到 test_api_endpoints.py
+# 此文件专注于前端集成测试
 
 
 if __name__ == '__main__':
