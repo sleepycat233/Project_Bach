@@ -302,6 +302,44 @@ def create_app(config=None):
             whisper_model = request.form.get('whisper_model', 'whisper-tiny')
             # MLX模型使用简单的模型名称，无需前缀
 
+            # 解析Post-Processing选项（复用偏好默认值作为fallback）
+            def _checkbox_to_bool(field_name: str, default: bool = False) -> bool:
+                raw_value = request.form.get(field_name)
+                if raw_value is None:
+                    return default
+                if isinstance(raw_value, str):
+                    return raw_value.strip().lower() in ('on', 'true', '1', 'yes')
+                return bool(raw_value)
+
+            post_processing_defaults = {}
+            if handler and getattr(handler, 'content_type_service', None):
+                try:
+                    post_processing_defaults = handler.content_type_service.get_effective_config(
+                        content_type,
+                        subcategory or None,
+                    ) or {}
+                except Exception as prefs_error:  # pragma: no cover - defensive logging
+                    logger.warning(
+                        "Failed to load post-processing defaults for %s/%s: %s",
+                        content_type,
+                        subcategory,
+                        prefs_error,
+                    )
+            if post_processing_defaults:
+                logger.debug(
+                    "Post-processing defaults for %s/%s: %s",
+                    content_type,
+                    subcategory,
+                    post_processing_defaults,
+                )
+
+            post_processing_overrides = {
+                'enable_anonymization': _checkbox_to_bool('enable_anonymization'),
+                'enable_summary': _checkbox_to_bool('enable_summary'),
+                'enable_mindmap': _checkbox_to_bool('enable_mindmap'),
+                'enable_diarization': _checkbox_to_bool('enable_diarization'),
+            }
+
             # 处理上传 - 使用清晰的参数分离
             handler = app.config['AUDIO_HANDLER']
             result = handler.process_upload(
@@ -312,7 +350,8 @@ def create_app(config=None):
                 metadata={                        # 处理参数和用户输入
                     'audio_language': audio_language,
                     'description': request.form.get('description', ''),
-                    'whisper_model': whisper_model
+                    'whisper_model': whisper_model,
+                    **post_processing_overrides,
                 }
             )
 

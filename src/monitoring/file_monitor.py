@@ -4,12 +4,13 @@
 负责监控文件夹变化并管理文件处理
 """
 
+import json
 import time
 import threading
 import signal
 import logging
 from pathlib import Path
-from typing import Callable, Optional, Dict, Any, Set
+from typing import Callable, Optional, Dict, Any, Set, Tuple
 from watchdog.observers import Observer
 
 from .event_handler import AudioFileHandler
@@ -54,6 +55,13 @@ class FileMonitor:
         # 文件稳定性检查
         self.stability_check_delay = 2.0  # 秒
         self.stability_check_interval = 1.0  # 秒
+
+    # ------------------------------------------------------------------
+    # Metadata registration API
+    # ------------------------------------------------------------------
+    def register_metadata(self, file_path: str, metadata: Dict[str, Any]) -> None:
+        """Register processing metadata to be merged when the file is enqueued."""
+        self.processing_queue.register_metadata(file_path, metadata)
     
     def start_monitoring(self):
         """开始文件监控"""
@@ -146,6 +154,10 @@ class FileMonitor:
                 'source': 'watch_folder'
             }
 
+            extra_metadata = self.processing_queue.pending_metadata.pop(resolved_path, None)
+            if extra_metadata:
+                metadata.update(extra_metadata)
+
             if self.processing_queue.add_file(resolved_path, metadata):
                 self.logger.info(f"文件已添加到处理队列: {Path(file_path).name}")
             else:
@@ -185,6 +197,26 @@ class FileMonitor:
         except Exception as e:
             self.logger.error(f"检查文件稳定性失败: {file_path}, 错误: {str(e)}")
             return False
+
+    def _load_upload_metadata(self, file_path: Path) -> Tuple[Dict[str, Any], Optional[Path]]:
+        """Load sidecar metadata persisted during upload, if present."""
+        metadata_path = file_path.with_suffix(f"{file_path.suffix}.metadata.json")
+        if not metadata_path.exists():
+            return {}, None
+
+        try:
+            with open(metadata_path, 'r', encoding='utf-8') as handle:
+                payload = json.load(handle)
+            if isinstance(payload, dict):
+                return payload, metadata_path
+            return {}, metadata_path
+        except Exception as error:  # pragma: no cover - 防御性日志
+            self.logger.warning(
+                "Failed to load upload metadata from %s: %s",
+                metadata_path,
+                error,
+            )
+            return {}, metadata_path
 
     def _invoke_processor(self, file_path: str, *, privacy_level: str,
                           metadata: Optional[Dict[str, Any]], processing_id: Optional[str]) -> bool:

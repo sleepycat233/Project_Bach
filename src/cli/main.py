@@ -121,12 +121,18 @@ def run_monitor_and_web_server(container: DependencyContainer, dev_mode: bool = 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # 启动文件监控
-    if not processor.start_file_monitoring():
-        print("❌ 启动文件监控失败")
-        return
+    # 启动文件监控（开发模式下避免debug reloader多次启动）
+    should_start_monitor = True
+    if dev_mode:
+        should_start_monitor = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+        if not should_start_monitor:
+            print("⏭️  开发模式：跳过reloader父进程的FileMonitor启动")
 
-    print("✅ 文件监控已启动")
+    if should_start_monitor:
+        if not processor.start_file_monitoring():
+            print("❌ 启动文件监控失败")
+            return
+        print("✅ 文件监控已启动")
 
     # 配置Flask应用
     print(f"🚀 启动Web服务器: http://{host}:{port}")

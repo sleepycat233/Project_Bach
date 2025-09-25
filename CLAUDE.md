@@ -46,201 +46,40 @@
 - **Speaker Diarization**: 多人对话识别，IoU时间戳对齐算法 (Phase 10-11)
 - **测试系统**: 91个单元测试，10个集成测试，95%+覆盖率
 
+✅ **Phase 7.1-7.2**: Post-Processing选择器配置传递架构 (新增)
+- **Web配置解析**: 4个checkbox选项(匿名化、摘要、思维导图、说话人分离)后端解析
+- **配置传递架构**: Web上传→FileMonitor元数据注册→AudioProcessor条件化处理
+- **PreferencesManager集成**: 默认值加载，用户选择覆盖，差异化存储
+- **双重保障机制**: 直接排队 + watchdog兜底，确保配置不丢失
+- **端到端验证**: Post-Processing选项真实控制下游服务调用，成本控制生效
+
 ## 当前开发状态
-### 🔴 **当前开发任务 - Phase 7: 前端用户体验优化**
+### ✅ **已完成 - Phase 7.1-7.2: Post-Processing选择器配置传递架构**
 
 **Phase 7.1 已完成** ✅: API重构和代码优化 (重构/private/路由，统一API响应)
-**Phase 7.2 部分完成** 🔄: Post-Processing选择器 + 智能Subcategory管理
+**Phase 7.2 已完成** ✅: Post-Processing选择器后端架构 + Web上传配置传递
 
 **Phase 7.2 已完成功能** ✅:
-- Post-Processing选择器UI (匿名化、摘要、思维导图、说话人分离)
-- PreferencesManager核心架构 (差异化存储、继承机制)
-- 创建新subcategory功能 (API + 前端UI)
-- Diarization决策逻辑简化 (移除三层冗余逻辑)
-- 配置系统重构 (默认值从代码迁移到user_preferences.json)
+- Post-Processing选择器后端解析 (匿名化、摘要、思维导图、说话人分离)
+- PreferencesManager默认值加载与用户覆盖机制
+- Web上传→FileMonitor配置传递架构 (register_metadata + pending_metadata)
+- AudioProcessor条件化处理逻辑 (根据前端选项跳过相应步骤)
+- 端到端功能验证 (Post-Processing选项真实控制下游服务调用)
+- Flask开发模式FileMonitor重复启动修复
 
 **Phase 7.2 待完成功能** 📋:
+- **前端UI界面**: 上传页面4个Post-Processing checkbox选项
 - **编辑已有subcategory功能**: 前端UI + 后端API支持修改已创建的subcategory配置
 - **删除subcategory功能**: 前端UI + 后端API支持删除不需要的subcategory
 
 ### 📋 **后续开发重点**
-
-#### **Phase 7.1: API重构和代码优化**
-
-**需求背景**:
-1. **代码质量**: app.py中/private/路由300+行代码过长，影响可维护性
-2. **API一致性**: 缺少统一的响应格式，错误处理不一致
-3. **重复代码**: 配置管理器获取代码重复，需要提取辅助函数
-
-**核心功能要求**:
-
-##### **A. /private/路由重构**:
-1. **函数拆分**: 将300+行代码拆分为独立的辅助函数
-2. **模块化**: 内容扫描、组织、渲染分离
-3. **性能优化**: 减少重复的文件系统操作
-
-##### **B. API响应统一化**:
-1. **标准格式**: 统一JSON响应结构
-2. **错误处理**: 一致的错误码和消息格式
-3. **配置辅助**: 提取重复的配置获取逻辑
-
 #### **Phase 7.2: Post-Processing选择器 + 智能Subcategory管理**
-
-**需求背景**:
-1. **成本控制**: 当前所有后处理步骤(NER匿名化、摘要生成、思维导图)都是hardcoded，用户无法根据需要选择性启用
-2. **配置管理**: subcategory配置分散在config.yaml中，难以动态管理，用户无法灵活添加自定义类别
-
-**核心功能要求**:
-
-##### **A. Post-Processing选择器**:
-1. **NER + 匿名化**: 可选的敏感信息识别和匿名化
-2. **摘要生成**: 可选的AI内容摘要生成
-3. **思维导图生成**: 可选的AI结构化思维导图
-4. **说话人分离**: 可选的多人对话识别
-5. **智能记忆**: 配置按content_type和subcategory自动保存和加载
-
 ##### **B. 智能Subcategory管理**:
-1. **极简配置**: config.yaml只定义基础content_type (lecture, meeting)
 2. **动态添加**: 用户可通过前端"Add new"直接创建subcategory
 3. **差异化存储**: user_preferences.json只保存与默认值不同的配置
 4. **继承机制**: 系统默认 → content_type默认 → subcategory覆盖
 5. **显示名称**: 支持友好的subcategory显示名称
-
-**Phase 7.1 技术实现方案**:
-
-##### **A. /private/路由重构**
-```python
-# 原300+行函数拆分为：
-def _scan_content_directory(directory_path, is_private=False):
-    """扫描目录获取内容文件信息"""
-    # 文件扫描逻辑
-
-def _organize_content_by_type(content_list):
-    """将内容按类型和课程组织为树形结构"""
-    # 内容组织逻辑
-
-def _render_private_index(all_content, organized_content):
-    """渲染私有内容首页"""
-    # 模板渲染逻辑
-
-def _serve_private_file(filepath):
-    """提供私有文件访问"""
-    # 文件服务逻辑
-```
-
-##### **B. 统一API响应和配置助手**
-```python
-def get_config_value(app, key_path, default=None):
-    """统一配置获取助手"""
-    config_manager = app.config.get('CONFIG_MANAGER')
-    if config_manager:
-        return config_manager.get_nested_config(*key_path.split('.')) or default
-    return default
-
-def create_api_response(success=True, data=None, message=None, error=None):
-    """标准API响应格式"""
-    return {
-        'success': success,
-        'data': data,
-        'message': message,
-        'error': error,
-        'timestamp': datetime.now().isoformat()
-    }
-```
-
-**Phase 7.2 技术实现方案**:
-
-##### **A. 极简config.yaml结构**
-```yaml
-# 只保留基础content_type定义
-content_types:
-  lecture: "🎓 Academic Lecture"
-  meeting: "🏢 Meeting Recording"
-```
-
-##### **B. 智能用户偏好系统**
-```json
-// user_preferences.json - 差异化存储
-{
-  "lecture": {
-    "_defaults": {
-      "enable_anonymization": false,
-      "enable_summary": true,
-      "enable_mindmap": true,
-      "diarization": false
-    },
-    "CS101": {
-      "_display_name": "Computer Science 101",
-      "enable_anonymization": true  // 仅存储与defaults不同的部分
-    }
-  }
-}
-```
-
-##### **C. PreferencesManager核心类**
-```python
-class PreferencesManager:
-    def get_effective_config(self, content_type, subcategory):
-        """继承机制：系统默认 → content_type默认 → subcategory覆盖"""
-
-    def save_config(self, content_type, subcategory, display_name, config):
-        """差异化存储：只保存与有效默认值不同的配置"""
-```
-
-##### **D. 前端"Add new"UI**
-```html
-<select name="subcategory">
-    <option value="CS101">Computer Science 101</option>
-    <option value="__new__">➕ Add new...</option>
-</select>
-
-<div class="post-processing-options">
-    <label><input type="checkbox" name="enable_anonymization">🕵️ Name Anonymization</label>
-    <label><input type="checkbox" name="enable_summary">📝 AI Summary</label>
-    <label><input type="checkbox" name="enable_mindmap">🧠 Mindmap</label>
-    <label><input type="checkbox" name="diarization">👥 Speaker Diarization</label>
-</div>
-        </label>
-    </div>
-</div>
-```
-
-##### **B. 前端Transcript动态加载功能**
-```javascript
-// 增强dynamic-content-loader.js支持transcript显示
-class DynamicContentLoader {
-    async loadContent(url, title, type) {
-        // 1. 加载HTML内容 (现有功能)
-        const htmlContent = await this.fetchHTML(url);
-
-        // 2. 同时加载JSON数据获取transcript
-        const jsonUrl = url.replace('_result.html', '_result.json');
-        const jsonData = await this.fetchJSON(jsonUrl);
-
-        // 3. 在页面中添加transcript功能
-        this.renderContentWithTranscript(htmlContent, jsonData, title, type);
-    }
-
-    renderContentWithTranscript(htmlContent, jsonData, title, type) {
-        // 渲染主要内容
-        this.renderLoadedContent(htmlContent, title, type);
-
-        // 添加transcript section (如果存在且为public内容)
-        if (jsonData.anonymized_transcript &&
-            jsonData.metadata?.privacy_level === 'public') {
-            this.addTranscriptSection(jsonData.anonymized_transcript);
-        }
-    }
-
-    addTranscriptSection(transcript) {
-        // 创建可交互的transcript显示区域
-        // - 预览模式 (前500字符)
-        // - 展开/收起功能
-        // - 复制到剪贴板功能
-        // - 搜索高亮功能
-    }
-}
-```
+`
 
 ##### **C. 实时进度API和AudioProcessor增强**
 ```python
@@ -254,63 +93,19 @@ class ProcessingService:
     def cancel_processing(self, processing_id: str):
         """取消处理任务"""
         pass
-
-# 修改现有AudioProcessor支持post-processing选项
-class AudioProcessor:
-    def process_audio_file(self, audio_path, metadata=None):
-        # 1. 转录 (必需)
-        transcript = self.transcribe_audio(...)
-
-        # 2. 条件化后处理
-        post_config = metadata.get('post_processing', {})
-
-        if post_config.get('enable_anonymization', True):
-            anonymized_text = self.anonymizer.anonymize(transcript)
-        else:
-            anonymized_text = transcript  # 跳过匿名化
-
-        if post_config.get('enable_summary', True):
-            summary = self.ai_generator.generate_summary(anonymized_text)
-        else:
-            summary = None  # 跳过摘要生成
-
-        if post_config.get('enable_mindmap', True):
-            mindmap = self.ai_generator.generate_mindmap(anonymized_text)
-        else:
-            mindmap = None  # 跳过思维导图
-
-# 修改现有上传端点支持post-processing选项
-@app.route('/upload/audio', methods=['POST'])
-def upload_audio():
-    # 获取post-processing选项
-    enable_anonymization = request.form.get('enable_anonymization', 'on') == 'on'
-    enable_summary = request.form.get('enable_summary', 'on') == 'on'
-    enable_mindmap = request.form.get('enable_mindmap', 'on') == 'on'
-
-    metadata = {
-        'post_processing': {
-            'enable_anonymization': enable_anonymization,
-            'enable_summary': enable_summary,
-            'enable_mindmap': enable_mindmap
-        }
-    }
 ```
 
 **Phase 7完成标准**:
 
-**Phase 7.1完成标准**:
-- ✅ /private/路由重构为模块化函数
-- ✅ 统一API响应格式和错误处理
-- ✅ 提取配置管理重复代码
-- ✅ 代码可读性和维护性提升
-
 **Phase 7.2完成标准**:
-- ✅ 前端UI支持三个post-processing选项开关
-- ✅ AudioProcessor根据选项动态跳过步骤
-- ✅ 实时进度API显示子步骤和预计时间
-- ✅ 处理任务取消和重试功能
-- ✅ 配置系统智能默认值支持
-- ✅ 向后兼容现有API行为
+- ✅ Web后端支持4个post-processing选项解析 (app.py + audio_upload_handler.py)
+- ✅ AudioProcessor根据选项动态跳过步骤 (条件化处理逻辑已验证)
+- ✅ 配置传递架构 (Web上传→FileMonitor→AudioProcessor完整链路)
+- ✅ 元数据注册机制 (register_metadata + pending_metadata合并)
+- ✅ 配置系统智能默认值支持 (PreferencesManager集成)
+- ✅ 向后兼容现有API行为 (watchdog兜底机制)
+- ✅ 端到端功能测试验证 (Post-Processing选项真实控制服务调用)
+- 📋 前端UI界面 (上传页面checkbox选项) - 待实现
 
 #### **Phase 7.3: Post-Processing配置依赖检查和前端智能提示**
 
@@ -450,21 +245,28 @@ Project_Bach/
 ├── data/                         # 数据存储目录 (统一管理)
 │   ├── logs/                     # 系统日志
 │   ├── output/                   # 处理结果输出
-│   └── transcripts/              # 音频转录文本
+│   ├── uploads/                  # 用户上传文件目录
+│   └── user_preferences.json    # 用户偏好配置 (Phase 7.2)
 ├── doc/                          # 项目文档
 │   ├── implementation_plan.md    # 详细实施计划
 │   ├── project_overview.md       # 项目概览
 │   ├── system_architecture.md    # 系统架构
 │   ├── SECURITY_REVIEW_CN.md     # 安全审查
-│   └── openapi.yaml             # API规范
+│   ├── openapi.yaml             # API规范
+│   └── technical_doc/           # 技术文档
 ├── public/                       # 静态资源 (公开访问)
+│   └── static/                   # 公开静态文件
 ├── static/                       # Web静态文件 (CSS, JS)
+│   ├── assets/                   # 资产文件
+│   ├── css/                      # 样式表
+│   └── js/                       # JavaScript文件
 ├── templates/                    # 网站模板文件
 │   ├── base/                     # 基础模板
 │   ├── components/               # 组件模板
 │   ├── github_pages/             # GitHub Pages模板
 │   └── web_app/                  # Web应用模板
-├── uploads/                      # 用户上传文件目录
+├── temp/                         # 临时文件目录
+│   └── youtube/                  # YouTube临时文件
 ├── watch_folder/                 # 音频文件监控目录
 ├── src/                         # 核心源代码
 │   ├── core/                    # 核心业务逻辑层
@@ -473,7 +275,7 @@ Project_Bach/
 │   │   ├── audio_processor.py   # 流程编排器 (集成diarization)
 │   │   ├── dependency_container.py # 依赖注入容器
 │   │   ├── mlx_transcription.py # MLX Whisper音频转录服务
-│   │   ├── processing_service.py # 处理服务
+│   │   ├── processing_service.py # 处理服务和状态追踪
 │   │   └── speaker_diarization.py # 说话人分离服务 (pyannote.audio)
 │   ├── cli/                     # 命令行接口层
 │   │   └── main.py             # 主入口 (307行，从954行优化68%)
@@ -482,39 +284,53 @@ Project_Bach/
 │   │   ├── file_monitor.py      # 文件监控器 (watchdog集成)
 │   │   └── processing_queue.py  # 线程安全处理队列
 │   ├── network/                 # 网络集成模块 (Phase 4)
-│   │   ├── connection_monitor.py # 网络连接监控
 │   │   ├── file_transfer.py     # 跨设备文件传输
-│   │   ├── network_manager.py   # 网络管理器
-│   │   ├── security_validator.py # 网络安全验证
 │   │   └── tailscale_manager.py # Tailscale VPN管理
 │   ├── publishing/              # GitHub Pages发布系统
-│   │   ├── content_formatter.py # 内容格式化服务
-│   │   ├── git_operations.py    # Git操作服务
-│   │   ├── github_publisher.py  # GitHub API集成
+│   │   ├── git_publisher.py     # Git操作和GitHub集成
 │   │   └── template_engine.py   # Jinja2模板引擎
 │   ├── storage/                 # 数据存储抽象层
-│   │   ├── file_manager.py      # 文件管理器
 │   │   ├── result_storage.py    # 处理结果存储管理
 │   │   └── transcript_storage.py # 转录文本存储管理
 │   ├── utils/                   # 通用工具模块
 │   │   ├── config.py           # 配置管理 (环境变量+YAML)
+│   │   ├── content_type_defaults.py # 内容类型默认值
+│   │   ├── content_type_service.py # 内容类型服务
 │   │   ├── env_manager.py      # 环境管理器
-│   │   ├── logging_setup.py    # 日志配置
+│   │   ├── preferences_manager.py # 用户偏好管理 (Phase 7.2)
 │   │   └── rate_limiter.py     # API限流保护
 │   └── web_frontend/            # Web前端应用
-│       ├── app.py              # Flask主应用
-│       ├── handlers/           # 路由处理器
-│       ├── processors/         # 内容处理器
-│       └── services/           # Web服务层
+│       ├── app.py              # Flask主应用 (Post-Processing选择器)
+│       ├── audio_upload_handler.py # 音频上传处理器
+│       ├── helpers.py          # Web辅助函数
+│       ├── youtube_handler.py   # YouTube处理器
+│       └── youtube_processor.py # YouTube处理服务
 ├── tests/                       # 测试体系 (95%+覆盖率)
-│   ├── unit/                   # 单元测试
-│   │   ├── core/               # 核心模块测试
-│   │   ├── config/             # 配置管理测试
-│   │   ├── features/           # 功能特性测试
-│   │   ├── middleware/         # 中间件测试
-│   │   ├── network/            # 网络模块测试
-│   │   └── publishing/         # 发布系统测试
-│   └── integration/            # 集成测试
+│   ├── e2e/                    # 端到端测试 (Phase 7.2 新增)
+│   │   ├── test_post_processing_end_to_end.py # Post-Processing E2E测试
+│   │   └── test_upload_to_filemonitor_integration.py # 上传集成测试
+│   ├── integration/            # 集成测试
+│   │   ├── test_api_endpoints.py # API端点集成测试
+│   │   ├── test_mlx_diarization_integration.py # MLX + Diarization集成
+│   │   ├── test_private_content_integration.py # 私有内容集成测试
+│   │   ├── test_tailscale_network.py # Tailscale网络测试
+│   │   ├── test_web_frontend_comprehensive.py # Web前端综合测试
+│   │   ├── test_web_frontend_integration.py # Web前端集成测试
+│   │   └── test_youtube_*.py    # YouTube功能集成测试
+│   └── unit/                   # 单元测试
+│       ├── api/                # API单元测试
+│       ├── config/             # 配置管理测试
+│       ├── core/               # 核心模块测试
+│       ├── features/           # 功能特性测试
+│       ├── handlers/           # 处理器测试
+│       ├── middleware/         # 中间件测试
+│       ├── monitoring/         # 监控系统测试
+│       ├── network/            # 网络模块测试
+│       ├── processors/         # 处理器测试
+│       ├── publishing/         # 发布系统测试
+│       ├── storage/            # 存储层测试
+│       ├── utils/              # 工具模块测试
+│       └── web_frontend/       # Web前端单元测试
 ├── run_frontend.py             # Web前端启动脚本
 ├── debug_speaker_diarization.py # Speaker Diarization调试脚本
 ├── test_timestamp_alignment_algorithm.py # 时间戳对齐算法测试

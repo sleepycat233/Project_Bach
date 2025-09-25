@@ -9,7 +9,7 @@ import uuid
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from werkzeug.utils import secure_filename
 
@@ -18,7 +18,6 @@ from ..core.processing_service import (
     ProcessingStage,
     get_processing_service,
 )
-from ..core.audio_processor import AudioProcessor
 from ..utils.content_type_service import ContentTypeService
 
 logger = logging.getLogger(__name__)
@@ -49,6 +48,79 @@ class AudioUploadHandler:
         if self.content_type_service is None:
             self.content_type_service = ContentTypeService(self.config_manager)
 
+    @staticmethod
+    def _to_bool(value) -> bool:
+        """宽松地将任意输入转换为布尔值"""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in ('1', 'true', 'yes', 'on')
+        if isinstance(value, (int, float)):
+            return value != 0
+        return bool(value)
+
+    def _get_post_processing_defaults(self, content_type: str, subcategory: Optional[str]) -> dict:
+        """从PreferencesManager载入Post-Processing默认值"""
+        defaults = {
+            'enable_anonymization': False,
+            'enable_summary': False,
+            'enable_mindmap': False,
+            'enable_diarization': False,
+        }
+
+        if not self.content_type_service:
+            return defaults
+
+        try:
+            effective = self.content_type_service.get_effective_config(
+                content_type,
+                subcategory or None,
+            ) or {}
+        except Exception as error:  # pragma: no cover - 防御性日志
+            logger.warning(
+                "Unable to load effective config for %s/%s: %s",
+                content_type,
+                subcategory,
+                error,
+            )
+            return defaults
+
+        defaults['enable_anonymization'] = self._to_bool(
+            effective.get('enable_anonymization', defaults['enable_anonymization'])
+        )
+        defaults['enable_summary'] = self._to_bool(
+            effective.get('enable_summary', defaults['enable_summary'])
+        )
+        defaults['enable_mindmap'] = self._to_bool(
+            effective.get('enable_mindmap', defaults['enable_mindmap'])
+        )
+        defaults['enable_diarization'] = self._to_bool(
+            effective.get('diarization', defaults['enable_diarization'])
+        )
+        return defaults
+
+    def _normalize_metadata(self, metadata: Optional[dict]) -> dict:
+        """整理上传时传入的metadata，提取Post-Processing覆盖值"""
+        if not metadata:
+            return {}
+
+        normalized = dict(metadata)
+
+        # 拍平成post_processing字段
+        post_processing = normalized.pop('post_processing', None)
+        if isinstance(post_processing, dict):
+            normalized.update(post_processing)
+
+        for key in (
+            'enable_anonymization',
+            'enable_summary',
+            'enable_mindmap',
+            'enable_diarization',
+        ):
+            if key in normalized:
+                normalized[key] = self._to_bool(normalized[key])
+
+        return normalized
 
     def process_upload(self, file, content_type: str, subcategory: str = None,
                        privacy_level: str = 'private', metadata: dict = None):
@@ -82,9 +154,29 @@ class AudioUploadHandler:
             'file_size': file.content_length or 0,
         }
 
+        # 合并Post-Processing默认值
+        processing_config.update(
+            self._get_post_processing_defaults(content_type, subcategory)
+        )
+
+        overrides = self._normalize_metadata(metadata)
+        if overrides:
+            processing_config.update(overrides)
+
+        # 保持兼容的字段
+        processing_config['post_processing'] = {
+            'enable_anonymization': processing_config.get('enable_anonymization', False),
+            'enable_summary': processing_config.get('enable_summary', False),
+            'enable_mindmap': processing_config.get('enable_mindmap', False),
+            'enable_diarization': processing_config.get('enable_diarization', False),
+        }
+
         # 合并用户提供的metadata（处理参数和用户输入）
         if metadata:
-            processing_config.update(metadata)
+            # 已经合并overrides，此处确保其余字段也被保留
+            for key, value in metadata.items():
+                if key not in processing_config:
+                    processing_config[key] = value
 
         # ProcessingTracker使用完整配置
         tracker_metadata = processing_config.copy()
@@ -163,15 +255,20 @@ class AudioUploadHandler:
                     # CLI整合模式：将处理委托给已运行的FileMonitor
                     file_monitor = self.container.get_file_monitor()
 
+                    file_monitor.register_metadata(normalized_path, {
+                        'processing_config': processing_config,
+                        'privacy_level': privacy_level,
+                        'processing_id': tracker.processing_id,
+                        'source': 'web_upload',
+                        'uploaded_time': datetime.utcnow().isoformat() + 'Z'
+                    })
+
                     queue_metadata = {
                         'processing_id': tracker.processing_id,
                         'privacy_level': privacy_level,
-                        'processing_config': processing_config,
                         'source': 'web_upload',
                         'uploaded_time': datetime.utcnow().isoformat() + 'Z'
                     }
-
-                    normalized_path = str(target_file.resolve())
 
                     if file_monitor.enqueue_file_for_processing(normalized_path, queue_metadata):
                         processing_service.add_log(
@@ -193,63 +290,22 @@ class AudioUploadHandler:
                             'estimated_time': '15-25 seconds'
                         }
 
-                    logger.warning(f"Failed to enqueue file via FileMonitor, falling back to direct processing: {target_file}")
+                    logger.warning(
+                        "Failed to enqueue file via FileMonitor (will rely on watch folder detection): %s",
+                        target_file,
+                    )
 
-                # 开发服务器模式：直接在后台线程中处理
-                from ..core.dependency_container import DependencyContainer
-
-                container = DependencyContainer(self.config_manager)
-                audio_processor = container.get_configured_audio_processor()
-
+                # 如果无法直接排队，返回上传成功，由后台watch folder检测
                 processing_service.add_log(
                     tracker.processing_id,
-                    f"Starting direct audio processing: {filename}",
+                    'Upload completed; waiting for watch-folder processor to pick up the file.',
                     'info',
                 )
-
-                import threading
-
-                def background_process():
-                    try:
-                        success = audio_processor.process_audio_file(
-                            normalized_path,
-                            privacy_level=privacy_level,
-                            metadata=processing_config,
-                            processing_id=tracker.processing_id,
-                        )
-
-                        if success:
-                            file_stem = target_file.stem
-                            result_url = AudioProcessor.build_result_url(
-                                self.config_manager,
-                                file_stem,
-                                privacy_level,
-                            )
-
-                            processing_service.add_log(
-                                tracker.processing_id,
-                                f"Audio processing completed, result: {result_url}",
-                                'success',
-                            )
-                            tracker.set_completed(result_url)
-                        else:
-                            error_msg = 'Complete audio processing failed'
-                            processing_service.add_log(tracker.processing_id, error_msg, 'error')
-                            tracker.set_error(error_msg)
-
-                    except Exception as proc_e:
-                        error_msg = f'Audio processing exception: {str(proc_e)}'
-                        processing_service.add_log(tracker.processing_id, error_msg, 'error')
-                        tracker.set_error(error_msg)
-                        logger.error(f"Background audio processing error: {proc_e}")
-
-                thread = threading.Thread(target=background_process, daemon=True)
-                thread.start()
 
                 return {
                     'status': 'success',
                     'processing_id': tracker.processing_id,
-                    'message': 'Audio file uploaded successfully. Processing in background...',
+                    'message': 'Audio file uploaded successfully. Awaiting watch-folder processing...',
                     'estimated_time': '15-25 seconds'
                 }
 

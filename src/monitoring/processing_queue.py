@@ -11,6 +11,7 @@ from typing import Dict, Optional, List, Set
 from enum import Enum
 from datetime import datetime
 import time
+from pathlib import Path
 
 
 class ProcessingStatus(Enum):
@@ -34,8 +35,15 @@ class ProcessingQueue:
         self.queue = queue.Queue(maxsize=max_size)
         self.processing_status: Dict[str, ProcessingStatus] = {}
         self.processing_metadata: Dict[str, Dict] = {}
+        self.pending_metadata: Dict[str, Dict] = {}
         self.lock = threading.Lock()
         self.logger = logging.getLogger('project_bach.processing_queue')
+
+    def register_metadata(self, file_path: str, metadata: Dict) -> None:
+        """预注册文件的处理元数据，当文件稍后入队时合并使用。"""
+        with self.lock:
+            normalized_path = str(Path(file_path).resolve())
+            self.pending_metadata[normalized_path] = dict(metadata)
 
     def add_file(self, file_path: str, metadata: Dict = None) -> bool:
         """添加文件到队列
@@ -57,10 +65,14 @@ class ProcessingQueue:
 
             try:
                 self.queue.put(file_path, block=False)
+                merged_metadata = dict(metadata or {})
+                if file_path in self.pending_metadata:
+                    merged_metadata = {**self.pending_metadata.pop(file_path), **merged_metadata}
+
                 self.processing_status[file_path] = ProcessingStatus.PENDING
                 self.processing_metadata[file_path] = {
                     'added_time': datetime.now(),
-                    'metadata': metadata or {},
+                    'metadata': merged_metadata,
                     'retry_count': 0
                 }
 
