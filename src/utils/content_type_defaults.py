@@ -8,7 +8,4 @@ DEFAULT_CONTENT_TYPES = {
     'meeting': {
         'display_name': 'Meeting Recording',
     },
-    'youtube': {
-        'display_name': 'YouTube Video',
-    },
 }

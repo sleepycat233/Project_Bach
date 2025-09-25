@@ -166,6 +166,13 @@ class WebApp {
             e.preventDefault();
             await this.handleYouTubeFormSubmission(form, validator);
         });
+
+        // 加载YouTube内容类型的默认后处理配置
+        this.updatePostProcessingDefaults('youtube', null, {
+            formSelector: '#youtube-form'
+        }).catch((error) => {
+            console.error('Failed to load YouTube post-processing defaults:', error);
+        });
     }
 
     setupConfigForm() {
@@ -213,7 +220,9 @@ class WebApp {
                 } else if (e.target.value) {
                     // 选择了现有的subcategory，更新Post-Processing默认值
                     const contentType = contentTypeSelect.value;
-                    await this.updatePostProcessingDefaults(contentType, e.target.value);
+                    await this.updatePostProcessingDefaults(contentType, e.target.value, {
+                        formSelector: '#audio-form'
+                    });
                 }
             });
         }
@@ -255,7 +264,9 @@ class WebApp {
             subcategorySelect.appendChild(addNewOption);
             
             // 更新Post-Processing默认值
-            await this.updatePostProcessingDefaults(contentType);
+            await this.updatePostProcessingDefaults(contentType, null, {
+                formSelector: '#audio-form'
+            });
                 
         } catch (error) {
             console.error('Error loading subcategories:', error);
@@ -425,23 +436,29 @@ class WebApp {
         document.getElementById('new-subcategory-display').value = '';
     }
 
-    async updatePostProcessingDefaults(contentType, subcategory = null) {
+    async updatePostProcessingDefaults(contentType, subcategory = null, options = {}) {
         try {
             // 获取有效配置
             const response = await this.apiClient.get(`/api/preferences/config/${contentType}${subcategory ? `/${subcategory}` : ''}`);
-            const config = response.data.data || {};
-            
-            // 更新checkbox状态
-            const anonymizationCheck = document.querySelector('input[name="enable_anonymization"]');
-            const summaryCheck = document.querySelector('input[name="enable_summary"]');
-            const mindmapCheck = document.querySelector('input[name="enable_mindmap"]');
-            const diarizationCheck = document.querySelector('input[name="enable_diarization"]');
-            
-            if (anonymizationCheck) anonymizationCheck.checked = config.enable_anonymization !== false;
-            if (summaryCheck) summaryCheck.checked = config.enable_summary !== false;
-            if (mindmapCheck) mindmapCheck.checked = config.enable_mindmap !== false;
-            if (diarizationCheck) diarizationCheck.checked = config.diarization === true;
-            
+            const config = (response?.data && response.data.data) || {};
+
+            const formSelector = options.formSelector || '#audio-form';
+            const form = document.querySelector(formSelector);
+            if (!form) {
+                return;
+            }
+
+            const setChecked = (name, value) => {
+                const input = form.querySelector(`input[name="${name}"]`);
+                if (!input) return;
+                input.checked = value === true;
+            };
+
+            setChecked('enable_anonymization', config.enable_anonymization);
+            setChecked('enable_summary', config.enable_summary);
+            setChecked('enable_mindmap', config.enable_mindmap);
+            setChecked('enable_diarization', config.diarization);
+
         } catch (error) {
             console.error('Error loading post-processing defaults:', error);
         }

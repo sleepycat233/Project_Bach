@@ -28,5 +28,17 @@
       "english": ["whisper-tiny-mlx"],
       "multilingual": []
     }
+  },
+  "_media_defaults": {
+    "youtube": {
+      "enable_anonymization": false,
+      "enable_summary": false,
+      "enable_mindmap": false,
+      "diarization": false,
+      "_recommendations": {
+        "english": ["whisper-tiny-mlx"],
+        "multilingual": ["whisper-medium-mlx"]
+      }
+    }
   }
 }

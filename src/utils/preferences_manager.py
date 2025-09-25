@@ -38,7 +38,7 @@ class PreferencesManager:
         # 加载用户偏好（包含系统默认值）
         self.prefs = {}
         self.load_preferences()
-        
+
         # 从文件中获取系统默认值，如果不存在则使用fallback
         self.system_defaults = self.prefs.get('_system_defaults', {
             'enable_anonymization': False,
@@ -75,6 +75,18 @@ class PreferencesManager:
                     '_defaults': {
                         'diarization': True   # 会议默认启用diarization
                     }
+                },
+                '_media_defaults': {
+                    'youtube': {
+                        'enable_anonymization': False,
+                        'enable_summary': False,
+                        'enable_mindmap': False,
+                        'diarization': False,
+                        '_recommendations': {
+                            'english': ['whisper-tiny-mlx'],
+                            'multilingual': ['whisper-large-v3-mlx']
+                        }
+                    }
                 }
             }
             self._save_to_file()
@@ -110,6 +122,10 @@ class PreferencesManager:
                 overrides = self.prefs[content_type][subcategory]
                 # 只应用非元数据字段
                 config.update({k: v for k, v in overrides.items() if not k.startswith('_')})
+        else:
+            media_defaults = self.prefs.get('_media_defaults', {})
+            if content_type in media_defaults:
+                config.update({k: v for k, v in media_defaults[content_type].items() if not k.startswith('_')})
 
         return config
 
@@ -166,25 +182,33 @@ class PreferencesManager:
 
     def get_content_type_recommendations(self, content_type: str) -> Optional[Dict[str, List[str]]]:
         """Get stored model recommendations for a content type, if any."""
-        if content_type not in self.prefs:
-            return None
+        if content_type in self.prefs:
+            recommendations = self.prefs[content_type].get('_recommendations')
+            if recommendations is None:
+                return None
+            return self._normalize_recommendations(recommendations)
 
-        recommendations = self.prefs[content_type].get('_recommendations')
-        if recommendations is None:
-            return None
+        media_defaults = self.prefs.get('_media_defaults', {})
+        if content_type in media_defaults:
+            media_recs = media_defaults[content_type].get('_recommendations')
+            if media_recs is None:
+                return None
+            return self._normalize_recommendations(media_recs)
 
-        return self._normalize_recommendations(recommendations)
+        return None
 
     def save_content_type_recommendations(self, content_type: str,
                                           recommendations: Dict[str, Any]) -> None:
         """Persist model recommendations for a content type."""
         normalized = self._normalize_recommendations(recommendations)
 
-        if content_type not in self.prefs:
-            self.prefs[content_type] = {'_defaults': {}}
-
-        # 始终写入归一化结构，空列表表示显式清除推荐
-        self.prefs[content_type]['_recommendations'] = normalized
+        if content_type in self.prefs:
+            self.prefs[content_type].setdefault('_defaults', {})
+            self.prefs[content_type]['_recommendations'] = normalized
+        else:
+            media_defaults = self.prefs.setdefault('_media_defaults', {})
+            media_entry = media_defaults.setdefault(content_type, {})
+            media_entry['_recommendations'] = normalized
 
         self._save_to_file()
         self.logger.debug(

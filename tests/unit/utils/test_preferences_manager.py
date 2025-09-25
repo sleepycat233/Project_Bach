@@ -138,7 +138,21 @@ class TestPreferencesManager(unittest.TestCase):
         }
         
         self.assertEqual(config, expected)
-    
+
+    def test_youtube_defaults(self):
+        """媒体内容类型（YouTube）在无自定义时应回退到系统默认"""
+        config = self.manager.get_effective_config('youtube')
+
+        expected = {
+            'enable_anonymization': False,
+            'enable_summary': False,
+            'enable_mindmap': False,
+            'diarization': False
+        }
+
+        self.assertEqual(config, expected)
+
+
     def test_content_type_defaults_inheritance(self):
         """测试content_type级别的默认值继承"""
         # 设置lecture的默认值：启用摘要和思维导图
@@ -266,7 +280,7 @@ class TestPreferencesManager(unittest.TestCase):
     def test_complex_inheritance_chain(self):
         """测试复杂的继承链：系统默认 → content_type默认 → subcategory覆盖"""
         # 1. 系统默认值（在代码中定义）
-        # enable_anonymization: True, enable_summary: True, enable_mindmap: True, diarization: False
+        # enable_anonymization: False, enable_summary: False, enable_mindmap: False, diarization: False
         
         # 2. 设置meeting的content_type默认值
         self.manager.update_content_type_defaults('meeting', {
