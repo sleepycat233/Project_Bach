@@ -69,29 +69,31 @@ export class ModelSelector {
         try {
             const response = await this.apiClient.get(this.options.apiEndpoint);
             
-            if (response.data.error) {
-                throw new Error(response.data.error);
+            if (!response.data.success) {
+                throw new Error(response.data.error || 'API request failed');
             }
+
+            const apiData = response.data.data || {};
 
             // 处理API返回的数据格式
             this.modelsConfig = {
                 // 英文模式：显示英文推荐模型和通用模型
-                english: response.data.all ? response.data.all.filter(m => 
+                english: apiData.all ? apiData.all.filter(m =>
                     m.language_mode === 'english' || m.language_mode === 'general'
                 ) : [],
-                
+
                 // 多语言模式：显示多语言推荐模型和通用模型
-                multilingual: response.data.all ? response.data.all.filter(m => 
+                multilingual: apiData.all ? apiData.all.filter(m => 
                     m.language_mode === 'multilingual' || m.language_mode === 'general'
                 ) : [],
                 
                 contentTypes: {
-                    lecture: response.data.lecture || [],
-                    meeting: response.data.meeting || [],
-                    others: response.data.others || []
+                    lecture: apiData.lecture || [],
+                    meeting: apiData.meeting || [],
+                    others: apiData.others || []
                 },
                 
-                all: response.data.all || []
+                all: apiData.all || []
             };
 
             // 为每个语言模式的模型设置推荐状态和排序

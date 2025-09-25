@@ -268,10 +268,10 @@ def create_app(config=None):
         try:
             service = app.config['PROCESSING_SERVICE']
             active_sessions = service.list_active_sessions()
-            return jsonify({'active_sessions': active_sessions})
+            return jsonify(create_api_response(success=True, data={'active_sessions': active_sessions}))
         except Exception as e:
             logger.error(f"Processing status API error: {e}")
-            return jsonify({'error': 'Failed to get status'}), 500
+            return jsonify(create_api_response(success=False, error='Failed to get status')), 500
 
     @app.route('/api/status/<processing_id>')
     def api_single_status(processing_id):
@@ -281,12 +281,12 @@ def create_app(config=None):
             status = service.get_status(processing_id)
 
             if status is None:
-                return jsonify({'error': 'Processing session not found'}), 404
+                return jsonify(create_api_response(success=False, error='Processing session not found')), 404
 
-            return jsonify(status)
+            return jsonify(create_api_response(success=True, data=status))
         except Exception as e:
             logger.error(f"Single status API error: {e}")
-            return jsonify({'error': 'Failed to get status'}), 500
+            return jsonify(create_api_response(success=False, error='Failed to get status')), 500
 
     @app.route('/api/categories')
     def api_categories():
@@ -375,10 +375,10 @@ def create_app(config=None):
             storage = ResultStorage()
             results = storage.get_recent_results(limit=limit)
 
-            return jsonify(results)
+            return jsonify(create_api_response(success=True, data=results))
         except Exception as e:
             logger.error(f"Recent results API error: {e}")
-            return jsonify({'error': 'Failed to get recent results'}), 500
+            return jsonify(create_api_response(success=False, error='Failed to get recent results')), 500
 
 
     @app.route('/api/youtube/metadata')
@@ -484,7 +484,12 @@ def create_app(config=None):
                     return False
 
             # 构建MLX模型基础信息
-            config_manager = ConfigManager()
+            config_manager = app.config.get('CONFIG_MANAGER')
+            if not config_manager:
+                return jsonify(create_api_response(
+                    success=False,
+                    error='Configuration manager not initialized'
+                )), 500
             config = config_manager.get_full_config()
             mlx_config = config.get('mlx_whisper', {})
             available_models = mlx_config.get('available_models', [])
@@ -510,105 +515,103 @@ def create_app(config=None):
                         'is_default': is_default
                     })
 
+
             # 为Smart Config API添加专用字段
+            cache = app.config.setdefault('HUGGINGFACE_CACHE', {})
+
+            def _build_model_entry(base_model, english_set, multilingual_set):
+                entry = {
+                    **base_model,
+                    'is_english_recommended': base_model['value'] in english_set or base_model['name'] in english_set,
+                    'is_multilingual_recommended': base_model['value'] in multilingual_set or base_model['name'] in multilingual_set,
+                }
+                return entry
+
             all_models = []
             for model in base_models:
-                # 检查真实下载状态
-                is_downloaded = _check_model_downloaded(model['repo'])
+                repo_name = model['repo']
+                if repo_name in cache:
+                    is_downloaded = cache[repo_name]
+                else:
+                    is_downloaded = _check_model_downloaded(repo_name)
+                    cache[repo_name] = is_downloaded
 
                 all_models.append({
-                    **model,  # 基础信息
-                    # 'display_name': f"{model['name']}" + (" (default)" if model['is_default'] else ""),
-                    'downloaded': is_downloaded,  # 真实下载状态
-                    'config_info': {}  # MLX模型无需复杂配置信息
+                    **model,
+                    'downloaded': is_downloaded,
+                    'config_info': {},
                 })
 
-            # 读取内容类型推荐（已由ContentTypeService归一化）
-            content_types = get_content_types_config(app)
+            content_type_service: ContentTypeService = app.config.get('CONTENT_TYPE_SERVICE')
+            if not content_type_service:
+                return jsonify(create_api_response(success=False, error='Content type service is not initialized')), 503
 
-            content_type_recommendations = {}
-            for content_type, type_config in content_types.items():
-                recommendations = type_config.get('recommendations') or {}
-                english = recommendations.get('english', []) if isinstance(recommendations, dict) else []
-                multilingual = recommendations.get('multilingual', []) if isinstance(recommendations, dict) else []
-                content_type_recommendations[content_type] = {
-                    'english': list(english),
-                    'multilingual': list(multilingual),
-                }
+            content_types = content_type_service.get_all()
 
-
-            def _set_recommendation_flags(model, english_recs, multilingual_recs):
-                """为模型设置推荐标志的共用函数"""
-                model_value = model.get('value', '')
-                model_name = model.get('name', '')
-
-                model['is_english_recommended'] = any(
-                    rec_model == model_value or rec_model == model_name
-                    for rec_model in english_recs
-                )
-                model['is_multilingual_recommended'] = any(
-                    rec_model == model_value or rec_model == model_name
-                    for rec_model in multilingual_recs
-                )
-                return model
-
-            # 收集所有内容类型的推荐模型（合并用于'all'类别）
+            recommendation_map = {}
             all_english_recs = set()
             all_multilingual_recs = set()
 
-            for content_type, recommendations in content_type_recommendations.items():
-                # 只支持新格式：{"english": [...], "multilingual": [...]}
-                all_english_recs.update(recommendations.get('english', []))
-                all_multilingual_recs.update(recommendations.get('multilingual', []))
+            for content_type, type_config in content_types.items():
+                recommendations = type_config.get('recommendations') or {}
+                if not isinstance(recommendations, dict):
+                    recommendations = {}
+                english_set = {str(item) for item in recommendations.get('english', [])}
+                multilingual_set = {str(item) for item in recommendations.get('multilingual', [])}
 
-            # 生成结果
+                recommendation_map[content_type] = {
+                    'english': english_set,
+                    'multilingual': multilingual_set,
+                }
+
+                all_english_recs.update(english_set)
+                all_multilingual_recs.update(multilingual_set)
+
             result = {}
+            for content_type, recommendation_sets in recommendation_map.items():
+                models_with_flags = [
+                    _build_model_entry(model, recommendation_sets['english'], recommendation_sets['multilingual'])
+                    for model in all_models
+                ]
 
-            # 为每个内容类型生成专用模型列表
-            for content_type in content_type_recommendations.keys():
-                content_recommendations = content_type_recommendations.get(content_type, {})
-                english_recommendations = content_recommendations.get('english', [])
-                multilingual_recommendations = content_recommendations.get('multilingual', [])
+                models_with_flags.sort(
+                    key=lambda m: (
+                        not (m.get('is_english_recommended') or m.get('is_multilingual_recommended')),
+                        not m.get('is_default', False),
+                        m.get('name', ''),
+                    )
+                )
+                result[content_type] = models_with_flags
 
-                content_type_models = []
-                for model in all_models:
-                    model_copy = model.copy()
-                    _set_recommendation_flags(model_copy, english_recommendations, multilingual_recommendations)
-                    content_type_models.append(model_copy)
-
-                result[content_type] = content_type_models
-
-            # 为'all'类别生成模型列表
-            all_models_with_recommendations = []
+            all_models_general = []
             for model in all_models:
-                model_copy = model.copy()
-                _set_recommendation_flags(model_copy, all_english_recs, all_multilingual_recs)
+                entry = _build_model_entry(model, all_english_recs, all_multilingual_recs)
 
-                # all列表不显示推荐标识，让前端根据语言模式过滤时显示
-                model_copy['recommended'] = False
-                model_copy['language_mode'] = 'general'
+                if entry['is_english_recommended'] and not entry['is_multilingual_recommended']:
+                    entry['language_mode'] = 'english'
+                elif entry['is_multilingual_recommended'] and not entry['is_english_recommended']:
+                    entry['language_mode'] = 'multilingual'
+                else:
+                    entry['language_mode'] = 'general'
 
-                all_models_with_recommendations.append(model_copy)
+                entry['recommended'] = False
+                all_models_general.append(entry)
 
-            # 按推荐优先级和默认模型排序
-            def get_model_complexity(model):
-                is_english_recommended = model.get('is_english_recommended', False)
-                is_multilingual_recommended = model.get('is_multilingual_recommended', False)
-                is_default = model.get('is_default', False)
-                model_name = model.get('name', '')
+            all_models_general.sort(
+                key=lambda m: (
+                    not (m.get('is_english_recommended') or m.get('is_multilingual_recommended')),
+                    not m.get('is_default', False),
+                    m.get('name', ''),
+                )
+            )
 
-                # 任何推荐的模型都排在前面，然后是默认模型，最后按名称排序
-                is_any_recommended = is_english_recommended or is_multilingual_recommended
-                return (not is_any_recommended, not is_default, model_name)
+            result['all'] = all_models_general
 
-            all_models_with_recommendations.sort(key=get_model_complexity)
-            result['all'] = all_models_with_recommendations
-
-            return jsonify(result)
+            return jsonify(create_api_response(success=True, data=result))
 
         except Exception as e:
             logger.error(f"Smart models config API error: {e}")
-            return jsonify({'error': 'Failed to get smart models configuration'}), 500
+            return jsonify(create_api_response(success=False, error='Failed to get smart models configuration')), 500
 
 
     # PreferencesManager API路由 - Phase 7.2
@@ -696,7 +699,7 @@ def create_app(config=None):
             config = data.get('config', {})
             
             if not content_type or not subcategory or not display_name:
-                return jsonify({'error': 'content_type, subcategory and display_name are required'}), 400
+                return jsonify(create_api_response(success=False, error='content_type, subcategory and display_name are required')), 400
             
             content_type_service: ContentTypeService = app.config.get('CONTENT_TYPE_SERVICE')
             if not content_type_service:
@@ -704,14 +707,14 @@ def create_app(config=None):
 
             content_type_service.save_subcategory(content_type, subcategory, display_name, config)
 
-            return jsonify({
-                'success': True,
-                'message': f'Subcategory "{display_name}" created successfully'
-            })
+            return jsonify(create_api_response(
+                success=True,
+                message=f'Subcategory "{display_name}" created successfully'
+            ))
             
         except Exception as e:
             logger.error(f"Create subcategory API error: {e}")
-            return jsonify({'error': f'Failed to create subcategory: {str(e)}'}), 500
+            return jsonify(create_api_response(success=False, error=f'Failed to create subcategory: {str(e)}')), 500
 
     # Private内容访问路由
     @app.route('/private/')

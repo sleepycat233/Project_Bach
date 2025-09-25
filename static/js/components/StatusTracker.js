@@ -108,7 +108,15 @@ export class StatusTracker {
     async fetchStatus() {
         try {
             const response = await this.apiClient.get(this.options.apiEndpoint);
-            this.handleStatusUpdate(response.data);
+            const payload = response.data || {};
+
+            if (!payload.success) {
+                throw new Error(payload.error || 'Failed to fetch status');
+            }
+
+            const statusData = payload.data?.active_sessions ?? [];
+
+            this.handleStatusUpdate(statusData);
             this.retryCount = 0; // 重置重试计数
         } catch (error) {
             console.error('StatusTracker: Failed to fetch status', error);
@@ -118,7 +126,9 @@ export class StatusTracker {
 
     handleStatusUpdate(data) {
         this.lastUpdate = new Date();
-        this.statusHistory.unshift({ ...data, timestamp: this.lastUpdate });
+        const historyEntry = Array.isArray(data) ? { sessions: data } : { ...data };
+        historyEntry.timestamp = this.lastUpdate;
+        this.statusHistory.unshift(historyEntry);
         
         // 限制历史记录长度
         if (this.statusHistory.length > 50) {
@@ -169,11 +179,11 @@ export class StatusTracker {
         return `
             <div class="status-list">
                 ${statusList.map((item, index) => `
-                    <div class="status-item ${item.status || 'unknown'}">
+                    <div class="status-item ${item.status || item.stage || 'unknown'}">
                         <div class="status-item-header">
-                            <span class="status-icon">${this.getStatusIcon(item.status)}</span>
-                            <span class="status-title">${item.name || item.filename || `Task ${index + 1}`}</span>
-                            <span class="status-badge ${item.status || 'unknown'}">${item.status || 'Unknown'}</span>
+                            <span class="status-icon">${this.getStatusIcon(item.status || item.stage)}</span>
+                            <span class="status-title">${item.name || item.filename || item.processing_id || `Task ${index + 1}`}</span>
+                            <span class="status-badge ${item.status || item.stage || 'unknown'}">${(item.status || item.stage || 'Unknown').toString().toUpperCase()}</span>
                         </div>
                         ${item.progress !== undefined ? `
                             <div class="status-progress">
@@ -274,7 +284,7 @@ export class StatusTracker {
         return `
             <div class="simple-status">
                 <div class="status-card">
-                    <div class="status-icon">${this.getStatusIcon(status.status)}</div>
+                    <div class="status-icon">${this.getStatusIcon(status.status || status.stage)}</div>
                     <div class="status-info">
                         <div class="status-title">${status.message || 'Processing'}</div>
                         <div class="status-details">
@@ -297,6 +307,11 @@ export class StatusTracker {
             error: '❌',
             cancelled: '⏹️',
             paused: '⏸️',
+            uploaded: '📤',
+            transcribing: '🗣️',
+            anonymizing: '🕵️',
+            ai_generating: '🤖',
+            publishing: '🚀',
             unknown: '❓'
         };
         return icons[status] || icons.unknown;

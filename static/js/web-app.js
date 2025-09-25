@@ -476,7 +476,7 @@ class WebApp {
             ]);
 
             if (categoriesResponse.status === 'fulfilled') {
-                this.contentTypes = categoriesResponse.value.data;
+                this.contentTypes = categoriesResponse.value.data.data;
             }
 
         } catch (error) {

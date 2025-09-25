@@ -30,7 +30,7 @@ openrouter:
   # Free tier: 10 req/10s, 60 req/min, 5 credits/day
   # Paid tier: 10 req/10s, 60 req/min, 按credit计费
 
-# Phase 10: MLX Whisper配置 (替代WhisperKit)
+# Phase 10: MLX Whisper配置
 mlx_whisper:
   # 默认模型配置 - 使用标准MLX命名
   default_model: "whisper-tiny-mlx"  # 默认使用的模型

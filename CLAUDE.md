@@ -47,39 +47,6 @@
 - **测试系统**: 91个单元测试，10个集成测试，95%+覆盖率
 
 ## 当前开发状态
-
-### ✅ **Phase 10-11 完成**: MLX Whisper + Speaker Diarization + 算法分析
-
-**已完成核心功能**:
-- ✅ MLX Whisper后端迁移: 消除subprocess调用，提升转录性能30-50%
-- ✅ Speaker Diarization集成: 基于pyannote.audio的多人对话识别
-- ✅ 智能配置系统: 基于content type的自动diarization启用
-- ✅ IoU时间戳对齐算法: 实现ASR转录与说话人信息的精确合并
-- ✅ 双输出模式: group_by_speaker模式 + chunk级精确模式
-- ✅ 深度算法分析: 识别跨说话人边界chunks的分配问题，设计了改进方案
-
-**当前系统能力**:
-- **多说话人识别**: 支持2-6人对话，准确率>85%
-- **性能优化**: 转录速度提升，内存管理精细化(<2GB峰值)
-- **灵活配置**: 基于subcategory的diarization默认配置
-- **生产就绪**: 完整错误处理和日志记录
-
-### ✅ **代码清理与架构重构完成**
-
-**已完成的清理工作**:
-- ✅ **配置与密钥分离**: API keys完全迁移到环境变量，配置文件无敏感信息
-- ✅ **冗余代码删除**: 移除~1500行重复/未使用代码
-  - 删除重复的Web前端ProcessingService类 (419行)
-  - 删除未使用的RSS handler和content_classifier (~978行)
-  - 删除GitHub deployment monitor等冗余功能
-- ✅ **环境变量架构**: 纯Python实现.env加载，零依赖
-- ✅ **配置文件重构**: config.yaml已加入版本控制，移除config.template.yaml
-
-**架构优化成果**:
-- **配置管理简化**: config.yaml直接版本控制，环境变量独立管理
-- **依赖减少**: 移除不必要的python-dotenv依赖
-- **安全提升**: 敏感信息完全从配置文件分离
-
 ### 🔴 **当前开发任务 - Phase 7: 前端用户体验优化**
 
 **Phase 7.1 已完成** ✅: API重构和代码优化 (重构/private/路由，统一API响应)

@@ -9,6 +9,10 @@
     "_defaults": {
       "diarization": false
     },
+    "_recommendations": {
+      "english": ["whisper-tiny-mlx"],
+      "multilingual": ["whisper-large-v3-mlx"]
+    },
     "MATH101": {
       "_display_name": "Advanced Calculus"
     },
@@ -19,6 +23,10 @@
   "meeting": {
     "_defaults": {
       "diarization": true
+    },
+    "_recommendations": {
+      "english": ["whisper-tiny-mlx"],
+      "multilingual": []
     }
   }
 }
