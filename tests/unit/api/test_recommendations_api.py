@@ -199,3 +199,165 @@ class TestRecommendationAPIEndpoints:
             assert isinstance(data['data']['english'], list)
             assert isinstance(data['data']['multilingual'], list)
             assert len(data['data']['multilingual']) == 0
+
+
+class TestMediaDefaultsRecommendations:
+    """Test suite for media defaults recommendations handling."""
+
+    @pytest.fixture
+    def mock_content_type_service_with_media(self):
+        """Create mock ContentTypeService with media defaults support."""
+        mock_service = MagicMock()
+
+        # Mock different behavior for regular content types vs media types
+        def get_recommendations_side_effect(content_type):
+            if content_type == 'youtube':
+                # YouTube is handled as media default
+                return {
+                    'english': ['whisper-tiny-mlx'],
+                    'multilingual': ['whisper-large-v3-mlx']
+                }
+            elif content_type == 'lecture':
+                # Lecture is regular content type
+                return {
+                    'english': ['whisper-tiny-mlx'],
+                    'multilingual': []
+                }
+            else:
+                return {'english': [], 'multilingual': []}
+
+        mock_service.get_content_type_recommendations.side_effect = get_recommendations_side_effect
+        return mock_service
+
+    def test_get_media_defaults_recommendations(self, client, app, mock_content_type_service_with_media):
+        """Test getting recommendations for media defaults (YouTube)."""
+        with app.app_context():
+            app.config['CONTENT_TYPE_SERVICE'] = mock_content_type_service_with_media
+
+            response = client.get('/api/preferences/recommendations/youtube')
+
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert data['success'] is True
+            assert data['data']['english'] == ['whisper-tiny-mlx']
+            assert data['data']['multilingual'] == ['whisper-large-v3-mlx']
+
+            mock_content_type_service_with_media.get_content_type_recommendations.assert_called_once_with('youtube')
+
+    def test_get_regular_content_type_recommendations(self, client, app, mock_content_type_service_with_media):
+        """Test getting recommendations for regular content types (lecture)."""
+        with app.app_context():
+            app.config['CONTENT_TYPE_SERVICE'] = mock_content_type_service_with_media
+
+            response = client.get('/api/preferences/recommendations/lecture')
+
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert data['success'] is True
+            assert data['data']['english'] == ['whisper-tiny-mlx']
+            assert data['data']['multilingual'] == []
+
+            mock_content_type_service_with_media.get_content_type_recommendations.assert_called_once_with('lecture')
+
+    def test_save_media_defaults_recommendations(self, client, app, mock_content_type_service_with_media):
+        """Test saving recommendations for media defaults (YouTube)."""
+        with app.app_context():
+            app.config['CONTENT_TYPE_SERVICE'] = mock_content_type_service_with_media
+
+            payload = {
+                'english': ['whisper-medium-mlx'],
+                'multilingual': ['whisper-large-v3-mlx']
+            }
+
+            response = client.post(
+                '/api/preferences/recommendations/youtube',
+                json=payload,
+                content_type='application/json'
+            )
+
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert data['success'] is True
+            assert 'youtube' in data['message']
+
+            # Verify the service method was called with YouTube as media type
+            mock_content_type_service_with_media.save_content_type_recommendations.assert_called_once_with('youtube', payload)
+
+    def test_save_regular_content_type_recommendations(self, client, app, mock_content_type_service_with_media):
+        """Test saving recommendations for regular content types."""
+        with app.app_context():
+            app.config['CONTENT_TYPE_SERVICE'] = mock_content_type_service_with_media
+
+            payload = {
+                'english': ['whisper-base-mlx'],
+                'multilingual': []
+            }
+
+            response = client.post(
+                '/api/preferences/recommendations/lecture',
+                json=payload,
+                content_type='application/json'
+            )
+
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert data['success'] is True
+            assert 'lecture' in data['message']
+
+            mock_content_type_service_with_media.save_content_type_recommendations.assert_called_once_with('lecture', payload)
+
+    def test_media_vs_regular_content_type_distinction(self, client, app, mock_content_type_service_with_media):
+        """Test that media defaults and regular content types are handled distinctly."""
+        with app.app_context():
+            app.config['CONTENT_TYPE_SERVICE'] = mock_content_type_service_with_media
+
+            # Test YouTube (media default)
+            youtube_response = client.get('/api/preferences/recommendations/youtube')
+            youtube_data = json.loads(youtube_response.data)
+
+            # Test lecture (regular content type)
+            lecture_response = client.get('/api/preferences/recommendations/lecture')
+            lecture_data = json.loads(lecture_response.data)
+
+            # Both should succeed but return different recommendations
+            assert youtube_response.status_code == 200
+            assert lecture_response.status_code == 200
+
+            # YouTube should have multilingual recommendations, lecture shouldn't
+            assert len(youtube_data['data']['multilingual']) > 0
+            assert len(lecture_data['data']['multilingual']) == 0
+
+    def test_clear_media_defaults_recommendations(self, client, app, mock_content_type_service_with_media):
+        """Test clearing recommendations for media defaults."""
+        with app.app_context():
+            app.config['CONTENT_TYPE_SERVICE'] = mock_content_type_service_with_media
+
+            # Clear YouTube recommendations
+            response = client.post(
+                '/api/preferences/recommendations/youtube',
+                json={'english': [], 'multilingual': []},
+                content_type='application/json'
+            )
+
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert data['success'] is True
+
+            # Verify empty recommendations were saved
+            expected_payload = {'english': [], 'multilingual': []}
+            mock_content_type_service_with_media.save_content_type_recommendations.assert_called_once_with('youtube', expected_payload)
+
+    def test_unknown_media_type_handling(self, client, app, mock_content_type_service_with_media):
+        """Test handling of unknown media types."""
+        with app.app_context():
+            app.config['CONTENT_TYPE_SERVICE'] = mock_content_type_service_with_media
+
+            # Test unknown media type
+            response = client.get('/api/preferences/recommendations/unknown_media')
+
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert data['success'] is True
+            # Should return empty recommendations for unknown types
+            assert data['data']['english'] == []
+            assert data['data']['multilingual'] == []

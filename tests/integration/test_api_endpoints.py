@@ -30,6 +30,8 @@ class TestAPIEndpoints(unittest.TestCase):
              patch('src.web_frontend.app.ipaddress.ip_address'):
             self.app = create_app()
             self.app.config['TESTING'] = True
+            self.processing_service = MagicMock()
+            self.app.config['PROCESSING_SERVICE'] = self.processing_service
             self.client = self.app.test_client()
 
     def tearDown(self):
@@ -57,9 +59,11 @@ class TestAPIEndpoints(unittest.TestCase):
 
     def test_processing_status_api(self):
         """测试处理状态API - 适配统一响应格式"""
-        with patch('src.web_frontend.app.get_processing_service') as mock_service:
-            # Mock处理服务
-            mock_service.return_value.list_active_sessions.return_value = []
+        with self.app.app_context():
+            # Mock处理服务 - 直接mock app.config中的service
+            mock_service = MagicMock()
+            mock_service.list_active_sessions.return_value = []
+            self.app.config['PROCESSING_SERVICE'] = mock_service
 
             response = self.client.get('/api/status/processing')
 
@@ -84,13 +88,15 @@ class TestAPIEndpoints(unittest.TestCase):
         """测试单个状态API - 适配统一响应格式"""
         test_processing_id = 'test_123'
 
-        with patch('src.web_frontend.app.get_processing_service') as mock_service:
-            # Mock成功情况
-            mock_service.return_value.get_status.return_value = {
+        with self.app.app_context():
+            # Mock成功情况 - 直接mock app.config中的service
+            mock_service = MagicMock()
+            mock_service.get_status.return_value = {
                 'stage': 'processing',
                 'progress': 50,
                 'message': 'Test message'
             }
+            self.app.config['PROCESSING_SERVICE'] = mock_service
 
             response = self.client.get(f'/api/status/{test_processing_id}')
 
@@ -114,9 +120,11 @@ class TestAPIEndpoints(unittest.TestCase):
         """测试单个状态API - 未找到处理ID"""
         test_processing_id = 'nonexistent_id'
 
-        with patch('src.web_frontend.app.get_processing_service') as mock_service:
-            # Mock未找到情况
-            mock_service.return_value.get_status.return_value = None
+        with self.app.app_context():
+            # Mock未找到情况 - 直接mock app.config中的service
+            mock_service = MagicMock()
+            mock_service.get_status.return_value = None
+            self.app.config['PROCESSING_SERVICE'] = mock_service
 
             response = self.client.get(f'/api/status/{test_processing_id}')
 
@@ -161,34 +169,36 @@ class TestAPIEndpoints(unittest.TestCase):
 
     def test_create_subcategory_api(self):
         """测试创建子分类API - 适配统一响应格式"""
-        with patch('src.web_frontend.app.get_processing_service'):
+        with self.app.app_context():
             # Mock内容类型服务
-            with patch.object(self.app, 'config') as mock_config:
-                mock_service = MagicMock()
-                mock_config.get.return_value = mock_service
+            mock_service = MagicMock()
+            mock_service.save_subcategory.return_value = None  # save操作通常返回None表示成功
+            self.app.config['CONTENT_TYPE_SERVICE'] = mock_service
 
-                # 测试数据
-                test_data = {
-                    'content_type': 'lecture',
-                    'subcategory': 'CS101',
-                    'display_name': 'Computer Science 101',
-                    'config': json.dumps({
-                        'enable_anonymization': True,
-                        'enable_summary': True
-                    })
-                }
+            # 测试数据
+            test_data = {
+                'content_type': 'lecture',
+                'subcategory': 'CS101',
+                'display_name': 'Computer Science 101',
+                'config': json.dumps({
+                    'enable_anonymization': True,
+                    'enable_summary': True
+                })
+            }
 
-                response = self.client.post('/api/subcategory/create', data=test_data)
+            response = self.client.post('/api/preferences/subcategory',
+                                      json=test_data,
+                                      content_type='application/json')
 
-                self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 200)
 
-                data = json.loads(response.data)
+            data = json.loads(response.data)
 
-                # 验证统一响应格式
-                self.assertIn('success', data)
-                self.assertTrue(data['success'])
-                self.assertIn('message', data)
-                self.assertIn('Computer Science 101', data['message'])
+            # 验证统一响应格式
+            self.assertIn('success', data)
+            self.assertTrue(data['success'])
+            self.assertIn('message', data)
+            self.assertIn('Computer Science 101', data['message'])
 
         print("✅ Create subcategory API unified response format validated")
 
@@ -233,25 +243,6 @@ class TestAPIEndpoints(unittest.TestCase):
 
         print("✅ API response headers consistency validated")
 
-    def test_models_smart_config_api_http(self):
-        """测试模型配置API - 仅HTTP层面测试（业务逻辑在Unit测试中）"""
-        with patch('src.web_frontend.app.get_processing_service'):
-            response = self.client.get('/api/models/smart-config')
-
-            # 只测试HTTP层面：状态码、响应格式、Content-Type
-            self.assertEqual(response.status_code, 200)
-            self.assertIn('application/json', response.content_type)
-
-            data = json.loads(response.data)
-
-            # 只验证统一响应格式（不测试具体业务数据）
-            self.assertIn('success', data)
-            self.assertIn('timestamp', data)
-
-            # 业务逻辑测试在Unit测试中，这里不重复
-            # Unit测试: test_models_endpoint_unit.py
-
-        print("✅ Models smart config API HTTP layer validated")
 
     def test_github_config_status_api_http(self):
         """测试GitHub配置状态API - 仅HTTP层面测试"""

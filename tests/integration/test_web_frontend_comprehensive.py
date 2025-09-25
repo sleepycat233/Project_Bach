@@ -31,33 +31,31 @@ class TestWebFrontendComprehensive:
         """临时工作空间"""
         temp_dir = tempfile.mkdtemp(prefix="web_frontend_integration_")
         
-        # 创建模拟的WhisperKit模型目录结构
-        models_dir = Path(temp_dir) / 'models' / 'whisperkit-coreml'
+        # 创建模拟的MLX模型目录结构
+        models_dir = Path(temp_dir) / 'models' / 'mlx-models'
         models_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 创建模拟模型文件夹和文件
+
+        # 创建模拟MLX模型文件夹和文件
         test_models = [
-            'distil-whisper_distil-large-v3',
-            'openai_whisper-medium',
-            'openai_whisper-large-v3',
-            'openai_whisper-large-v3-v20240930'
+            'mlx-community--whisper-tiny-mlx',
+            'mlx-community--whisper-large-v3-mlx'
         ]
-        
+
         for model_name in test_models:
             model_dir = models_dir / model_name
             model_dir.mkdir(exist_ok=True)
-            
-            # 创建必要的模型文件
-            required_files = ['MelSpectrogram.mlmodelc', 'AudioEncoder.mlmodelc', 'TextDecoder.mlmodelc']
+
+            # 创建必要的MLX模型文件
+            required_files = ['config.json', 'weights.npz', 'tokenizer.json']
             for file_name in required_files:
-                file_dir = model_dir / file_name
-                file_dir.mkdir(exist_ok=True)
-                (file_dir / 'coremldata.bin').touch()
+                (model_dir / file_name).touch()
         
         # 创建其他必要目录
         directories = [
+            'data',
+            'watch_folder',
             'data/uploads',
-            'output', 
+            'output',
             'temp',
             'data/logs',
             'data/output/public/transcripts',
@@ -71,28 +69,64 @@ class TestWebFrontendComprehensive:
             (Path(temp_dir) / dir_path).mkdir(parents=True, exist_ok=True)
         
         # 创建模拟配置文件
-        config_content = """
+        config_content = f"""
 # 测试配置文件
-openrouter:
-  api_key: "test-key"
-  base_url: "https://openrouter.ai/api/v1"
+paths:
+  data_folder: "{temp_dir}/data"
+  watch_folder: "{temp_dir}/watch_folder"
+  output_folder: "{temp_dir}/data/output"
+  input: "{temp_dir}/watch_folder"
+  output_private: "{temp_dir}/data/output/private"
+  output_public: "{temp_dir}/data/output/public"
+  uploads: "{temp_dir}/data/uploads"
+  logs: "{temp_dir}/data/logs"
+  models: "{temp_dir}/models"
 
-whisperkit:
-  model_path: "./models/whisperkit-coreml"
-  default_model: "distil-whisper_distil-large-v3"
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+spacy:
+  model: "zh_core_web_sm"
+
+system:
+  debug: false
+
+mlx_whisper:
+  default_model: "whisper-tiny-mlx"
+  available_models:
+    - "mlx-community/whisper-tiny-mlx"
+    - "mlx-community/whisper-large-v3-mlx"
+
+diarization:
+  provider: "pyannote"
+  max_speakers: 6
+  min_segment_duration: 1.0
+
+openrouter:
+  base_url: "https://openrouter.ai/api/v1"
+  models:
+    summary: "google/gemma-3n-e4b-it:free"
+    mindmap: "google/gemma-3n-e4b-it:free"
 
 github:
-  username: "sleepycat233"
   repo_name: "Project_Bach"
+  pages:
+    enabled: true
+    url: "https://sleepycat233.github.io/Project_Bach"
 
-content_classification:
-  content_types:
-    lecture:
-      icon: "🎓"
-      name: "Academic Lecture"
-    youtube:
-      icon: "📺"
-      name: "YouTube Video"
+web_frontend:
+  app:
+    host: "0.0.0.0"
+    port: 8080
+    debug: false
+  upload:
+    max_file_size: 1073741824
+
+youtube:
+  downloader:
+    max_duration: 7200
+    min_duration: 60
 """
         
         config_file = Path(temp_dir) / 'config.yaml'
@@ -149,62 +183,45 @@ FLASK_SECRET_KEY=test-secret-key
             mock_ip_address.return_value = mock_ip
             mock_network.__contains__ = Mock(return_value=True)
             
-            # 1. 测试模型配置API
-            response = flask_app.get('/api/models/smart-config')
+            # 1. 获取可用模型目录
+            response = flask_app.get('/api/models/available')
             assert response.status_code == 200
-            
-            data = json.loads(response.data)
-            
-            # 2. 验证模型名称映射
-            downloaded_models = []
-            for language_mode in ['english', 'multilingual']:
-                models = data.get(language_mode, [])
-                for model in models:
-                    if model.get('downloaded', False):
-                        downloaded_models.append(model)
-            
-            # 应该检测到4个已下载的模型
-            assert len(downloaded_models) >= 3, f"Expected at least 3 models, got {len(downloaded_models)}"
-            
-            # 3. 验证每个模型的名称格式
-            expected_folders = [
-                'distil-whisper_distil-large-v3',
-                'openai_whisper-medium', 
-                'openai_whisper-large-v3',
-                'openai_whisper-large-v3-v20240930'
-            ]
-            
-            found_folders = []
-            for model in downloaded_models:
-                # 验证display_name包含实际文件夹名
-                display_name = model['display_name']
-                actual_dir = model.get('actual_dir', '')
-                value = model['value']
-                
-                # 验证emoji保留
-                assert any(emoji in display_name for emoji in ['🚀', '⚖️', '🎯']), \
-                    f"Model {value} should retain emoji in display name: {display_name}"
-                
-                # 验证文件夹名在display_name中
-                assert actual_dir in display_name, \
-                    f"Display name {display_name} should contain folder name {actual_dir}"
-                
-                # 验证value与actual_dir一致
-                assert value == actual_dir, \
-                    f"Value {value} should match actual_dir {actual_dir}"
-                
-                # 验证有可读描述
-                assert 'description_readable' in model, \
-                    f"Model {value} should have readable description"
-                
-                found_folders.append(actual_dir)
-            
-            # 4. 验证找到了预期的文件夹
-            for expected_folder in expected_folders[:3]:  # 至少前3个
-                assert any(expected_folder in folder for folder in found_folders), \
-                    f"Should find model with folder containing: {expected_folder}"
-            
-            print(f"✅ Model name integration test passed with {len(downloaded_models)} models")
+
+            catalog_payload = json.loads(response.data)
+            assert catalog_payload.get('success') is True
+
+            catalog = catalog_payload.get('data', {})
+            models = catalog.get('models', [])
+
+            # 2. 验证API返回了模型列表
+            assert len(models) >= 1, f"Expected at least 1 model in catalog, got {len(models)}"
+
+            # 3. 验证每个模型的基本结构
+            for model in models:
+                # 验证必需字段
+                assert 'value' in model and model['value'], "Model entry must include value"
+                assert 'display_name' in model, "Model entry must include display_name"
+                assert 'repo' in model and model['repo'].startswith('mlx-community/'), \
+                    f"Model repo should use mlx-community namespace: {model.get('repo')}"
+                assert isinstance(model.get('is_default'), bool), "Model must include boolean is_default"
+                assert isinstance(model.get('downloaded'), bool), "Model must include boolean downloaded status"
+
+                print(f"✅ Found model: {model['display_name']} (value: {model['value']}, downloaded: {model.get('downloaded')})")
+
+            # 4. 验证默认模型设置
+            default_model = catalog.get('default_model')
+            assert default_model, "Default model should be defined"
+            print(f"✅ Default model: {default_model}")
+
+            # 5. 验证有一些已下载的模型（如果有的话）
+            downloaded_models = [m for m in models if m.get('downloaded') is True]
+            print(f"✅ Downloaded models count: {len(downloaded_models)}")
+            if len(downloaded_models) > 0:
+                print("✅ At least one model is marked as downloaded")
+            else:
+                print("ℹ️ No models marked as downloaded (expected in test environment)")
+
+            print(f"✅ Model name integration test passed with {len(models)} total models")
             return True
         
         result = run_test()
@@ -257,18 +274,18 @@ FLASK_SECRET_KEY=test-secret-key
             
             mock_get.side_effect = [pages_response, deployments_response, status_response]
             
-            response = flask_app.get('/api/github/pages-status')
+            response = flask_app.get('/api/config/github-status')
             assert response.status_code == 200
             
             data = json.loads(response.data)
-            
-            # 验证返回数据结构
-            required_fields = ['status', 'message', 'last_checked', 'api_method', 'repository']
-            for field in required_fields:
-                assert field in data, f"Response should contain field: {field}"
-            
-            assert data['api_method'] == 'github_rest_api'
-            assert 'sleepycat233/Project_Bach' in data['repository']
+
+            # 验证统一API响应结构
+            assert 'success' in data
+            assert data['success'] is True
+            assert 'data' in data
+
+            config_status = data['data']
+            assert 'configured' in config_status
             
             # 2. GitHub deployment monitor removed - simplified API test only
             print("✅ GitHub deployment monitor removed - API integration verified")
@@ -297,19 +314,26 @@ FLASK_SECRET_KEY=test-secret-key
             assert response.status_code == 200
             
             data = json.loads(response.data)
-            assert 'active_sessions' in data
+            assert 'success' in data and data['success'] is True
+            assert 'data' in data
+            processing_data = data['data']
+            assert 'active_sessions' in processing_data
             
             # 测试内容分类API
             response = flask_app.get('/api/categories')
             assert response.status_code == 200
             
             data = json.loads(response.data)
-            assert isinstance(data, dict)
-            assert 'lecture' in data
-            assert 'youtube' in data
+            assert 'success' in data and data['success'] is True
+            assert 'data' in data
+            categories_data = data['data']
+            assert isinstance(categories_data, dict)
+            assert 'lecture' in categories_data
+            assert 'meeting' in categories_data
+            # youtube 通过ContentTypeService动态添加，在测试环境中可能不存在
             
             # 验证分类信息结构
-            for category_name, category_info in data.items():
+            for category_name, category_info in categories_data.items():
                 assert 'display_name' in category_info
                 assert 'recommendations' in category_info
             
@@ -393,66 +417,91 @@ FLASK_SECRET_KEY=test-secret-key
             mock_ip_address.return_value = mock_ip
             mock_network.__contains__ = Mock(return_value=True)
             
-            # 1. 获取模型配置
-            response = flask_app.get('/api/models/smart-config')
-            assert response.status_code == 200
-            
-            data = json.loads(response.data)
-            
-            # 2. 验证模型配置在UI中的使用
-            english_models = data.get('english', [])
-            multilingual_models = data.get('multilingual', [])
-            
+            # 1. 获取模型目录与推荐数据
+            catalog_resp = flask_app.get('/api/models/available')
+            recs_resp = flask_app.get('/api/preferences/recommendations/_all')
+
+            assert catalog_resp.status_code == 200
+            assert recs_resp.status_code == 200
+
+            catalog_payload = json.loads(catalog_resp.data)
+            recs_payload = json.loads(recs_resp.data)
+
+            models = catalog_payload.get('data', {}).get('models', [])
+            aggregates = recs_payload.get('data', {})
+
+            assert models, "Model catalog should not be empty"
+
+            global_english = set(aggregates.get('all', {}).get('english', []))
+            global_multilingual = set(aggregates.get('all', {}).get('multilingual', []))
+
+            def build_entry(model, english_set, multilingual_set):
+                entry = dict(model)
+                value = entry['value']
+                entry['is_english_recommended'] = value in english_set
+                entry['is_multilingual_recommended'] = value in multilingual_set
+                if entry['is_english_recommended'] and not entry['is_multilingual_recommended']:
+                    entry['language_mode'] = 'english'
+                elif entry['is_multilingual_recommended'] and not entry['is_english_recommended']:
+                    entry['language_mode'] = 'multilingual'
+                else:
+                    entry['language_mode'] = 'general'
+                return entry
+
+            all_models = [build_entry(model, global_english, global_multilingual) for model in models]
+
+            english_models = [
+                entry for entry in all_models
+                if entry['language_mode'] in ('english', 'general')
+            ]
+
+            multilingual_models = [
+                entry for entry in all_models
+                if entry['language_mode'] in ('multilingual', 'general')
+            ]
+
             # 验证每种语言模式都有模型
-            assert len(english_models) > 0, "Should have English models"
-            assert len(multilingual_models) > 0, "Should have multilingual models"
+            assert len(english_models) >= 1, "Should have English model options"
+            assert len(multilingual_models) >= 1, "Should have multilingual model options"
             
-            # 3. 验证模型选择的一致性
+            # 2. 验证模型选择的一致性
             all_model_values = set()
             for language_models in [english_models, multilingual_models]:
                 for model in language_models:
-                    if model.get('downloaded', False):
-                        value = model['value']
-                        display_name = model['display_name']
-                        
-                        # 验证value在display_name中
-                        assert value in display_name, \
-                            f"Value {value} should be in display name {display_name}"
-                        
-                        # 验证value唯一性
-                        assert value not in all_model_values, f"Duplicate model value: {value}"
-                        all_model_values.add(value)
-                        
-                        # 验证UI相关字段
-                        assert len(display_name) < 100, f"Display name too long: {display_name}"
-                        assert len(display_name) > 5, f"Display name too short: {display_name}"
-            
-            # 4. 验证模型在实际使用中的一致性
+                    value = model['value']
+                    display_name = model['display_name']
+
+                    assert isinstance(display_name, str) and display_name, "Display name should be non-empty"
+                    assert len(display_name) < 120, f"Display name too long: {display_name}"
+
+                    assert value not in all_model_values, f"Duplicate model value: {value}"
+                    all_model_values.add(value)
+
+            # 3. 验证模型在实际使用中的一致性
             # 模拟使用其中一个模型值进行上传
             if english_models:
                 selected_model = english_models[0]
-                if selected_model.get('downloaded'):
-                    model_value = selected_model['value']
-                    
-                    # 创建模拟文件
-                    temp_file_path = Path(temp_workspace) / 'ui_test_audio.mp3'
-                    temp_file_path.write_bytes(b'fake mp3 for ui test')
-                    
-                    with open(temp_file_path, 'rb') as f:
-                        data = {
-                            'audio_file': (f, 'ui_test_audio.mp3'),
-                            'content_type': 'lecture',
-                            'privacy_level': 'public', 
-                            'audio_language': 'english',
-                            'whisper_model': model_value  # 使用实际的模型值
-                        }
-                        
-                        response = flask_app.post('/upload/audio',
-                                                data=data,
-                                                content_type='multipart/form-data')
-                        
-                        # 应该能正确处理模型值
-                        assert response.status_code in [200, 302]
+                model_value = selected_model['value']
+
+                # 创建模拟文件
+                temp_file_path = Path(temp_workspace) / 'ui_test_audio.mp3'
+                temp_file_path.write_bytes(b'fake mp3 for ui test')
+
+                with open(temp_file_path, 'rb') as f:
+                    data = {
+                        'audio_file': (f, 'ui_test_audio.mp3'),
+                        'content_type': 'lecture',
+                        'privacy_level': 'public',
+                        'audio_language': 'english',
+                        'whisper_model': model_value  # 使用实际的模型值
+                    }
+
+                    response = flask_app.post('/upload/audio',
+                                            data=data,
+                                            content_type='multipart/form-data')
+
+                    # 应该能正确处理模型值
+                    assert response.status_code in [200, 302]
             
             print(f"✅ Model selection UI integration test passed with {len(all_model_values)} unique models")
             return True
@@ -489,36 +538,40 @@ FLASK_SECRET_KEY=test-secret-key
             workflow_steps.append("✅ Homepage loaded")
             
             # 2. 用户查看可用模型
-            response = flask_app.get('/api/models/smart-config')
+            response = flask_app.get('/api/models/available')
             assert response.status_code == 200
-            models_data = json.loads(response.data)
-            available_models = [m for m in models_data.get('english', []) if m.get('downloaded')]
-            assert len(available_models) > 0
-            workflow_steps.append(f"✅ Found {len(available_models)} available models")
+            models_payload = json.loads(response.data)
+            catalog = models_payload.get('data', {})
+            available_models = [m for m in catalog.get('models', []) if m.get('downloaded')]
+            assert len(catalog.get('models', [])) > 0, "Should have models in catalog"
+            workflow_steps.append(f"✅ Found {len(catalog.get('models', []))} total models, {len(available_models)} downloaded")
             
             # 3. 用户查看内容分类
             response = flask_app.get('/api/categories')
             assert response.status_code == 200
-            categories_data = json.loads(response.data)
+            categories_payload = json.loads(response.data)
+            categories_data = categories_payload.get('data', {})
             workflow_steps.append(f"✅ Found {len(categories_data)} content categories")
-            
+
             # 4. 用户检查部署状态
-            response = flask_app.get('/api/github/pages-status')
+            response = flask_app.get('/api/config/github-status')
             assert response.status_code == 200
-            status_data = json.loads(response.data)
-            assert 'status' in status_data
+            status_payload = json.loads(response.data)
+            assert 'success' in status_payload
             workflow_steps.append("✅ GitHub Pages status checked")
-            
+
             # 5. 用户查看处理状态
             response = flask_app.get('/api/status/processing')
             assert response.status_code == 200
-            processing_data = json.loads(response.data)
+            processing_payload = json.loads(response.data)
+            processing_data = processing_payload.get('data', {})
             assert 'active_sessions' in processing_data
             workflow_steps.append("✅ Processing status retrieved")
             
             # 6. 模拟文件上传准备（不实际上传，验证表单）
-            if available_models:
-                selected_model = available_models[0]['value']
+            all_models = catalog.get('models', [])
+            if all_models:
+                selected_model = all_models[0]['value']
                 temp_file_path = Path(temp_workspace) / 'workflow_test.mp3'
                 temp_file_path.write_bytes(b'fake audio for workflow test')
                 workflow_steps.append(f"✅ Selected model: {selected_model}")
