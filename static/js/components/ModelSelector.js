@@ -12,7 +12,9 @@ export class ModelSelector {
             modelSelectId: 'modelSelect',
             modelInfoId: 'modelInfoContent',
             contentTypeSelectName: 'content_type',
-            apiEndpoint: '/api/models/smart-config',
+            availableApiEndpoint: '/api/models/available',
+            recommendationsApiEndpoint: '/api/preferences/recommendations/_all',
+            defaultContentType: null,
             ...options
         };
 
@@ -33,7 +35,12 @@ export class ModelSelector {
         this.languageSelect = document.getElementById(this.options.languageSelectId);
         this.modelSelect = document.getElementById(this.options.modelSelectId);
         this.modelInfo = document.getElementById(this.options.modelInfoId);
-        this.contentTypeSelect = document.querySelector(`select[name="${this.options.contentTypeSelectName}"]`);
+        if (this.options.contentTypeSelectName) {
+            this.contentTypeSelect = document.querySelector(`select[name="${this.options.contentTypeSelectName}"]`);
+        } else {
+            this.contentTypeSelect = null;
+        }
+        this.defaultContentType = this.options.defaultContentType;
 
         if (!this.languageSelect || !this.modelSelect) {
             console.warn('ModelSelector: Required elements not found');
@@ -67,43 +74,66 @@ export class ModelSelector {
         const loader = this.loadingManager.show(this.modelSelect.parentElement, 'Loading models...');
 
         try {
-            const response = await this.apiClient.get(this.options.apiEndpoint);
-            
-            if (!response.data.success) {
-                throw new Error(response.data.error || 'API request failed');
+            const [modelsResponse, recommendationsResponse] = await Promise.all([
+                this.apiClient.get(this.options.availableApiEndpoint),
+                this.apiClient.get(this.options.recommendationsApiEndpoint)
+            ]);
+
+            const modelsPayload = modelsResponse.data || {};
+            const recommendationsPayload = recommendationsResponse.data || {};
+
+            if (!modelsPayload.success) {
+                throw new Error(modelsPayload.error || 'Failed to load available models');
             }
 
-            const apiData = response.data.data || {};
+            if (!recommendationsPayload.success) {
+                throw new Error(recommendationsPayload.error || 'Failed to load recommendations');
+            }
 
-            // 处理API返回的数据格式
+            const baseModels = modelsPayload.data?.models || [];
+            const recommendationData = recommendationsPayload.data || {};
+            const requestedContentTypes = recommendationData.ordered_content_types || [];
+            const recommendationMap = recommendationData.recommendations || {};
+            const globalEnglishSet = new Set(recommendationData.all?.english || []);
+            const globalMultilingualSet = new Set(recommendationData.all?.multilingual || []);
+
+            const allModels = this.sortModels(
+                baseModels.map(model => this.buildModelEntry(model, globalEnglishSet, globalMultilingualSet))
+            );
+
+            const englishModels = this.prepareLanguageModels(allModels, 'english');
+            const multilingualModels = this.prepareLanguageModels(allModels, 'multilingual');
+
+            const contentTypeModels = {};
+            const effectiveContentTypes = requestedContentTypes.length > 0
+                ? requestedContentTypes
+                : Object.keys(recommendationMap);
+
+            effectiveContentTypes.forEach(contentType => {
+                const recs = recommendationMap[contentType] || {};
+                const englishSet = new Set(recs.english || []);
+                const multilingualSet = new Set(recs.multilingual || []);
+                contentTypeModels[contentType] = this.sortModels(
+                    baseModels.map(model => this.buildModelEntry(model, englishSet, multilingualSet))
+                );
+            });
+
             this.modelsConfig = {
-                // 英文模式：显示英文推荐模型和通用模型
-                english: apiData.all ? apiData.all.filter(m =>
-                    m.language_mode === 'english' || m.language_mode === 'general'
-                ) : [],
-
-                // 多语言模式：显示多语言推荐模型和通用模型
-                multilingual: apiData.all ? apiData.all.filter(m => 
-                    m.language_mode === 'multilingual' || m.language_mode === 'general'
-                ) : [],
-                
+                english: englishModels,
+                multilingual: multilingualModels,
                 contentTypes: {
-                    lecture: apiData.lecture || [],
-                    meeting: apiData.meeting || [],
-                    others: apiData.others || []
+                    lecture: contentTypeModels.lecture || [],
+                    meeting: contentTypeModels.meeting || [],
+                    others: contentTypeModels.others || [],
+                    ...contentTypeModels
                 },
-                
-                all: apiData.all || []
+                all: allModels
             };
-
-            // 为每个语言模式的模型设置推荐状态和排序
-            this.processModelRecommendations();
 
             console.log('Models config loaded:', this.modelsConfig);
 
-            // 更新UI
             this.updateModelOptions();
-            
+
         } catch (error) {
             console.error('Error loading models config:', error);
             this.notifications.error(`Failed to load models: ${error.message}`);
@@ -115,35 +145,60 @@ export class ModelSelector {
         }
     }
 
-    processModelRecommendations() {
-        // 处理英文模式模型
-        this.modelsConfig.english = this.modelsConfig.english.map(model => {
-            const updatedModel = {...model};
-            updatedModel.recommended = model.is_english_recommended === true;
-            return updatedModel;
-        }).sort((a, b) => {
-            // 推荐模型排在前面
-            if (a.recommended && !b.recommended) return -1;
-            if (!a.recommended && b.recommended) return 1;
-            return 0;
-        });
+    buildModelEntry(model, englishSet, multilingualSet) {
+        const value = model.value || model.name;
+        const entry = { ...model };
+        entry.is_english_recommended = englishSet.has(value);
+        entry.is_multilingual_recommended = multilingualSet.has(value);
 
-        // 处理多语言模式模型
-        this.modelsConfig.multilingual = this.modelsConfig.multilingual.map(model => {
-            const updatedModel = {...model};
-            updatedModel.recommended = model.is_multilingual_recommended === true;
-            return updatedModel;
-        }).sort((a, b) => {
-            // 推荐模型排在前面
-            if (a.recommended && !b.recommended) return -1;
-            if (!a.recommended && b.recommended) return 1;
-            return 0;
+        if (entry.is_english_recommended && !entry.is_multilingual_recommended) {
+            entry.language_mode = 'english';
+        } else if (entry.is_multilingual_recommended && !entry.is_english_recommended) {
+            entry.language_mode = 'multilingual';
+        } else {
+            entry.language_mode = 'general';
+        }
+
+        entry.recommended = false;
+        entry.config_info = entry.config_info || {};
+        return entry;
+    }
+
+    prepareLanguageModels(allModels, language) {
+        return allModels
+            .filter(model =>
+                language === 'english'
+                    ? (model.language_mode === 'english' || model.language_mode === 'general')
+                    : (model.language_mode === 'multilingual' || model.language_mode === 'general')
+            )
+            .map(model => ({
+                ...model,
+                recommended: language === 'english'
+                    ? model.is_english_recommended === true
+                    : model.is_multilingual_recommended === true
+            }));
+    }
+
+    sortModels(models) {
+        return [...models].sort((a, b) => {
+            const aRecommended = a.is_english_recommended || a.is_multilingual_recommended;
+            const bRecommended = b.is_english_recommended || b.is_multilingual_recommended;
+            if (aRecommended !== bRecommended) {
+                return aRecommended ? -1 : 1;
+            }
+
+            if (a.is_default && !b.is_default) return -1;
+            if (!a.is_default && b.is_default) return 1;
+
+            const aName = (a.display_name || a.name || '').toString();
+            const bName = (b.display_name || b.name || '').toString();
+            return aName.localeCompare(bName);
         });
     }
 
     updateModelOptions() {
         const language = this.languageSelect.value;
-        const contentType = this.contentTypeSelect ? this.contentTypeSelect.value : '';
+        const contentType = this.contentTypeSelect ? this.contentTypeSelect.value : (this.defaultContentType || '');
 
         // 获取适用的模型列表
         let models = this.getModelsForContext(language, contentType);

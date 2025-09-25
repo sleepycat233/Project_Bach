@@ -74,7 +74,9 @@ class WebApp {
         // 模型选择器 - YouTube标签页
         this.components.youtubeModelSelector = new ModelSelector({
             languageSelectId: 'youtubeLanguageSelect',
-            modelSelectId: 'youtubeModelSelect'
+            modelSelectId: 'youtubeModelSelect',
+            contentTypeSelectName: null,
+            defaultContentType: 'youtube'
         });
 
         // 状态跟踪器

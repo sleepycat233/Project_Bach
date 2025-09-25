@@ -328,7 +328,44 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-
+  /api/models/available:
+    get:
+      summary: List Available MLX Whisper Models
+      description: |
+        Return the catalog of MLX Whisper models defined in configuration, including
+        download status, default marking, and any declared metadata. This endpoint
+        replaces the discovery logic previously bundled with the smart-config API.
+      tags:
+        - Model Management
+      responses:
+        '200':
+          description: Available models retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      default_model:
+                        type: string
+                        description: Default model identifier
+                      models:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AvailableModel'
+                  message:
+                    type: [string, 'null']
+                  error:
+                    type: [string, 'null']
+                  timestamp:
+                    type: string
+                    format: date-time
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /api/models/smart-config:
     get:
@@ -336,6 +373,8 @@ paths:
       description: |
         Get intelligent model recommendations based on content types and current model availability.
         Provides optimized model selection with language-specific recommendations.
+        Deprecated in favour of `/api/models/available` + `/api/preferences/recommendations/_all`.
+      deprecated: true
       tags:
         - Model Management
       responses:
@@ -349,6 +388,67 @@ paths:
                   type: array
                   items:
                     $ref: '#/components/schemas/ModelRecommendation'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/preferences/recommendations/_all:
+    get:
+      summary: Aggregate recommendation map for all content types
+      description: |
+        Returns the merged recommendation sets for every content type and media preset.
+        The payload includes ordering hints and global language-specific recommendation lists.
+      tags:
+        - Model Management
+      responses:
+        '200':
+          description: Recommendation map retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      ordered_content_types:
+                        type: array
+                        items:
+                          type: string
+                      recommendations:
+                        type: object
+                        additionalProperties:
+                          type: object
+                          properties:
+                            english:
+                              type: array
+                              items:
+                                type: string
+                            multilingual:
+                              type: array
+                              items:
+                                type: string
+                      all:
+                        type: object
+                        properties:
+                          english:
+                            type: array
+                            items:
+                              type: string
+                          multilingual:
+                            type: array
+                            items:
+                              type: string
+                  message:
+                    type: [string, 'null']
+                  error:
+                    type: [string, 'null']
+                  timestamp:
+                    type: string
+                    format: date-time
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /private/:
     get:
@@ -696,6 +796,31 @@ components:
         config_info:
           type: object
           description: Model configuration details
+
+    AvailableModel:
+      type: object
+      properties:
+        value:
+          type: string
+          description: Model identifier (short name)
+        name:
+          type: string
+          description: Canonical model name
+        display_name:
+          type: string
+          description: Friendly display name for UI rendering
+        repo:
+          type: string
+          description: Hugging Face repository path for the model
+        is_default:
+          type: boolean
+          description: Whether the model is the configured default
+        downloaded:
+          type: boolean
+          description: True if the model is already cached locally
+        config_info:
+          type: object
+          description: Optional configuration metadata declared in config files
 
   responses:
     BadRequest:

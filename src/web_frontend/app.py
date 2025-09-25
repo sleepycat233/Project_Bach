@@ -121,6 +121,136 @@ def create_app(config=None):
             logger.error(f"Security middleware error: {e}")
             return jsonify({'error': 'Security check failed'}), 500
 
+    # ------------------------------------------------------------------
+    # MLX Whisper模型助手函数
+    # ------------------------------------------------------------------
+
+    def _check_model_downloaded(repo_name: str) -> bool:
+        """检查MLX模型是否已在本地缓存中存在。"""
+        try:
+            import os
+            from huggingface_hub import snapshot_download
+            from huggingface_hub.utils import LocalEntryNotFoundError
+
+            try:
+                cache_path = snapshot_download(repo_name, local_files_only=True)
+                return os.path.exists(cache_path)
+            except LocalEntryNotFoundError:
+                return False
+        except Exception as exc:  # pragma: no cover - 安全兜底
+            logger.warning("Failed to check download status for %s: %s", repo_name, exc)
+            return False
+
+    def _build_mlx_model_catalog() -> dict:
+        """返回MLX可用模型的基础信息和下载状态。"""
+        config_manager = app.config.get('CONFIG_MANAGER')
+        if not config_manager:
+            raise RuntimeError('Configuration manager not initialized')
+
+        full_config = config_manager.get_full_config()
+        mlx_config = full_config.get('mlx_whisper', {}) or {}
+        available_models = mlx_config.get('available_models') or []
+        default_model = str(mlx_config.get('default_model', 'whisper-tiny-mlx'))
+
+        cache = app.config.setdefault('HUGGINGFACE_CACHE', {})
+        catalog = []
+
+        for entry in available_models:
+            if isinstance(entry, dict):
+                model_data = dict(entry)
+                value = str(model_data.get('value') or model_data.get('name') or model_data.get('repo', ''))
+                if not value and 'display_name' in model_data:
+                    value = model_data['display_name']
+                repo_name = model_data.get('repo')
+                if not repo_name:
+                    repo_name = value if '/' in value else f"mlx-community/{value}"
+                value = repo_name.split('/')[-1]
+                model_data.setdefault('value', value)
+                model_data.setdefault('name', model_data.get('display_name', value))
+                model_data.setdefault('display_name', model_data['name'])
+                model_data.setdefault('config_info', model_data.get('config_info') or {})
+            else:
+                repo_name = entry if '/' in entry else f"mlx-community/{entry}"
+                value = repo_name.split('/')[-1]
+                model_data = {
+                    'value': value,
+                    'name': value,
+                    'display_name': value,
+                    'repo': repo_name,
+                    'config_info': {},
+                }
+
+            repo_name = model_data.get('repo') or f"mlx-community/{model_data['value']}"
+            is_default = model_data.get('is_default')
+            if is_default is None:
+                is_default = model_data['value'] == default_model or model_data.get('name') == default_model
+
+            if repo_name in cache:
+                downloaded = cache[repo_name]
+            else:
+                downloaded = _check_model_downloaded(repo_name)
+                cache[repo_name] = downloaded
+
+            catalog.append({
+                **model_data,
+                'repo': repo_name,
+                'is_default': bool(is_default),
+                'downloaded': downloaded,
+            })
+
+        return {
+            'default_model': default_model,
+            'models': catalog,
+        }
+
+    def _collect_recommendation_payload() -> dict:
+        """收集所有内容类型及媒体预设的推荐模型集合。"""
+        content_type_service: ContentTypeService = app.config.get('CONTENT_TYPE_SERVICE')
+        if not content_type_service:
+            raise RuntimeError('Content type service is not initialized')
+
+        content_types = content_type_service.get_all()
+        ordered_content_types = list(content_types.keys())
+
+        preferences_manager = content_type_service.get_preferences_manager()
+        media_defaults = {}
+        if hasattr(preferences_manager, 'prefs'):
+            media_defaults = preferences_manager.prefs.get('_media_defaults', {}) or {}
+
+        for media_type in media_defaults.keys():
+            if media_type not in ordered_content_types:
+                ordered_content_types.append(media_type)
+
+        recommendations = {}
+        english_union = []
+        multilingual_union = []
+        english_seen = set()
+        multilingual_seen = set()
+
+        for content_type in ordered_content_types:
+            recs = content_type_service.get_content_type_recommendations(content_type) or {}
+            normalized = {
+                'english': [str(item) for item in recs.get('english', [])],
+                'multilingual': [str(item) for item in recs.get('multilingual', [])],
+            }
+            recommendations[content_type] = normalized
+
+            for model_name in normalized['english']:
+                if model_name not in english_seen:
+                    english_seen.add(model_name)
+                    english_union.append(model_name)
+            for model_name in normalized['multilingual']:
+                if model_name not in multilingual_seen:
+                    multilingual_seen.add(model_name)
+                    multilingual_union.append(model_name)
+
+        return {
+            'ordered_content_types': ordered_content_types,
+            'recommendations': recommendations,
+            'english_union': english_union,
+            'multilingual_union': multilingual_union,
+        }
+
     # 主页路由
     @app.route('/')
     def index():
@@ -454,124 +584,66 @@ def create_app(config=None):
             return jsonify({'error': 'Failed to get video metadata'}), 500
 
 
+    @app.route('/api/models/available')
+    def api_models_available():
+        """提供MLX Whisper模型列表及其下载状态。"""
+        try:
+            catalog = _build_mlx_model_catalog()
+            return jsonify(create_api_response(success=True, data=catalog))
+        except Exception as exc:
+            logger.error("Available models API error: %s", exc)
+            return jsonify(create_api_response(success=False, error='Failed to list available models')), 500
+
     @app.route('/api/models/smart-config')
     def api_models_smart_config():
-        """MLX Whisper智能模型配置API
-
-        基于配置文件的动态推荐系统，为不同内容类型和语言模式提供智能模型推荐。
-        返回 {all: [...], lecture: [...], meeting: [...]} 格式的分类模型列表。
-        包含推荐标记、下载状态检查、按优先级排序等功能。
-        """
+        """兼容层：返回旧版smart-config结构。"""
         try:
-            from ..utils.config import ConfigManager
+            catalog = _build_mlx_model_catalog()
+            rec_payload = _collect_recommendation_payload()
 
-            def _check_model_downloaded(repo_name):
-                """检查MLX模型是否已在HuggingFace缓存中下载"""
-                try:
-                    import os
-                    from huggingface_hub import snapshot_download
-                    from huggingface_hub.utils import LocalEntryNotFoundError
+            base_models = catalog['models']
+            all_english = set(rec_payload['english_union'])
+            all_multilingual = set(rec_payload['multilingual_union'])
 
-                    # 尝试获取本地缓存路径，如果不存在会抛出异常
-                    try:
-                        cache_path = snapshot_download(repo_name, local_files_only=True)
-                        return os.path.exists(cache_path)
-                    except LocalEntryNotFoundError:
-                        return False
-                except Exception as e:
-                    # 如果检查失败，默认为未下载
-                    logger.warning(f"Failed to check download status for {repo_name}: {e}")
-                    return False
-
-            # 构建MLX模型基础信息
-            config_manager = app.config.get('CONFIG_MANAGER')
-            if not config_manager:
-                return jsonify(create_api_response(
-                    success=False,
-                    error='Configuration manager not initialized'
-                )), 500
-            config = config_manager.get_full_config()
-            mlx_config = config.get('mlx_whisper', {})
-            available_models = mlx_config.get('available_models', [])
-            default_model = mlx_config.get('default_model', 'whisper-tiny')
-
-            base_models = []
-            for model in available_models:
-                if isinstance(model, str):
-                    # 解析模型名称
-                    if '/' in model:
-                        model_name = model.split('/')[-1]
-                        repo_name = model
-                    else:
-                        model_name = model
-                        repo_name = f"mlx-community/{model}"
-
-                    is_default = model_name == default_model
-
-                    base_models.append({
-                        'value': model_name,
-                        'name': model_name,
-                        'repo': repo_name,
-                        'is_default': is_default
-                    })
-
-
-            # 为Smart Config API添加专用字段
-            cache = app.config.setdefault('HUGGINGFACE_CACHE', {})
-
-            def _build_model_entry(base_model, english_set, multilingual_set):
-                entry = {
-                    **base_model,
-                    'is_english_recommended': base_model['value'] in english_set or base_model['name'] in english_set,
-                    'is_multilingual_recommended': base_model['value'] in multilingual_set or base_model['name'] in multilingual_set,
+            def _with_flags(model_entry, english_set, multilingual_set):
+                value = model_entry.get('value') or model_entry.get('name')
+                return {
+                    **model_entry,
+                    'is_english_recommended': value in english_set,
+                    'is_multilingual_recommended': value in multilingual_set,
                 }
-                return entry
 
             all_models = []
             for model in base_models:
-                repo_name = model['repo']
-                if repo_name in cache:
-                    is_downloaded = cache[repo_name]
+                entry = _with_flags(model, all_english, all_multilingual)
+                if entry['is_english_recommended'] and not entry['is_multilingual_recommended']:
+                    entry['language_mode'] = 'english'
+                elif entry['is_multilingual_recommended'] and not entry['is_english_recommended']:
+                    entry['language_mode'] = 'multilingual'
                 else:
-                    is_downloaded = _check_model_downloaded(repo_name)
-                    cache[repo_name] = is_downloaded
+                    entry['language_mode'] = 'general'
+                entry.setdefault('config_info', {})
+                entry['recommended'] = False
+                all_models.append(entry)
 
-                all_models.append({
-                    **model,
-                    'downloaded': is_downloaded,
-                    'config_info': {},
-                })
+            all_models.sort(
+                key=lambda m: (
+                    not (m.get('is_english_recommended') or m.get('is_multilingual_recommended')),
+                    not m.get('is_default', False),
+                    m.get('name', ''),
+                )
+            )
 
-            content_type_service: ContentTypeService = app.config.get('CONTENT_TYPE_SERVICE')
-            if not content_type_service:
-                return jsonify(create_api_response(success=False, error='Content type service is not initialized')), 503
+            result = {'all': all_models}
 
-            content_types = content_type_service.get_all()
+            for content_type in rec_payload['ordered_content_types']:
+                recommendation_sets = rec_payload['recommendations'].get(content_type, {})
+                english_set = set(recommendation_sets.get('english', []))
+                multilingual_set = set(recommendation_sets.get('multilingual', []))
 
-            recommendation_map = {}
-            all_english_recs = set()
-            all_multilingual_recs = set()
-
-            for content_type, type_config in content_types.items():
-                recommendations = type_config.get('recommendations') or {}
-                if not isinstance(recommendations, dict):
-                    recommendations = {}
-                english_set = {str(item) for item in recommendations.get('english', [])}
-                multilingual_set = {str(item) for item in recommendations.get('multilingual', [])}
-
-                recommendation_map[content_type] = {
-                    'english': english_set,
-                    'multilingual': multilingual_set,
-                }
-
-                all_english_recs.update(english_set)
-                all_multilingual_recs.update(multilingual_set)
-
-            result = {}
-            for content_type, recommendation_sets in recommendation_map.items():
                 models_with_flags = [
-                    _build_model_entry(model, recommendation_sets['english'], recommendation_sets['multilingual'])
-                    for model in all_models
+                    _with_flags(model, english_set, multilingual_set)
+                    for model in base_models
                 ]
 
                 models_with_flags.sort(
@@ -581,36 +653,13 @@ def create_app(config=None):
                         m.get('name', ''),
                     )
                 )
+
                 result[content_type] = models_with_flags
-
-            all_models_general = []
-            for model in all_models:
-                entry = _build_model_entry(model, all_english_recs, all_multilingual_recs)
-
-                if entry['is_english_recommended'] and not entry['is_multilingual_recommended']:
-                    entry['language_mode'] = 'english'
-                elif entry['is_multilingual_recommended'] and not entry['is_english_recommended']:
-                    entry['language_mode'] = 'multilingual'
-                else:
-                    entry['language_mode'] = 'general'
-
-                entry['recommended'] = False
-                all_models_general.append(entry)
-
-            all_models_general.sort(
-                key=lambda m: (
-                    not (m.get('is_english_recommended') or m.get('is_multilingual_recommended')),
-                    not m.get('is_default', False),
-                    m.get('name', ''),
-                )
-            )
-
-            result['all'] = all_models_general
 
             return jsonify(create_api_response(success=True, data=result))
 
-        except Exception as e:
-            logger.error(f"Smart models config API error: {e}")
+        except Exception as exc:
+            logger.error("Smart models config API error: %s", exc)
             return jsonify(create_api_response(success=False, error='Failed to get smart models configuration')), 500
 
 
@@ -645,6 +694,24 @@ def create_app(config=None):
         except Exception as e:
             logger.error(f"Get preferences config API error: {e}")
             return jsonify({'error': f'Failed to get preferences config: {str(e)}'}), 500
+
+    @app.route('/api/preferences/recommendations/_all', methods=['GET'])
+    def api_get_all_recommendations():
+        """获取所有内容类型/媒体的推荐模型集合。"""
+        try:
+            payload = _collect_recommendation_payload()
+            data = {
+                'ordered_content_types': payload['ordered_content_types'],
+                'recommendations': payload['recommendations'],
+                'all': {
+                    'english': payload['english_union'],
+                    'multilingual': payload['multilingual_union'],
+                }
+            }
+            return jsonify(create_api_response(success=True, data=data))
+        except Exception as exc:
+            logger.error("Get all recommendations API error: %s", exc)
+            return jsonify(create_api_response(success=False, error=str(exc))), 500
 
     @app.route('/api/preferences/recommendations/<content_type>', methods=['GET'])
     def api_get_recommendations(content_type):
