@@ -2,7 +2,7 @@
 
 ## 🔐 安全配置
 
-为了保护API密钥和敏感信息，Project Bach使用环境变量管理配置。
+Project Bach使用环境变量管理敏感配置，使用YAML文件管理应用配置。
 
 ### 1. 设置环境变量
 
@@ -14,16 +14,23 @@ cp .env.template .env
 nano .env
 ```
 
-### 2. 获取必需的API密钥
+### 2. 获取API密钥
 
-#### OpenRouter API密钥
+#### OpenRouter API密钥（AI功能必需）
 1. 访问 https://openrouter.ai/
 2. 注册账户并登录
 3. 进入 **API Keys** 页面
 4. 创建新的API密钥
 5. 复制密钥到`.env`文件中的`OPENROUTER_API_KEY`
 
-#### Tailscale认证密钥
+#### HuggingFace Token（Speaker Diarization功能必需）
+1. 访问 https://huggingface.co/
+2. 注册账户并登录
+3. 进入 **Settings** → **Access Tokens**
+4. 创建新的Token（Read权限即可）
+5. 复制Token到`.env`文件中的`HUGGINGFACE_TOKEN`
+
+#### Tailscale认证密钥（远程访问可选）
 1. 访问 https://tailscale.com/
 2. 注册账户并登录管理控制台
 3. 进入 **Settings** → **Keys**
@@ -34,83 +41,77 @@ nano .env
    - ❌ **Ephemeral** (非临时)
 6. 复制密钥到`.env`文件中的`TAILSCALE_AUTH_KEY`
 
-python3.11 src/cli/main.py --mode monitor --config config.yaml
-
 ## 🚀 快速启动
 
 ### 第一次设置
 ```bash
-# 1. 安装依赖
-pip3.11 install -r requirements.txt
+# 1. 创建虚拟环境并安装依赖
+python3.11 -m venv venv
+source venv/bin/activate  # macOS/Linux
+pip install -r requirements.txt
 
 # 2. 设置环境变量（见上方说明）
 cp .env.template .env
 # 编辑.env文件填入真实密钥
 
-# 3. 下载MLX Whisper模型（必需）
-# 设置HuggingFace token（如果.env文件中已有，自动使用）
-source .env
+# 3. 安装spaCy语言模型（NER匿名化功能）
+python -m spacy download zh_core_web_sm
+python -m spacy download en_core_web_sm
 
-# 下载推荐的基础模型
-./venv/bin/python -c "
+# 4. 下载基础MLX Whisper模型
+python -c "
 import os
 from huggingface_hub import snapshot_download
-token = os.getenv('HUGGINGFACE_TOKEN')
 
-# 下载基础模型组合
+# 下载推荐的基础模型组合
 models = [
-    'mlx-community/whisper-tiny-mlx',    # 默认快速模型
-    'mlx-community/whisper-base-mlx',    # 英文推荐模型
-    'mlx-community/whisper-medium-mlx'   # 平衡模型
+    'mlx-community/whisper-tiny-mlx',        # 快速转录
+    'mlx-community/whisper-large-v3-mlx'     # 高精度转录
 ]
 
-for model in models:
+for model_repo in models:
     try:
-        print(f'Downloading {model}...')
-        cache_path = snapshot_download(model, token=token)
-        print(f'✅ {model} downloaded to: {cache_path}')
+        print(f'Downloading {model_repo}...')
+        cache_path = snapshot_download(model_repo)
+        print(f'✅ {model_repo} downloaded')
     except Exception as e:
-        print(f'❌ Failed to download {model}: {e}')
+        print(f'❌ Failed to download {model_repo}: {e}')
 "
 
-# 4. 生成配置文件
-python3.11 src/utils/env_manager.py
-
-# 5. 运行测试验证
-python3.11 -m pytest tests/unit/test_network_manager.py -v
+# 5. 验证安装
+python -m pytest tests/unit/utils/test_preferences_manager.py -v
 ```
 
-### 连接Tailscale网络
+## 🎮 运行项目
+
+### 开发模式（推荐）
 ```bash
-# 使用配置中的密钥连接
-python3.11 -c "
-from src.utils.env_manager import setup_project_environment
-from src.network.tailscale_manager import TailscaleManager
+# 启动开发模式 - 支持自动重载
+python src/cli/main.py --dev
 
-config = setup_project_environment()
-if config:
-    manager = TailscaleManager(config['network']['tailscale'])
-    if manager.connect():
-        print('✅ Tailscale连接成功')
-        status = manager.check_status()
-        print(f'节点IP: {status[\"tailscale_ips\"]}')
-    else:
-        print('❌ Tailscale连接失败')
-"
+# 特点：
+# ✅ Flask自动重载 - 代码修改立即生效
+# ✅ 跳过Tailscale检查 - 快速启动
+# ✅ 调试模式开启
+# ✅ 本地访问：http://localhost:8080
 ```
 
-## 📁 文件结构说明
+### 生产模式
+```bash
+# 启动生产模式 - 完整功能
+python src/cli/main.py
 
+# 特点：
+# ✅ 文件监控功能
+# ✅ Tailscale网络检查
+# ✅ 远程安全访问
+# ✅ 稳定性优化
 ```
-Project_Bach/
-├── .env                    # 环境变量（不提交到Git）
-├── .env.template          # 环境变量模板
-├── config.template.yaml   # 配置模板
-├── config.yaml           # 实际配置（自动生成，不提交到Git）
-├── src/
-│   ├── utils/
-│   │   └── env_manager.py # 环境管理器
-│   └── network/           # 网络集成模块
-├── tests/                 # 测试文件
-└── SETUP.md              # 此设置指南
+
+### Web前端独立启动
+```bash
+# 仅启动Web界面（测试用）
+python run_dev_server.py
+
+# 访问: http://localhost:8080
 ```

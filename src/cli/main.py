@@ -26,11 +26,12 @@ from src.web_frontend.app import create_app
 from src.network.tailscale_manager import TailscaleManager
 
 
-def run_monitor_and_web_server(container: DependencyContainer):
+def run_monitor_and_web_server(container: DependencyContainer, dev_mode: bool = False):
     """运行文件监控和Web服务器
 
     Args:
         container: 依赖容器
+        dev_mode: 是否为开发模式
     """
     print("=== Project Bach 服务器启动 ===")
     print("启动文件监控和Web服务器...")
@@ -43,13 +44,17 @@ def run_monitor_and_web_server(container: DependencyContainer):
         print("❌ 无法获取配置管理器")
         return
 
-    # 检查Tailscale连接状态（可选）
-    print("🔍 检查Tailscale网络连接...")
-    tailscale_manager = TailscaleManager()
-
-    if not tailscale_manager.check_tailscale_installed():
-        print("⚠️  Tailscale未安装，跳过远程模式（可选功能）")
+    # 检查Tailscale连接状态（开发模式下可选）
+    if dev_mode:
+        print("🔧 开发模式：跳过Tailscale检查")
+        tailscale_manager = None
     else:
+        print("🔍 检查Tailscale网络连接...")
+        tailscale_manager = TailscaleManager()
+
+    if not dev_mode and tailscale_manager and not tailscale_manager.check_tailscale_installed():
+        print("⚠️  Tailscale未安装，跳过远程模式（可选功能）")
+    elif not dev_mode and tailscale_manager:
         status = tailscale_manager.check_status()
         if not status.get('connected', False):
             print("⚠️  Tailscale未连接，尝试自动连接...")
@@ -123,32 +128,45 @@ def run_monitor_and_web_server(container: DependencyContainer):
 
     print("✅ 文件监控已启动")
 
-    # 在后台线程中启动Web服务器
-    def run_web_server():
-        print(f"🚀 启动Web服务器: http://{host}:{port}")
-        print(f"🔒 私有内容: http://{host}:{port}/private/")
+    # 配置Flask应用
+    print(f"🚀 启动Web服务器: http://{host}:{port}")
+    print(f"🔒 私有内容: http://{host}:{port}/private/")
+
+    if dev_mode:
+        print("🔧 开发模式：启用自动重载和调试模式")
+        print("📝 文件修改将自动触发重载")
+        print("⚠️  开发模式下需要手动停止文件监控")
+        # 开发模式下设置TESTING跳过安全检查
+        app.config['TESTING'] = True
+
+        # 开发模式下直接运行，支持reloader
+        app.run(host=host, port=port, debug=True, use_reloader=True)
+    else:
         print("⚠️  生产模式：需要Tailscale网络访问")
-        app.run(host=host, port=port, debug=False, use_reloader=False)
 
-    web_thread = threading.Thread(target=run_web_server, daemon=True)
-    web_thread.start()
+        # 生产模式在后台线程中启动Web服务器
+        def run_web_server():
+            app.run(host=host, port=port, debug=False, use_reloader=False)
 
-    try:
-        # 保持程序运行，显示状态
-        while True:
-            time.sleep(5)
+        web_thread = threading.Thread(target=run_web_server, daemon=True)
+        web_thread.start()
 
-            # 显示队列状态
-            status = processor.get_queue_status()
-            if status.get("queue_stats", {}).get("processing") > 0:
-                processing_files = status.get("processing_files", [])
-                if processing_files:
-                    file_names = [Path(f).name for f in processing_files]
-                    print(f"正在处理: {', '.join(file_names)}")
+        try:
+            # 保持程序运行，显示状态
+            while True:
+                time.sleep(5)
 
-    except KeyboardInterrupt:
-        print("\n停止服务...")
-        processor.stop_file_monitoring()
+                # 显示队列状态
+                status = processor.get_queue_status()
+                if status.get("queue_stats", {}).get("processing") > 0:
+                    processing_files = status.get("processing_files", [])
+                    if processing_files:
+                        file_names = [Path(f).name for f in processing_files]
+                        print(f"正在处理: {', '.join(file_names)}")
+
+        except KeyboardInterrupt:
+            print("\n停止服务...")
+            processor.stop_file_monitoring()
 
 def main():
     """主函数"""
@@ -156,10 +174,16 @@ def main():
     parser = argparse.ArgumentParser(description='Project Bach - 音频处理和Web服务器')
     parser.add_argument('--config', default='config.yaml',
                        help='配置文件路径（默认: config.yaml）')
+    parser.add_argument('--dev', action='store_true',
+                       help='开发模式（启用自动重载，跳过Tailscale检查）')
 
     args = parser.parse_args()
 
     print("=== Project Bach - 音频处理和Web服务器 ===")
+    if args.dev:
+        print("🔧 运行模式：开发模式")
+    else:
+        print("🏭 运行模式：生产模式")
     print()
 
     try:
@@ -170,7 +194,7 @@ def main():
         print("✅ 系统初始化成功")
 
         # 运行集成的监控和Web服务器
-        run_monitor_and_web_server(container)
+        run_monitor_and_web_server(container, dev_mode=args.dev)
         return True
 
     except Exception as e:
